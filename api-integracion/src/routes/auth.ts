@@ -1,0 +1,204 @@
+import { FastifyInstance } from 'fastify';
+import jwt from 'jsonwebtoken';
+import { callMs } from '../http';
+
+const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-secret-change-in-production';
+const JWT_EXPIRY  = '7d';
+
+// ── Schemas reutilizables ─────────────────────────
+const UserSchema = {
+  type: 'object',
+  properties: {
+    id:         { type: 'string', format: 'uuid' },
+    username:   { type: 'string', example: 'jugador42' },
+    email:      { type: 'string', format: 'email' },
+    created_at: { type: 'string', format: 'date-time' },
+  },
+} as const;
+
+const ErrorSchema = {
+  type: 'object',
+  properties: { error: { type: 'string' } },
+} as const;
+
+const MessageSchema = {
+  type: 'object',
+  properties: { message: { type: 'string' } },
+} as const;
+
+const TokenUserSchema = {
+  type: 'object',
+  properties: {
+    token: { type: 'string', description: 'JWT válido por 7 días' },
+    user:  UserSchema,
+  },
+} as const;
+
+// ─────────────────────────────────────────────────
+export async function authRoutes(app: FastifyInstance) {
+
+  // ── POST /auth/register ─────────────────────────
+  app.post<{ Body: { username: string; email: string; password: string } }>(
+    '/auth/register',
+    {
+      schema: {
+        tags:        ['auth'],
+        summary:     'Registrar nuevo usuario',
+        description: 'Crea una cuenta nueva y devuelve un JWT listo para usar.',
+        body: {
+          type: 'object',
+          required: ['username', 'email', 'password'],
+          properties: {
+            username: { type: 'string', minLength: 3, maxLength: 20, example: 'jugador42' },
+            email:    { type: 'string', format: 'email', example: 'jugador@correo.com' },
+            password: { type: 'string', minLength: 8, example: 'MiPass123!' },
+          },
+        },
+        response: {
+          201: { description: 'Usuario creado',           ...TokenUserSchema },
+          409: { description: 'Usuario o email ya existe', ...ErrorSchema },
+          400: { description: 'Datos inválidos',           ...ErrorSchema },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { status, data } = await callMs('/usuarios', 'POST', req.body);
+      if (status !== 201) return reply.code(status).send(data);
+
+      const user = data as { id: string; username: string };
+      const token = jwt.sign(
+        { sub: user.id, username: user.username },
+        JWT_SECRET,
+        { expiresIn: JWT_EXPIRY },
+      );
+      return reply.code(201).send({ token, user });
+    },
+  );
+
+  // ── POST /auth/login ────────────────────────────
+  app.post<{ Body: { email: string; password: string } }>(
+    '/auth/login',
+    {
+      schema: {
+        tags:        ['auth'],
+        summary:     'Iniciar sesión',
+        description: 'Verifica credenciales y devuelve un JWT.',
+        body: {
+          type: 'object',
+          required: ['email', 'password'],
+          properties: {
+            email:    { type: 'string', format: 'email', example: 'jugador@correo.com' },
+            password: { type: 'string', example: 'MiPass123!' },
+          },
+        },
+        response: {
+          200: { description: 'Login exitoso',        ...TokenUserSchema },
+          401: { description: 'Credenciales inválidas', ...ErrorSchema },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { status, data } = await callMs('/usuarios/verificar', 'POST', req.body);
+      if (status !== 200) return reply.code(status).send(data);
+
+      const user = data as { id: string; username: string };
+      const token = jwt.sign(
+        { sub: user.id, username: user.username },
+        JWT_SECRET,
+        { expiresIn: JWT_EXPIRY },
+      );
+      return reply.send({ token, user });
+    },
+  );
+
+  // ── POST /auth/forgot-password ──────────────────
+  app.post<{ Body: { email: string } }>(
+    '/auth/forgot-password',
+    {
+      schema: {
+        tags:        ['auth'],
+        summary:     'Solicitar recuperación de contraseña',
+        description: 'Genera un token de reset. En producción se envía por email; en dev el token aparece en la respuesta (`_dev_token`).',
+        body: {
+          type: 'object',
+          required: ['email'],
+          properties: {
+            email: { type: 'string', format: 'email', example: 'jugador@correo.com' },
+          },
+        },
+        response: {
+          200: {
+            description: 'Solicitud procesada (la respuesta es la misma aunque el email no exista)',
+            type: 'object',
+            properties: {
+              message:    { type: 'string' },
+              _dev_token: { type: 'string', description: 'Solo en entorno dev' },
+            },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { data } = await callMs('/usuarios/reset-token', 'POST', req.body);
+      return reply.send(data);
+    },
+  );
+
+  // ── POST /auth/reset-password ───────────────────
+  app.post<{ Body: { token: string; newPassword: string } }>(
+    '/auth/reset-password',
+    {
+      schema: {
+        tags:        ['auth'],
+        summary:     'Restablecer contraseña',
+        description: 'Usa el token recibido por email para establecer una nueva contraseña.',
+        body: {
+          type: 'object',
+          required: ['token', 'newPassword'],
+          properties: {
+            token:       { type: 'string', example: 'abc123...' },
+            newPassword: { type: 'string', minLength: 8, example: 'NuevoPass456!' },
+          },
+        },
+        response: {
+          200: { description: 'Contraseña actualizada', ...MessageSchema },
+          400: { description: 'Token inválido o expirado', ...ErrorSchema },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { status, data } = await callMs('/usuarios/reset-password', 'POST', req.body);
+      return reply.code(status).send(data);
+    },
+  );
+
+  // ── GET /auth/me ────────────────────────────────
+  app.get(
+    '/auth/me',
+    {
+      schema: {
+        tags:        ['auth'],
+        summary:     'Perfil del usuario autenticado',
+        description: 'Devuelve los datos del usuario asociado al JWT del header `Authorization`.',
+        security:    [{ bearerAuth: [] }],
+        response: {
+          200: { description: 'Datos del usuario', ...UserSchema },
+          401: { description: 'Token ausente o inválido', ...ErrorSchema },
+        },
+      },
+    },
+    async (req, reply) => {
+      const authHeader = req.headers.authorization;
+      if (!authHeader?.startsWith('Bearer ')) {
+        return reply.code(401).send({ error: 'Token requerido' });
+      }
+      try {
+        const payload = jwt.verify(authHeader.slice(7), JWT_SECRET) as jwt.JwtPayload;
+        const { status, data } = await callMs(`/usuarios/${payload.sub}`, 'GET');
+        return reply.code(status).send(data);
+      } catch {
+        return reply.code(401).send({ error: 'Token inválido o expirado' });
+      }
+    },
+  );
+}

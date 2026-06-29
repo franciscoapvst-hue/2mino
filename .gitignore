@@ -1,0 +1,26 @@
+# Claude Code local config
+.claude/
+
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+
+# logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# editor
+.vscode/
+.idea/
+
+# build outputs
+ms-usuarios/dist/
+ms-frontend-landing/dist/
+ms-salas/dist/
+api-integracion/dist/

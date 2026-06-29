@@ -1,0 +1,313 @@
+import { FastifyInstance } from 'fastify';
+import bcrypt from 'bcrypt';
+import crypto from 'crypto';
+import { pool } from '../db/pool';
+
+const ROUNDS = 12;
+
+// ── Schemas reutilizables ─────────────────────────
+const SegmentoSchema = {
+  type: 'object',
+  properties: {
+    id:          { type: 'string', format: 'uuid' },
+    nombre:      { type: 'string' },
+    descripcion: { type: 'string' },
+    config:      { type: 'object', additionalProperties: true },
+    activo:      { type: 'boolean' },
+    created_at:  { type: 'string', format: 'date-time' },
+    updated_at:  { type: 'string', format: 'date-time' },
+  },
+} as const;
+
+const UserSchema = {
+  type: 'object',
+  properties: {
+    id:              { type: 'string', format: 'uuid' },
+    username:        { type: 'string' },
+    email:           { type: 'string', format: 'email' },
+    segmento_id:     { type: 'string', format: 'uuid' },
+    segmento:        { type: 'string' },
+    segmento_config: { type: 'object', additionalProperties: true },
+    created_at:      { type: 'string', format: 'date-time' },
+    updated_at:      { type: 'string', format: 'date-time' },
+  },
+} as const;
+
+const ErrorSchema = {
+  type: 'object',
+  properties: { error: { type: 'string' } },
+} as const;
+
+const MessageSchema = {
+  type: 'object',
+  properties: { message: { type: 'string' } },
+} as const;
+
+// ─────────────────────────────────────────────────
+export async function usuariosRoutes(app: FastifyInstance) {
+
+  // ── GET /segmentos ──────────────────────────────
+  app.get('/segmentos', {
+    schema: {
+      tags:    ['segmentos'],
+      summary: 'Listar todos los segmentos activos',
+      response: {
+        200: {
+          description: 'Lista de segmentos',
+          type: 'array',
+          items: SegmentoSchema,
+        },
+      },
+    },
+  }, async (_req, reply) => {
+    const { rows } = await pool.query(
+      `SELECT id, nombre, descripcion, config, activo, created_at, updated_at
+       FROM segmentos WHERE activo = true ORDER BY nombre`,
+    );
+    return reply.send(rows);
+  });
+
+  // ── POST /usuarios ──────────────────────────────
+  app.post<{ Body: { username: string; email: string; password: string; segmento?: string } }>(
+    '/usuarios',
+    {
+      schema: {
+        tags:        ['usuarios'],
+        summary:     'Crear usuario',
+        description: 'Crea un usuario nuevo. Se asigna al segmento indicado (default: tester).',
+        body: {
+          type: 'object',
+          required: ['username', 'email', 'password'],
+          properties: {
+            username: { type: 'string', minLength: 3, maxLength: 20, example: 'jugador42' },
+            email:    { type: 'string', format: 'email', example: 'jugador@correo.com' },
+            password: { type: 'string', minLength: 8,   example: 'MiPass123!' },
+            segmento: { type: 'string', example: 'tester' },
+          },
+        },
+        response: {
+          201: { description: 'Usuario creado',           ...UserSchema },
+          409: { description: 'Username o email en uso',  ...ErrorSchema },
+          400: { description: 'Datos inválidos',           ...ErrorSchema },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { username, email, password, segmento = 'tester' } = req.body;
+      const passwordHash = await bcrypt.hash(password, ROUNDS);
+
+      const { rows: segRows } = await pool.query(
+        `SELECT id FROM segmentos WHERE nombre = $1 AND activo = true`,
+        [segmento],
+      );
+      if (!segRows.length) {
+        return reply.code(400).send({ error: `Segmento '${segmento}' no existe o está inactivo` });
+      }
+      const segmentoId = segRows[0].id;
+
+      try {
+        const { rows } = await pool.query(
+          `INSERT INTO usuarios (username, email, password_hash, segmento_id)
+           VALUES ($1, $2, $3, $4)
+           RETURNING id, username, email, segmento_id, created_at`,
+          [username, email, passwordHash, segmentoId],
+        );
+        return reply.code(201).send({ ...rows[0], segmento });
+      } catch (err: any) {
+        if (err.code === '23505') {
+          const field = err.detail?.includes('username') ? 'username' : 'email';
+          return reply.code(409).send({ error: `El ${field} ya está registrado` });
+        }
+        throw err;
+      }
+    },
+  );
+
+  // ── POST /usuarios/verificar ────────────────────
+  app.post<{ Body: { email: string; password: string } }>(
+    '/usuarios/verificar',
+    {
+      schema: {
+        tags:        ['usuarios'],
+        summary:     'Verificar credenciales',
+        description: 'Compara email + contraseña. Devuelve el usuario con su segmento.',
+        body: {
+          type: 'object',
+          required: ['email', 'password'],
+          properties: {
+            email:    { type: 'string', format: 'email', example: 'jugador@correo.com' },
+            password: { type: 'string', example: 'MiPass123!' },
+          },
+        },
+        response: {
+          200: { description: 'Credenciales válidas', ...UserSchema },
+          401: { description: 'Credenciales inválidas', ...ErrorSchema },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { email, password } = req.body;
+
+      const { rows } = await pool.query(
+        `SELECT u.*, s.nombre as segmento, s.config as segmento_config
+         FROM usuarios u
+         LEFT JOIN segmentos s ON s.id = u.segmento_id
+         WHERE u.email = $1`,
+        [email],
+      );
+
+      if (!rows.length) {
+        return reply.code(401).send({ error: 'Credenciales inválidas' });
+      }
+
+      const user = rows[0];
+      const valid = await bcrypt.compare(password, user.password_hash);
+      if (!valid) return reply.code(401).send({ error: 'Credenciales inválidas' });
+
+      const { password_hash, ...safeUser } = user;
+      return reply.send(safeUser);
+    },
+  );
+
+  // ── GET /usuarios/:id ───────────────────────────
+  app.get<{ Params: { id: string } }>(
+    '/usuarios/:id',
+    {
+      schema: {
+        tags:    ['usuarios'],
+        summary: 'Obtener usuario por ID (incluye segmento)',
+        params: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid', description: 'UUID del usuario' },
+          },
+        },
+        response: {
+          200: { description: 'Usuario encontrado',    ...UserSchema },
+          404: { description: 'Usuario no encontrado', ...ErrorSchema },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { rows } = await pool.query(
+        `SELECT u.id, u.username, u.email, u.segmento_id, u.created_at, u.updated_at,
+                s.nombre as segmento, s.config as segmento_config
+         FROM usuarios u
+         LEFT JOIN segmentos s ON s.id = u.segmento_id
+         WHERE u.id = $1`,
+        [req.params.id],
+      );
+      if (!rows.length) return reply.code(404).send({ error: 'Usuario no encontrado' });
+      return reply.send(rows[0]);
+    },
+  );
+
+  // ── POST /usuarios/reset-token ──────────────────
+  app.post<{ Body: { email: string } }>(
+    '/usuarios/reset-token',
+    {
+      schema: {
+        tags:        ['usuarios'],
+        summary:     'Generar token de recuperación de contraseña',
+        description: 'Crea un token de 1 hora. En producción se enviaría por email; en dev se incluye en la respuesta.',
+        body: {
+          type: 'object',
+          required: ['email'],
+          properties: {
+            email: { type: 'string', format: 'email', example: 'jugador@correo.com' },
+          },
+        },
+        response: {
+          200: {
+            description: 'Solicitud procesada',
+            type: 'object',
+            properties: {
+              message:    { type: 'string' },
+              _dev_token: { type: 'string', description: 'Solo visible fuera de producción' },
+            },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { email } = req.body;
+      const { rows } = await pool.query('SELECT id FROM usuarios WHERE email = $1', [email]);
+
+      const msg = 'Si el correo existe, recibirás instrucciones en breve';
+      if (!rows.length) return reply.send({ message: msg });
+
+      await pool.query(
+        `UPDATE reset_tokens SET used = TRUE WHERE usuario_id = $1 AND used = FALSE`,
+        [rows[0].id],
+      );
+
+      const token     = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+      await pool.query(
+        `INSERT INTO reset_tokens (usuario_id, token, expires_at) VALUES ($1, $2, $3)`,
+        [rows[0].id, token, expiresAt],
+      );
+
+      app.log.info({ email, token }, 'Reset token generado');
+
+      if (process.env.ENABLE_EMAIL === 'true') {
+        // TODO: integrar proveedor de email (SendGrid, Resend, SES, etc.)
+        app.log.warn('Email sending enabled pero no implementado aún');
+      } else {
+        app.log.info('Email sending deshabilitado (ENABLE_EMAIL=false)');
+      }
+
+      return reply.send({
+        message: msg,
+        ...(process.env.NODE_ENV !== 'production' && { _dev_token: token }),
+      });
+    },
+  );
+
+  // ── POST /usuarios/reset-password ──────────────
+  app.post<{ Body: { token: string; newPassword: string } }>(
+    '/usuarios/reset-password',
+    {
+      schema: {
+        tags:        ['usuarios'],
+        summary:     'Restablecer contraseña con token',
+        description: 'Valida el token (no usado, no expirado) y actualiza la contraseña.',
+        body: {
+          type: 'object',
+          required: ['token', 'newPassword'],
+          properties: {
+            token:       { type: 'string', description: 'Token recibido por email', example: 'abc123...' },
+            newPassword: { type: 'string', minLength: 8, example: 'NuevoPass456!' },
+          },
+        },
+        response: {
+          200: { description: 'Contraseña actualizada',   ...MessageSchema },
+          400: { description: 'Token inválido o expirado', ...ErrorSchema },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { token, newPassword } = req.body;
+
+      const { rows } = await pool.query(
+        `SELECT * FROM reset_tokens
+         WHERE token = $1 AND used = FALSE AND expires_at > NOW()`,
+        [token],
+      );
+
+      if (!rows.length) return reply.code(400).send({ error: 'Token inválido o expirado' });
+
+      const passwordHash = await bcrypt.hash(newPassword, ROUNDS);
+
+      await pool.query(
+        'UPDATE usuarios SET password_hash = $1, updated_at = NOW() WHERE id = $2',
+        [passwordHash, rows[0].usuario_id],
+      );
+
+      await pool.query('UPDATE reset_tokens SET used = TRUE WHERE id = $1', [rows[0].id]);
+
+      return reply.send({ message: 'Contraseña actualizada correctamente' });
+    },
+  );
+}
