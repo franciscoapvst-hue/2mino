@@ -45,6 +45,22 @@ const SCHEMA = `
   CREATE INDEX IF NOT EXISTS idx_salas_codigo   ON salas(codigo);
   CREATE INDEX IF NOT EXISTS idx_salas_creador  ON salas(creador_id);
   CREATE INDEX IF NOT EXISTS idx_sala_jug_sala  ON sala_jugadores(sala_id);
+
+  -- Partida en curso de una sala.
+  -- El estado completo (manos, tablero, turno...) se guarda como UN solo
+  -- registro de texto (JSON serializado) en vez de una fila por jugada,
+  -- ya que es una partida temporal que se sobreescribe en cada movimiento.
+  CREATE TABLE IF NOT EXISTS juegos (
+    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    sala_id     UUID        NOT NULL REFERENCES salas(id) ON DELETE CASCADE,
+    estado      VARCHAR(20) NOT NULL DEFAULT 'jugando'
+                CHECK (estado IN ('jugando','terminado')),
+    partida     TEXT        NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_juegos_sala_id ON juegos(sala_id);
 `;
 
 export async function runMigrations() {

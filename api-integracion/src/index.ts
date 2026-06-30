@@ -34,6 +34,7 @@ app.register(swagger, {
       { name: 'auth',     description: 'Registro, login y recuperación de contraseña' },
       { name: 'frontend', description: 'Configuración del landing y preferencias de usuario' },
       { name: 'salas',    description: 'Salas de juego: crear, listar, unirse y salir' },
+      { name: 'juego',    description: 'Estado y movimientos de la partida' },
       { name: 'system',   description: 'Estado del servicio' },
     ],
     components: {

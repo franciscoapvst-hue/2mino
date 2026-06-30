@@ -26,6 +26,33 @@ export type Sala = {
   created_at:      string;
 };
 
+// ── Tipos del juego ────────────────────────────────
+export type Val   = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+export type Pieza = { a: Val; b: Val };
+
+export type FichaTablero = { pieza: Pieza; izqVal: Val; derVal: Val };
+
+export type Asiento = { usuario_id: string; username: string; posicion: number };
+
+export type ResultadoMano =
+  | { tipo: 'normal';  ganadorSeat: number; puntos: number }
+  | { tipo: 'capicua'; ganadorSeat: number; puntos: 30 }
+  | { tipo: 'tranca';  equipoGanador: 0 | 1; puntos: 30 };
+
+export type PartidaPublica = {
+  maxJugadores: number;
+  asientos:     Asiento[];
+  miSeat:       number;
+  miMano:       Pieza[];
+  conteoManos:  number[];
+  tablero:      FichaTablero[];
+  turno:        number;
+  pasadas:      number;
+  ultimaJugada: { lado: 'izq' | 'der' } | null;
+  resultado:    ResultadoMano | null;
+  estado:       'jugando' | 'terminado';
+};
+
 export type AuthUser = {
   id: string;
   username: string;
@@ -118,5 +145,18 @@ export const api = {
       req<Sala>(`/salas/${id}/salir`, { method: 'POST', body: '{}' }),
     cambiarEstado: (id: string, estado: Sala['estado']) =>
       req<Sala>(`/salas/${id}/estado`, { method: 'PATCH', body: JSON.stringify({ estado }) }),
+  },
+
+  juego: {
+    iniciar: (salaId: string) =>
+      req<PartidaPublica>(`/salas/${salaId}/juego/iniciar`, { method: 'POST', body: '{}' }),
+    estado: (salaId: string) =>
+      req<PartidaPublica>(`/salas/${salaId}/juego`),
+    jugar: (salaId: string, pieza: Pieza, lado?: 'izq' | 'der') =>
+      req<PartidaPublica>(`/salas/${salaId}/juego/jugar`, {
+        method: 'POST', body: JSON.stringify({ pieza, lado }),
+      }),
+    pasar: (salaId: string) =>
+      req<PartidaPublica>(`/salas/${salaId}/juego/pasar`, { method: 'POST', body: '{}' }),
   },
 };

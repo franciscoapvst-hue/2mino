@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback, FormEvent } from 'react';
 import { api, type Sala, type SalaJugador, type AuthUser } from '../api';
 
 type Props = {
-  user:   AuthUser;
-  onBack: () => void;
+  user:         AuthUser;
+  onBack:       () => void;
+  onGameStart:  (sala: Sala) => void;
 };
 
 // ── Iconos ────────────────────────────────────────
@@ -242,7 +243,7 @@ function CreateForm({ onCrear, creating }: { onCrear: (b: CreateBody) => void; c
 }
 
 // ── Main view ─────────────────────────────────────
-export default function SalasView({ user, onBack }: Props) {
+export default function SalasView({ user, onBack, onGameStart }: Props) {
   const [salas,       setSalas]       = useState<Sala[]>([]);
   const [loading,     setLoading]     = useState(true);
   const [refreshing,  setRefreshing]  = useState(false);
@@ -280,6 +281,10 @@ export default function SalasView({ user, onBack }: Props) {
     const id = setInterval(async () => {
       try {
         const actualizada = await api.salas.detalle(sala.id);
+        if (actualizada.estado === 'en_juego') {
+          onGameStart(actualizada);
+          return;
+        }
         setSala(actualizada);
       } catch { /* silencioso */ }
     }, 4000);
@@ -338,8 +343,8 @@ export default function SalasView({ user, onBack }: Props) {
     if (!sala) return;
     setIniciando(true);
     try {
-      const actualizada = await api.salas.cambiarEstado(sala.id, 'en_juego');
-      setSala(actualizada);
+      await api.juego.iniciar(sala.id);
+      onGameStart(sala);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error al iniciar la partida');
     } finally {

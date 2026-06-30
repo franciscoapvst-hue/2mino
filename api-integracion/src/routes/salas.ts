@@ -219,4 +219,129 @@ export async function salasGatewayRoutes(app: FastifyInstance) {
     });
     return reply.code(status).send(data);
   });
+
+  // ── POST /salas/:id/juego/iniciar ────────────────
+  app.post<{ Params: { id: string } }>('/salas/:id/juego/iniciar', {
+    schema: {
+      tags:     ['juego'],
+      summary:  'Reparte fichas e inicia la partida (solo el creador)',
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: { id: { type: 'string', format: 'uuid' } },
+      },
+      response: {
+        201: { ...SalaResumenSchema },
+        400: { ...ErrorSchema },
+        401: { ...ErrorSchema },
+        403: { ...ErrorSchema },
+        404: { ...ErrorSchema },
+      },
+    },
+  }, async (req, reply) => {
+    const payload = getJwtPayload(req.headers.authorization);
+    if (!payload) return reply.code(401).send({ error: 'Token requerido' });
+
+    const { status, data } = await callSalas(`/salas/${req.params.id}/juego/iniciar`, 'POST', {
+      solicitante_id: payload.sub,
+    });
+    return reply.code(status).send(data);
+  });
+
+  // ── GET /salas/:id/juego ──────────────────────────
+  app.get<{ Params: { id: string } }>('/salas/:id/juego', {
+    schema: {
+      tags:     ['juego'],
+      summary:  'Estado actual de la partida (vista propia)',
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: { id: { type: 'string', format: 'uuid' } },
+      },
+      response: {
+        200: { ...SalaResumenSchema },
+        401: { ...ErrorSchema },
+        404: { ...ErrorSchema },
+      },
+    },
+  }, async (req, reply) => {
+    const payload = getJwtPayload(req.headers.authorization);
+    if (!payload) return reply.code(401).send({ error: 'Token requerido' });
+
+    const { status, data } = await callSalas(
+      `/salas/${req.params.id}/juego?usuario_id=${payload.sub}`, 'GET',
+    );
+    return reply.code(status).send(data);
+  });
+
+  // ── POST /salas/:id/juego/jugar ───────────────────
+  app.post<{
+    Params: { id: string };
+    Body:   { pieza: { a: number; b: number }; lado?: 'izq' | 'der' };
+  }>('/salas/:id/juego/jugar', {
+    schema: {
+      tags:     ['juego'],
+      summary:  'Jugar una ficha',
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: { id: { type: 'string', format: 'uuid' } },
+      },
+      body: {
+        type: 'object',
+        required: ['pieza'],
+        properties: {
+          pieza: {
+            type: 'object',
+            required: ['a', 'b'],
+            properties: { a: { type: 'integer', minimum: 0, maximum: 6 }, b: { type: 'integer', minimum: 0, maximum: 6 } },
+          },
+          lado: { type: 'string', enum: ['izq', 'der'] },
+        },
+      },
+      response: {
+        200: { ...SalaResumenSchema },
+        400: { ...ErrorSchema },
+        401: { ...ErrorSchema },
+        404: { ...ErrorSchema },
+      },
+    },
+  }, async (req, reply) => {
+    const payload = getJwtPayload(req.headers.authorization);
+    if (!payload) return reply.code(401).send({ error: 'Token requerido' });
+
+    const { status, data } = await callSalas(`/salas/${req.params.id}/juego/jugar`, 'POST', {
+      usuario_id: payload.sub,
+      pieza:      req.body.pieza,
+      lado:       req.body.lado,
+    });
+    return reply.code(status).send(data);
+  });
+
+  // ── POST /salas/:id/juego/pasar ───────────────────
+  app.post<{ Params: { id: string } }>('/salas/:id/juego/pasar', {
+    schema: {
+      tags:     ['juego'],
+      summary:  'Pasar el turno',
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: { id: { type: 'string', format: 'uuid' } },
+      },
+      response: {
+        200: { ...SalaResumenSchema },
+        400: { ...ErrorSchema },
+        401: { ...ErrorSchema },
+        404: { ...ErrorSchema },
+      },
+    },
+  }, async (req, reply) => {
+    const payload = getJwtPayload(req.headers.authorization);
+    if (!payload) return reply.code(401).send({ error: 'Token requerido' });
+
+    const { status, data } = await callSalas(`/salas/${req.params.id}/juego/pasar`, 'POST', {
+      usuario_id: payload.sub,
+    });
+    return reply.code(status).send(data);
+  });
 }

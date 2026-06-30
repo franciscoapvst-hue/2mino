@@ -1,5 +1,5 @@
-// ── Valores posibles en una ficha (1-6, sin blancos) ──
-export type Val = 1 | 2 | 3 | 4 | 5 | 6;
+// ── Valores posibles en una ficha (0=blanco al 6) ─────
+export type Val = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 // ── Ficha física ───────────────────────────────────────
 export type Pieza = {
@@ -7,34 +7,68 @@ export type Pieza = {
   b: Val; // extremo derecho  / inferior
 };
 
-// ── Genera el set completo 1-6 (21 fichas) ────────────
+// ── Genera el set completo 0-6 (28 fichas) ────────────
 export function crearSet(): Pieza[] {
   const set: Pieza[] = [];
-  for (let a = 1; a <= 6; a++)
+  for (let a = 0; a <= 6; a++)
     for (let b = a; b <= 6; b++)
       set.push({ a: a as Val, b: b as Val });
-  return set; // 21 fichas
+  return set; // 28 fichas — 7 por jugador con 4 jugadores
 }
 
-// ── Ficha en el tablero ────────────────────────────────
+// ── Baraja y reparte ────────────────────────────────────
+export function barajar<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+export function repartir(jugadores: number, porJugador = 7): { manos: Pieza[][]; pozo: Pieza[] } {
+  const mazo = barajar(crearSet());
+  const manos: Pieza[][] = [];
+  for (let i = 0; i < jugadores; i++) manos.push(mazo.splice(0, porJugador));
+  return { manos, pozo: mazo };
+}
+
+// ── Ficha colocada en el tablero ────────────────────────
+// izqVal/derVal = valores que esta ficha muestra a cada lado
+// dentro de la cadena del tablero (pueden venir invertidos vs a/b)
 export type FichaTablero = {
-  pieza:    Pieza;
-  // cuál extremo de la pieza queda expuesto hacia afuera del tablero
-  extremo:  'a' | 'b';
-  // en qué lado del tablero fue jugada
-  lado:     'izq' | 'der';
+  pieza:  Pieza;
+  izqVal: Val;
+  derVal: Val;
 };
+
+// ── Abre el tablero con la primera ficha ───────────────
+export function abrirTablero(p: Pieza): FichaTablero {
+  return { pieza: p, izqVal: p.a, derVal: p.b };
+}
+
+// ── Coloca una ficha conectándola a un extremo existente ──
+export function colocarFicha(p: Pieza, valorConectado: Val, lado: 'izq' | 'der'): FichaTablero {
+  if (lado === 'der') {
+    // el valor que toca el tablero (conectado) debe quedar a la izquierda de esta ficha
+    return p.a === valorConectado
+      ? { pieza: p, izqVal: p.a, derVal: p.b }
+      : { pieza: p, izqVal: p.b, derVal: p.a };
+  }
+  // lado === 'izq': el valor conectado debe quedar a la derecha de esta ficha
+  return p.b === valorConectado
+    ? { pieza: p, izqVal: p.a, derVal: p.b }
+    : { pieza: p, izqVal: p.b, derVal: p.a };
+}
 
 // ── Extremos abiertos del tablero ──────────────────────
 export type Extremos = { izq: Val; der: Val };
 
 export function getExtremos(tablero: FichaTablero[]): Extremos | null {
   if (!tablero.length) return null;
-  const L = tablero[0];
-  const R = tablero[tablero.length - 1];
   return {
-    izq: L.extremo === 'a' ? L.pieza.a : L.pieza.b,
-    der: R.extremo === 'b' ? R.pieza.b : R.pieza.a,
+    izq: tablero[0].izqVal,
+    der: tablero[tablero.length - 1].derVal,
   };
 }
 
@@ -75,13 +109,13 @@ export function calcResultado(
 ): ResultadoMano {
   // Tranca (todos pasan)
   if (ganador === null || extremos === null) {
-    const sumA = sumaPips(manos[0]) + sumaPips(manos[2]);
-    const sumB = sumaPips(manos[1]) + sumaPips(manos[3]);
+    const sumA = sumaPips(manos[0] ?? []) + sumaPips(manos[2] ?? []);
+    const sumB = sumaPips(manos[1] ?? []) + sumaPips(manos[3] ?? []);
     return { tipo: 'tranca', equipoGanador: sumA <= sumB ? 0 : 1, puntos: PUNTOS_TRANCA };
   }
 
   // Capicúa
-  if (ultimaPieza && extremos && esCapicua(ultimaPieza, extremos)) {
+  if (ultimaPieza && esCapicua(ultimaPieza, extremos)) {
     return { tipo: 'capicua', ganador, puntos: PUNTOS_CAPICUA };
   }
 

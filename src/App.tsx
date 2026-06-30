@@ -5,10 +5,11 @@ import ForgotPasswordForm from './components/ForgotPasswordForm';
 import Dashboard from './components/Dashboard';
 import SalasView from './components/SalasView';
 import PieceDemo from './components/game/PieceDemo';
-import { api, tokenStore, type AuthUser, type UserConfig } from './api';
+import GameBoard from './components/game/GameBoard';
+import { api, tokenStore, type AuthUser, type UserConfig, type Sala } from './api';
 
 export type View = 'login' | 'register' | 'forgot';
-type AppView = View | 'dashboard' | 'salas' | 'piece-demo';
+type AppView = View | 'dashboard' | 'salas' | 'piece-demo' | 'game';
 
 type Session = { user: AuthUser; config: UserConfig };
 
@@ -51,9 +52,10 @@ function MoonIcon() {
 }
 
 export default function App() {
-  const [view,    setView]    = useState<AppView>('login');
-  const [session, setSession] = useState<Session | null>(null);
-  const [booting, setBooting] = useState(true);
+  const [view,     setView]     = useState<AppView>('login');
+  const [session,  setSession]  = useState<Session | null>(null);
+  const [booting,  setBooting]  = useState(true);
+  const [gameSala, setGameSala] = useState<Sala | null>(null);
   const [dark,    setDark]    = useState<boolean>(
     () => localStorage.getItem('2mino-theme') !== 'light'
   );
@@ -102,8 +104,24 @@ export default function App() {
     return <PieceDemo onBack={() => setView(session ? 'dashboard' : 'login')} />;
   }
 
+  if (view === 'game' && session && gameSala) {
+    return (
+      <GameBoard
+        sala={gameSala}
+        user={session.user}
+        onExit={() => { setGameSala(null); setView('salas'); }}
+      />
+    );
+  }
+
   if (view === 'salas' && session) {
-    return <SalasView user={session.user} onBack={() => setView('dashboard')} />;
+    return (
+      <SalasView
+        user={session.user}
+        onBack={() => setView('dashboard')}
+        onGameStart={(sala) => { setGameSala(sala); setView('game'); }}
+      />
+    );
   }
 
   if (view === 'dashboard' && session) {

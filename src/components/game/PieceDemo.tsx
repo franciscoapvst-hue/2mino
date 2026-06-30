@@ -3,7 +3,7 @@ import DominoPiece from './DominoPiece';
 import { crearSet } from '../../game/types';
 import type { Val } from '../../game/types';
 
-const SET = crearSet(); // 21 fichas
+const SET = crearSet(); // 28 fichas
 
 export default function PieceDemo({ onBack }: { onBack: () => void }) {
   const [selected, setSelected] = useState<string | null>(null);
@@ -16,7 +16,7 @@ export default function PieceDemo({ onBack }: { onBack: () => void }) {
 
       {/* Set completo */}
       <div className="piece-demo-section">
-        <h3>Set completo — 1 a 6 (21 fichas)</h3>
+        <h3>Set completo — 0 a 6 (28 fichas)</h3>
         <div className="piece-demo-row">
           {SET.map(p => {
             const key = `${p.a}-${p.b}`;
@@ -38,7 +38,7 @@ export default function PieceDemo({ onBack }: { onBack: () => void }) {
       <div className="piece-demo-section">
         <h3>Fichas dobles (vertical)</h3>
         <div className="piece-demo-row">
-          {([1,2,3,4,5,6] as Val[]).map(v => (
+          {([0,1,2,3,4,5,6] as Val[]).map(v => (
             <DominoPiece key={v} a={v} b={v} orient="v" />
           ))}
         </div>
@@ -79,7 +79,7 @@ export default function PieceDemo({ onBack }: { onBack: () => void }) {
       <div className="piece-demo-section">
         <h3>Reglas dominicanas</h3>
         <div style={{ color: 'var(--text-dim)', fontSize: '.9rem', lineHeight: 1.7, maxWidth: 520 }}>
-          <p>🎯 <strong style={{ color: 'var(--text)' }}>Set:</strong> 1 al 6 — 21 fichas en total.</p>
+          <p>🎯 <strong style={{ color: 'var(--text)' }}>Set:</strong> 0 (blanco) al 6 — 28 fichas en total.</p>
           <p>🏆 <strong style={{ color: 'var(--text)' }}>Victoria normal:</strong> el ganador suma los pips restantes del equipo contrario.</p>
           <p>⚡ <strong style={{ color: 'var(--text)' }}>Capicúa:</strong> si la última ficha encaja en ambos extremos del tablero → <strong style={{ color: '#c084fc' }}>30 puntos</strong>.</p>
           <p>🔒 <strong style={{ color: 'var(--text)' }}>Tranca:</strong> si todos pasan sin poder jugar → gana el equipo con menos pips → <strong style={{ color: '#c084fc' }}>30 puntos</strong>.</p>
