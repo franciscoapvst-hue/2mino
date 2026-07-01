@@ -1,186 +1,148 @@
 /**
- * SnakeBoard — Tablero de dominó con layout serpiente.
- *
- * Disposición:
- *   fila 0 →  [h][h]...[h]  [corner-der ↕]
- *   fila 1 ←  [h][h]...[h]  [corner-izq ↕]
- *   fila 2 →  ...
- *
- * Cada pieza tiene coordenadas absolutas (x,y) dentro del contenedor SVG.
- * Las piezas de filas impares (←) se muestran con a/b invertidos para
- * que los valores queden visualmente conectados al extremo correcto.
+ * SnakeBoard — layout serpiente responsivo.
+ * El GAP es fijo (4 px) para que boardW === containerWidth exactamente.
+ * Las zonas de juego (◀ / ▶) sirven tanto para drag-and-drop (desktop)
+ * como para tap-to-play (móvil) cuando hay una ficha seleccionada.
  */
-import type { Val } from '../../api';
-import type { FichaTablero } from '../../api';
+import type { Val, FichaTablero } from '../../api';
 import DominoPiece from './DominoPiece';
 
-// ── Dimensiones base (antes de escalar) ─────────
+// ── Dimensiones base (100 % escala) ─────────────
 const HW0 = 100, HH0 = 54;   // pieza horizontal
 const VW0 = 54,  VH0 = 100;  // pieza vertical (esquinas)
-const GAP0 = 5;               // gap entre piezas
-const N_PER_ROW = 5;          // fichas h por fila objetivo
+const GAP  = 4;               // ← fijo, NO escalado
+const N    = 5;               // fichas horizontales por fila
 
 type PlacedPiece = {
-  a: Val; b: Val;
-  orient: 'h' | 'v';
-  x: number; y: number;
-  w: number; h: number;
+  a: Val; b: Val; orient: 'h'|'v';
+  x: number; y: number; w: number; h: number;
   placing: boolean;
 };
 
 function computeLayout(
   tablero: FichaTablero[],
-  containerWidth: number,
-  nuevaFichaIdx: number | null,
-): { pieces: PlacedPiece[]; boardW: number; boardH: number } {
-  const N = N_PER_ROW;
+  cw: number,               // container width en px
+  nuevaIdx: number | null,
+) {
+  // Escala exacta: 2*VW + N*HW + (N+1)*GAP === cw
+  const S = Math.min(1, (cw - (N + 1) * GAP) / (N * HW0 + 2 * VW0));
 
-  // Escala para que N fichas h + 2 esquinas quepan en containerWidth
-  const S = Math.min(
-    1,
-    (containerWidth - (N + 1) * GAP0) / (N * HW0 + 2 * VW0),
-  );
-
-  const HW = HW0 * S, HH = HH0 * S;
-  const VW = VW0 * S, VH = VH0 * S;
-  const GAP = Math.round(GAP0 * S);
-
-  // Margen superior para que esquinas no queden en y<0
-  const YPAD = (VH - HH) / 2;
-
-  // Origen X de fichas horizontales (espacio para esquinas izquierdas)
-  const LEFT_X = VW + GAP;
-  // Origen X de esquinas derechas
-  const RIGHT_X = LEFT_X + N * (HW + GAP);
+  const HW = HW0 * S,  HH = HH0 * S;
+  const VW = VW0 * S,  VH = VH0 * S;
+  const YPAD  = (VH - HH) / 2;   // padding superior para que esquinas no tengan y<0
+  const LEFT  = VW + GAP;         // x inicio de fichas horizontales
+  const RIGHT = LEFT + N * (HW + GAP); // x inicio de esquinas derechas
 
   const pieces: PlacedPiece[] = [];
-  let rowNum      = 0;
-  let pieceInRow  = 0;
-  let nextIsCorner = false;
+  let row = 0, col = 0, corner = false;
 
   for (let i = 0; i < tablero.length; i++) {
-    const f       = tablero[i];
-    const placing = i === nuevaFichaIdx;
+    const f = tablero[i];
+    const placing = i === nuevaIdx;
 
-    if (nextIsCorner) {
-      // ── Esquina (vertical) ──────────────────────
-      const isEven = rowNum % 2 === 0; // dirección de la fila que SE ACABA DE COMPLETAR
-      const cx = isEven ? RIGHT_X : 0;
-      const cy = rowNum * VH;          // y=k*VH para que encaje entre las dos filas
-
+    if (corner) {
+      const even = row % 2 === 0;
       pieces.push({
         a: f.izqVal, b: f.derVal, orient: 'v',
-        x: cx, y: cy, w: VW, h: VH, placing,
+        x: even ? RIGHT : 0,
+        y: row * VH,
+        w: VW, h: VH, placing,
       });
-      rowNum++;
-      pieceInRow  = 0;
-      nextIsCorner = false;
-
+      row++;
+      col = 0;
+      corner = false;
     } else {
-      // ── Pieza horizontal ─────────────────────────
-      const isEven = rowNum % 2 === 0;
-      const y = YPAD + rowNum * VH;
-      let x: number, a: Val, b: Val;
-
-      if (isEven) {
-        // Fila →: izquierda a derecha, valores normales
-        x = LEFT_X + pieceInRow * (HW + GAP);
-        a = f.izqVal;
-        b = f.derVal;
-      } else {
-        // Fila ←: posicionada de derecha a izquierda, valores invertidos
-        // para que la punta que conecta a la esquina quede a la derecha visualmente
-        x = RIGHT_X - HW - pieceInRow * (HW + GAP);
-        a = f.derVal;
-        b = f.izqVal;
-      }
+      const even = row % 2 === 0;
+      const y = YPAD + row * VH;
+      const x = even
+        ? LEFT + col * (HW + GAP)
+        : RIGHT - HW - col * (HW + GAP);
+      const a: Val = even ? f.izqVal : f.derVal;
+      const b: Val = even ? f.derVal : f.izqVal;
 
       pieces.push({ a, b, orient: 'h', x, y, w: HW, h: HH, placing });
-      pieceInRow++;
-
-      if (pieceInRow >= N && i < tablero.length - 1) {
-        nextIsCorner = true;
-      }
+      col++;
+      if (col >= N && i < tablero.length - 1) corner = true;
     }
   }
 
-  const lastP  = pieces[pieces.length - 1];
-  const boardW = RIGHT_X + VW + GAP;
-  const boardH = lastP ? lastP.y + lastP.h + 4 : VH + 4;
+  const last  = pieces[pieces.length - 1];
+  // boardW exactamente igual al container width
+  const boardW = RIGHT + VW;   // = 2*VW + N*(HW+GAP) + GAP ... = cw ✓
+  const boardH = last ? last.y + last.h + 4 : VH + 4;
 
-  return { pieces, boardW, boardH };
+  return { pieces, boardW, boardH, VW, VH, HH };
 }
 
-// ── Componente ───────────────────────────────────
-type Props = {
+// ── Props ────────────────────────────────────────
+export type SnakeBoardProps = {
   tablero:       FichaTablero[];
   containerWidth: number;
   nuevaFichaIdx: number | null;
-  // drag-and-drop: llama a onDrop('izq'|'der') cuando sueltan sobre extremos
-  isDragging:   boolean;
-  sobreIzq:     boolean;
-  sobreDer:     boolean;
+
+  // Zonas de juego: muestran ◀ / ▶ para drag (desktop) Y tap (móvil)
+  showZones: boolean;           // mostrar alguna zona
+  canIzq:   boolean;           // zona izquierda válida
+  canDer:   boolean;           // zona derecha válida
+  sobreIzq: boolean;           // drag hover
+  sobreDer: boolean;
+
+  onPlayIzq:    () => void;    // clic o drop en zona izquierda
+  onPlayDer:    () => void;
   onDragOverIzq: (e: React.DragEvent) => void;
   onDragOverDer: (e: React.DragEvent) => void;
-  onDropIzq:     (e: React.DragEvent) => void;
-  onDropDer:     (e: React.DragEvent) => void;
   onDragLeave:   () => void;
 };
 
 export default function SnakeBoard({
   tablero, containerWidth, nuevaFichaIdx,
-  isDragging, sobreIzq, sobreDer,
-  onDragOverIzq, onDragOverDer,
-  onDropIzq, onDropDer, onDragLeave,
-}: Props) {
-  if (tablero.length === 0) return null;
+  showZones, canIzq, canDer, sobreIzq, sobreDer,
+  onPlayIzq, onPlayDer,
+  onDragOverIzq, onDragOverDer, onDragLeave,
+}: SnakeBoardProps) {
+  if (!tablero.length) return null;
 
-  const { pieces, boardW, boardH } = computeLayout(tablero, containerWidth, nuevaFichaIdx);
+  const { pieces, boardW, boardH, VW, HH } = computeLayout(
+    tablero, containerWidth, nuevaFichaIdx,
+  );
 
-  // Pieza más a la izquierda y más a la derecha para posicionar drop zones
-  const minX = Math.min(...pieces.map(p => p.x));
-  const maxX = Math.max(...pieces.map(p => p.x + p.w));
+  const ZW = Math.max(36, VW);        // ancho mínimo de zona
+  const ZH = Math.max(HH, 44);        // alto mínimo de zona (tap target)
+  const ZY = (boardH - ZH) / 2;       // centrar verticalmente
 
   return (
     <div className="snake-board-wrap" style={{ width: boardW, height: boardH }}>
-      {/* Fichas */}
+      {/* ── Fichas ─────────────────────────────── */}
       {pieces.map((p, i) => (
         <DominoPiece
           key={i}
-          a={p.a}
-          b={p.b}
-          orient={p.orient}
-          placing={p.placing}
-          style={{
-            position: 'absolute',
-            left: p.x,
-            top:  p.y,
-            width:  p.w,
-            height: p.h,
-          }}
+          a={p.a} b={p.b} orient={p.orient} placing={p.placing}
+          style={{ position: 'absolute', left: p.x, top: p.y, width: p.w, height: p.h }}
         />
       ))}
 
-      {/* Drop zone izquierda */}
-      {isDragging && (
+      {/* ── Zona IZQUIERDA ─────────────────────── */}
+      {showZones && canIzq && (
         <div
-          className={`snake-drop-zone snake-dz-izq${sobreIzq ? ' dz-sobre' : ''}`}
-          style={{ left: minX - 44, top: boardH / 2 - 26, position: 'absolute' }}
+          className={`snake-drop-zone${sobreIzq ? ' dz-sobre' : ''}`}
+          style={{ position: 'absolute', left: 0, top: ZY, width: ZW, height: ZH }}
+          onClick={onPlayIzq}
           onDragOver={onDragOverIzq}
-          onDrop={onDropIzq}
+          onDrop={e => { e.preventDefault(); onPlayIzq(); }}
           onDragLeave={onDragLeave}
         >
           ◀
         </div>
       )}
 
-      {/* Drop zone derecha */}
-      {isDragging && (
+      {/* ── Zona DERECHA ───────────────────────── */}
+      {showZones && canDer && (
         <div
-          className={`snake-drop-zone snake-dz-der${sobreDer ? ' dz-sobre' : ''}`}
-          style={{ left: maxX + 4, top: boardH / 2 - 26, position: 'absolute' }}
+          className={`snake-drop-zone${sobreDer ? ' dz-sobre' : ''}`}
+          style={{ position: 'absolute', right: 0, top: ZY, width: ZW, height: ZH }}
+          onClick={onPlayDer}
           onDragOver={onDragOverDer}
-          onDrop={onDropDer}
+          onDrop={e => { e.preventDefault(); onPlayDer(); }}
           onDragLeave={onDragLeave}
         >
           ▶

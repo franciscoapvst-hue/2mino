@@ -114,12 +114,11 @@ export default function DominoPiece({
     className,
   ].filter(Boolean).join(' ');
 
-  // El SVG no acepta `draggable` en tipos de React; usamos un div wrapper.
+  // SVG sin width/height absolutos: responde al tamaño del wrapper via viewBox.
   const svgNode = (
     <svg
       viewBox={`0 0 ${W} ${H}`}
-      width={W}
-      height={H}
+      style={{ display: 'block', width: '100%', height: '100%' }}
       onClick={clickable ? onClick : undefined}
       aria-label={faceDown ? 'Ficha oculta' : `${a}-${b}`}
       role={clickable ? 'button' : 'img'}
@@ -169,11 +168,14 @@ export default function DominoPiece({
     </svg>
   );
 
+  // Dimensiones naturales del tile: el caller puede sobrescribirlas con `style`
+  const baseStyle = { display: 'inline-flex', lineHeight: 0, width: W, height: H, ...style };
+
   if (draggable) {
     return (
       <div
         className={cls}
-        style={{ display: 'inline-flex', lineHeight: 0, ...style }}
+        style={baseStyle}
         draggable
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
@@ -184,7 +186,7 @@ export default function DominoPiece({
   }
 
   return (
-    <span className={cls} style={{ display: 'inline-flex', lineHeight: 0, ...style }}>
+    <span className={cls} style={baseStyle}>
       {svgNode}
     </span>
   );

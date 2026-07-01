@@ -5,47 +5,40 @@ import { puedeJugar, getExtremos } from '../../game/types';
 import { api } from '../../api';
 import type { PartidaPublica, Pieza, Sala, AuthUser } from '../../api';
 
-type Props = {
-  sala:   Sala;
-  user:   AuthUser;
-  onExit: () => void;
-};
+type Props = { sala: Sala; user: AuthUser; onExit: () => void };
 
 function BackIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M19 12H5M12 5l-7 7 7 7" />
     </svg>
   );
 }
 
 export default function GameBoard({ sala, user, onExit }: Props) {
-  const [partida,     setPartida]     = useState<PartidaPublica | null>(null);
-  const [cargando,    setCargando]    = useState(true);
-  const [error,       setError]       = useState<string | null>(null);
-  const [jugando,     setJugando]     = useState(false);
-  const [arrastrando, setArrastrando] = useState<Pieza | null>(null);
-  const [sobreZona,   setSobreZona]   = useState<'izq' | 'der' | null>(null);
+  const [partida,       setPartida]       = useState<PartidaPublica | null>(null);
+  const [cargando,      setCargando]      = useState(true);
+  const [error,         setError]         = useState<string | null>(null);
+  const [jugando,       setJugando]       = useState(false);
+  const [arrastrando,   setArrastrando]   = useState<Pieza | null>(null);
+  const [selectedPiece, setSelectedPiece] = useState<Pieza | null>(null);
+  const [sobreZona,     setSobreZona]     = useState<'izq' | 'der' | null>(null);
   const [nuevaFichaIdx, setNuevaFichaIdx] = useState<number | null>(null);
-  const [boardWidth,  setBoardWidth]  = useState(600);
+  const [boardWidth,    setBoardWidth]    = useState(600);
 
-  const prevLenRef    = useRef(0);
-  const boardCenterRef = useRef<HTMLDivElement>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
 
-  // ── Carga y polling del estado del juego ─────────
+  // ── Carga y polling ────────────────────────────
   const fetchPartida = useCallback(async () => {
     try {
       const p = await api.juego.estado(sala.id);
       setPartida(prev => {
-        // Detectar pieza nueva en tablero para animación
         if (prev && p.tablero.length > prev.tablero.length) {
-          const ladoNuevo = p.ultimaJugada?.lado ?? 'der';
-          const idx = ladoNuevo === 'der' ? p.tablero.length - 1 : 0;
-          setNuevaFichaIdx(idx);
+          const lado = p.ultimaJugada?.lado ?? 'der';
+          setNuevaFichaIdx(lado === 'der' ? p.tablero.length - 1 : 0);
           setTimeout(() => setNuevaFichaIdx(null), 600);
         }
-        prevLenRef.current = p.tablero.length;
         return p;
       });
       setError(null);
@@ -62,27 +55,27 @@ export default function GameBoard({ sala, user, onExit }: Props) {
     return () => clearInterval(id);
   }, [fetchPartida]);
 
-  // Mide el ancho del contenedor del tablero (para escalar fichas)
+  // Mide el ancho del contenedor
   useEffect(() => {
-    const el = boardCenterRef.current;
+    const el = boardRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(entries => {
-      setBoardWidth(entries[0].contentRect.width);
-    });
+    const ro = new ResizeObserver(([e]) => setBoardWidth(e.contentRect.width));
     ro.observe(el);
     setBoardWidth(el.clientWidth);
     return () => ro.disconnect();
   }, []);
 
-  // ── Jugar una ficha ───────────────────────────────
+  // ── Jugar ficha (API) ─────────────────────────
   async function handleJugar(pieza: Pieza, lado?: 'izq' | 'der') {
     if (jugando) return;
     setJugando(true);
+    setSelectedPiece(null);
+    setArrastrando(null);
+    setSobreZona(null);
     try {
       const nueva = await api.juego.jugar(sala.id, pieza, lado);
       const ladoJugado = nueva.ultimaJugada?.lado ?? 'der';
-      const idx = ladoJugado === 'der' ? nueva.tablero.length - 1 : 0;
-      setNuevaFichaIdx(idx);
+      setNuevaFichaIdx(ladoJugado === 'der' ? nueva.tablero.length - 1 : 0);
       setTimeout(() => setNuevaFichaIdx(null), 600);
       setPartida(nueva);
     } catch (e: unknown) {
@@ -90,17 +83,16 @@ export default function GameBoard({ sala, user, onExit }: Props) {
       setTimeout(() => setError(null), 2500);
     } finally {
       setJugando(false);
-      setArrastrando(null);
     }
   }
 
-  // ── Pasar turno ───────────────────────────────────
+  // ── Pasar turno ───────────────────────────────
   async function handlePasar() {
     if (jugando) return;
     setJugando(true);
+    setSelectedPiece(null);
     try {
-      const nueva = await api.juego.pasar(sala.id);
-      setPartida(nueva);
+      setPartida(await api.juego.pasar(sala.id));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'No puedes pasar');
       setTimeout(() => setError(null), 2500);
@@ -109,26 +101,53 @@ export default function GameBoard({ sala, user, onExit }: Props) {
     }
   }
 
-  // ── Drag handlers ─────────────────────────────────
-  function onDragStart(e: React.DragEvent, pieza: Pieza) {
+  // ── Tap-para-seleccionar (funciona en móvil y desktop) ──
+  function onTapPieza(pieza: Pieza) {
+    if (!esMiTurno || jugando) return;
+
+    // Deseleccionar si se toca la misma ficha
+    if (selectedPiece?.a === pieza.a && selectedPiece?.b === pieza.b) {
+      setSelectedPiece(null);
+      return;
+    }
+
+    if (!ext) {
+      // Tablero vacío → abrir directamente
+      handleJugar(pieza);
+      return;
+    }
+
+    const ops = puedeJugar(pieza, ext);
+    if (!ops.izq && !ops.der) return;
+
+    if (ops.izq && ops.der) {
+      // Ambos extremos válidos → mostrar zonas de elección
+      setSelectedPiece(pieza);
+    } else {
+      // Solo un lado → jugar directamente
+      handleJugar(pieza, ops.der ? 'der' : 'izq');
+    }
+  }
+
+  // ── Handlers unificados de zona (drag + tap) ──
+  function handlePlayIzq() {
+    const pieza = arrastrando ?? selectedPiece;
+    if (!pieza) return;
+    handleJugar(pieza, 'izq');
+  }
+
+  function handlePlayDer() {
+    const pieza = arrastrando ?? selectedPiece;
+    if (!pieza) return;
+    handleJugar(pieza, 'der');
+  }
+
+  // ── Drag (desktop) ────────────────────────────
+  function onDragStart(e: React.DragEvent<HTMLDivElement>, pieza: Pieza) {
     e.dataTransfer.setData('pieza', JSON.stringify(pieza));
     e.dataTransfer.effectAllowed = 'move';
+    setSelectedPiece(null);
     setArrastrando(pieza);
-  }
-
-  function onDragOver(e: React.DragEvent, zona: 'izq' | 'der') {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setSobreZona(zona);
-  }
-
-  function onDrop(e: React.DragEvent, lado: 'izq' | 'der') {
-    e.preventDefault();
-    setSobreZona(null);
-    const data = e.dataTransfer.getData('pieza');
-    if (!data) return;
-    const pieza = JSON.parse(data) as Pieza;
-    handleJugar(pieza, lado);
   }
 
   function onDragEnd() {
@@ -136,7 +155,7 @@ export default function GameBoard({ sala, user, onExit }: Props) {
     setSobreZona(null);
   }
 
-  // ── Derivados de estado ───────────────────────────
+  // ── Guards de carga ───────────────────────────
   if (cargando) {
     return (
       <div className="game-shell">
@@ -159,19 +178,23 @@ export default function GameBoard({ sala, user, onExit }: Props) {
     );
   }
 
-  const ext          = getExtremos(partida.tablero);
-  const esMiTurno    = partida.turno === partida.miSeat && !partida.resultado;
-  const maxJ         = partida.maxJugadores;
+  // ── Derivados ─────────────────────────────────
+  const ext       = getExtremos(partida.tablero);
+  const esMiTurno = partida.turno === partida.miSeat && !partida.resultado;
+  const maxJ      = partida.maxJugadores;
 
   const puedoPasar = esMiTurno && ext !== null &&
     !partida.miMano.some(p => { const o = puedeJugar(p, ext); return o.izq || o.der; });
 
-  const nombreAsiento = (seat: number) => {
-    const a = partida.asientos[seat];
-    return a ? `@${a.username}` : '—';
-  };
+  // Zonas de juego: visibles cuando arrastro O tengo ficha seleccionada
+  const selOps = selectedPiece && ext ? puedeJugar(selectedPiece, ext) : null;
+  const showZones = esMiTurno && (arrastrando !== null || selectedPiece !== null);
+  const canIzq = showZones && (arrastrando !== null ? true : (selOps?.izq ?? false));
+  const canDer = showZones && (arrastrando !== null ? true : (selOps?.der ?? false));
 
-  // Indicador de turno
+  const nombreAsiento = (seat: number) => partida.asientos[seat]
+    ? `@${partida.asientos[seat].username}` : '—';
+
   const turnoLabel = partida.resultado
     ? 'Partida terminada'
     : esMiTurno ? '¡Tu turno!' : `Turno de ${nombreAsiento(partida.turno)}`;
@@ -185,20 +208,15 @@ export default function GameBoard({ sala, user, onExit }: Props) {
         <span className={`game-turn-indicator${esMiTurno ? ' my-turn' : ''}`}>{turnoLabel}</span>
       </nav>
 
-      {error && (
-        <div className="game-error-banner">⚠ {error}</div>
-      )}
+      {error && <div className="game-error-banner">⚠ {error}</div>}
 
       {/* ── Mesa ────────────────────────────────── */}
       <div className={`game-table table-${maxJ}p`}>
-
-        {/* Rivales / compañero */}
         {maxJ === 4 && (
           <div className="seat seat-left">
             <OpSeat nombre={nombreAsiento(1)} count={partida.conteoManos[1] ?? 0} activo={partida.turno === 1} />
           </div>
         )}
-
         <div className="seat seat-top">
           <OpSeat
             nombre={nombreAsiento(maxJ === 2 ? 1 : 2)}
@@ -206,7 +224,6 @@ export default function GameBoard({ sala, user, onExit }: Props) {
             activo={partida.turno === (maxJ === 2 ? 1 : 2)}
           />
         </div>
-
         {maxJ === 4 && (
           <div className="seat seat-right">
             <OpSeat nombre={nombreAsiento(3)} count={partida.conteoManos[3] ?? 0} activo={partida.turno === 3} />
@@ -214,35 +231,38 @@ export default function GameBoard({ sala, user, onExit }: Props) {
         )}
 
         {/* ── Tablero ───────────────────────────── */}
-        <div className="board-center" ref={boardCenterRef}>
+        <div className="board-center" ref={boardRef}>
           {partida.tablero.length === 0 ? (
-            <>
+            <div className="board-empty-wrap">
               <p className="board-empty-hint">
-                {esMiTurno ? 'Arrastra una ficha para abrir el tablero' : 'Esperando apertura…'}
+                {esMiTurno ? 'Toca o arrastra una ficha para abrir' : 'Esperando apertura…'}
               </p>
+              {/* Zona de drop cuando está arrastrando con tablero vacío */}
               {esMiTurno && arrastrando && (
                 <div
                   className={`drop-zone-open${sobreZona === 'der' ? ' dz-sobre' : ''}`}
-                  onDragOver={e => onDragOver(e, 'der')}
-                  onDrop={e => onDrop(e, 'der')}
+                  onDragOver={e => { e.preventDefault(); setSobreZona('der'); }}
+                  onDrop={e => { e.preventDefault(); setSobreZona(null); handleJugar(arrastrando); }}
                   onDragLeave={() => setSobreZona(null)}
                 >
                   Suelta aquí para abrir
                 </div>
               )}
-            </>
+            </div>
           ) : (
             <SnakeBoard
               tablero={partida.tablero}
               containerWidth={boardWidth}
               nuevaFichaIdx={nuevaFichaIdx}
-              isDragging={esMiTurno && arrastrando !== null}
+              showZones={showZones}
+              canIzq={canIzq}
+              canDer={canDer}
               sobreIzq={sobreZona === 'izq'}
               sobreDer={sobreZona === 'der'}
-              onDragOverIzq={e => onDragOver(e, 'izq')}
-              onDragOverDer={e => onDragOver(e, 'der')}
-              onDropIzq={e => onDrop(e, 'izq')}
-              onDropDer={e => onDrop(e, 'der')}
+              onPlayIzq={handlePlayIzq}
+              onPlayDer={handlePlayDer}
+              onDragOverIzq={e => { e.preventDefault(); setSobreZona('izq'); }}
+              onDragOverDer={e => { e.preventDefault(); setSobreZona('der'); }}
               onDragLeave={() => setSobreZona(null)}
             />
           )}
@@ -253,19 +273,22 @@ export default function GameBoard({ sala, user, onExit }: Props) {
       <div className="my-hand-zone">
         <div className="my-hand">
           {partida.miMano.map((p, i) => {
-            const ops = ext ? puedeJugar(p, ext) : { izq: true, der: true };
+            const ops    = ext ? puedeJugar(p, ext) : { izq: true, der: true };
             const jugable = ops.izq || ops.der;
-            const dragg   = esMiTurno && jugable && !jugando;
+            const isSel   = selectedPiece?.a === p.a && selectedPiece?.b === p.b;
+            const canPlay  = esMiTurno && jugable && !jugando;
             return (
               <DominoPiece
                 key={i}
                 a={p.a} b={p.b}
                 orient="v"
-                playable={esMiTurno && jugable}
-                disabled={!esMiTurno || !jugable}
-                draggable={dragg}
-                onDragStart={dragg ? e => onDragStart(e, p) : undefined}
+                selected={isSel}
+                playable={canPlay && !isSel}
+                disabled={!canPlay}
+                draggable={canPlay}
+                onDragStart={canPlay ? e => onDragStart(e, p) : undefined}
                 onDragEnd={onDragEnd}
+                onClick={canPlay ? () => onTapPieza(p) : undefined}
               />
             );
           })}
@@ -277,7 +300,7 @@ export default function GameBoard({ sala, user, onExit }: Props) {
             disabled={!puedoPasar || jugando}
             onClick={handlePasar}
           >
-            Pasar turno
+            Pasar
           </button>
         )}
       </div>
@@ -295,8 +318,10 @@ export default function GameBoard({ sala, user, onExit }: Props) {
   );
 }
 
-// ── Sub-componentes ──────────────────────────────
-function OpSeat({ nombre, count, activo }: { nombre: string; count: number; activo: boolean }) {
+// ── Sub-componentes ─────────────────────────────
+function OpSeat({ nombre, count, activo }: {
+  nombre: string; count: number; activo: boolean;
+}) {
   return (
     <div className={`opponent-seat${activo ? ' seat-active' : ''}`}>
       <span className="opponent-name">{nombre}</span>
@@ -309,36 +334,15 @@ function OpSeat({ nombre, count, activo }: { nombre: string; count: number; acti
   );
 }
 
-function DropZone({ lado, activa, sobre, onDragOver, onDrop, onDragLeave }: {
-  lado: 'izq' | 'der'; activa: boolean; sobre: boolean;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop:     (e: React.DragEvent) => void;
-  onDragLeave: () => void;
-}) {
-  if (!activa) return null;
-  return (
-    <div
-      className={`drop-zone${sobre ? ' dz-sobre' : ''}`}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-      onDragLeave={onDragLeave}
-    >
-      {lado === 'izq' ? '◀' : '▶'}
-    </div>
-  );
-}
-
 function ResultadoOverlay({ resultado, miSeat, nombreAsiento, onExit }: {
   resultado: PartidaPublica['resultado'];
-  miSeat:    number;
+  miSeat: number;
   nombreAsiento: (seat: number) => string;
   onExit: () => void;
 }) {
   if (!resultado) return null;
 
-  let titulo: string;
-  let detalle: string;
-
+  let titulo: string, detalle: string;
   if (resultado.tipo === 'tranca') {
     titulo  = '🔒 Tranca';
     detalle = `Gana el equipo ${resultado.equipoGanador === 0 ? 'A' : 'B'} con menos pips`;
