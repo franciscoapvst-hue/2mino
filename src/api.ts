@@ -63,6 +63,7 @@ export type PartidaPublica = {
   resultadoMano:  ResultadoMano | null;
   equipoGanadorPartida: 0 | 1 | null;
   ultimoEvento:   { tipo: 'paso_a_todos'; seat: number } | null;
+  abandonadoPorSeat: number | null;
   estado:         'jugando' | 'entre_manos' | 'terminado';
 };
 
@@ -209,6 +210,8 @@ export const api = {
       req<PartidaPublica>(`/salas/${salaId}/juego/pasar`, { method: 'POST', body: '{}' }),
     listo: (salaId: string) =>
       req<PartidaPublica>(`/salas/${salaId}/juego/listo`, { method: 'POST', body: '{}' }),
+    abandonar: (salaId: string) =>
+      req<PartidaPublica>(`/salas/${salaId}/juego/abandonar`, { method: 'POST', body: '{}' }),
   },
 
   ranked: {

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   crearSet, getExtremos, puedeJugar, esCapicua, equipoDe,
-  abrirTablero, crearPartida, aplicarJugada, aplicarPase, marcarListo,
+  abrirTablero, crearPartida, aplicarJugada, aplicarPase, marcarListo, aplicarAbandono,
   type Val, type Pieza, type Asiento, type PartidaState,
 } from './logic';
 
@@ -35,6 +35,7 @@ function partida(over: Partial<PartidaState> = {}): PartidaState {
     salidaForzada: null,
     resultadoMano: null,
     ultimoEvento: null,
+    abandonadoPorSeat: null,
     ...over,
   };
 }
@@ -303,6 +304,27 @@ describe('aplicarPase', () => {
 });
 
 // ── Entre manos: listos y reparto ──────────────────
+describe('aplicarAbandono', () => {
+  it('4P: quien abandona hace ganar al equipo rival y marca el seat', () => {
+    const p = partida({ maxJugadores: 4, asientos: asientos(4), turno: 2 });
+    const s = ok(aplicarAbandono(p, 'u1')); // seat 1 (equipo 1) abandona
+    expect(s.fase).toBe('fin_partida');
+    expect(s.equipoGanadorPartida).toBe(0); // gana el equipo par
+    expect(s.abandonadoPorSeat).toBe(1);
+  });
+
+  it('rechaza si la partida ya terminó', () => {
+    const p = partida({ fase: 'fin_partida', equipoGanadorPartida: 0 });
+    const r = aplicarAbandono(p, 'u0');
+    expect(r.ok).toBe(false);
+  });
+
+  it('rechaza a alguien ajeno a la partida', () => {
+    const r = aplicarAbandono(partida(), 'ajeno');
+    expect(r.ok).toBe(false);
+  });
+});
+
 describe('marcarListo', () => {
   it('acumula listos y reparte la mano nueva cuando todos confirman', () => {
     const p = partida({

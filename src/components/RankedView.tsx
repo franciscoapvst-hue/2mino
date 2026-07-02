@@ -217,10 +217,18 @@ export default function RankedView({ user, onBack, onGameStart, autoJoinCodigo }
     navigator.clipboard.writeText(url).catch(() => {});
   }
 
+  // Salir de Ranked: limpia cualquier ticket de cola y/o party para no
+  // dejar al usuario "buscando" fantasma tras volver al lobby.
+  async function salirDeRanked() {
+    if (pantalla === 'cola') { try { await api.ranked.salirCola(); } catch { /* noop */ } }
+    if (party) { try { await api.ranked.salirParty(party.codigo); } catch { /* noop */ } }
+    onBack();
+  }
+
   return (
     <div className="salas-page">
       <nav className="salas-nav">
-        <button className="btn-back" onClick={onBack}><BackIcon /> Lobby</button>
+        <button className="btn-back" onClick={salirDeRanked}><BackIcon /> Lobby</button>
         <h2>Partida Ranked</h2>
       </nav>
 

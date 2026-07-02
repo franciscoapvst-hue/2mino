@@ -1576,6 +1576,11 @@ button:active { transform: scale(0.97); }
   font-size: .9rem;
   margin: 0 0 24px;
 }
+/* Diálogo de confirmar abandono: segundo botón (Seguir jugando) */
+.game-result-card .btn-salir {
+  width: 100%;
+  margin-top: 10px;
+}
 
 /* ── Animación pieza colocada ───────────────────── */
 @keyframes piece-place {

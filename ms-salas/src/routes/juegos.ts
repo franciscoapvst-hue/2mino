@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { pool } from '../db/pool';
 import {
-  crearPartida, aplicarJugada, aplicarPase, marcarListo, vistaPublica,
+  crearPartida, aplicarJugada, aplicarPase, marcarListo, aplicarAbandono, vistaPublica,
 } from '../game/logic';
 import type { PartidaState, Pieza } from '../game/logic';
 import { aplicarEloRanked } from './ranked';
@@ -259,6 +259,44 @@ export async function juegosRoutes(app: FastifyInstance) {
 
     const partida = parsePartida(juego);
     const resultado = marcarListo(partida, req.body.usuario_id);
+
+    if (!resultado.ok) return reply.code(400).send({ error: resultado.error });
+
+    await guardarPartida(juego.id, juego.sala_id, resultado.partida);
+    return reply.send(vistaPublica(resultado.partida, req.body.usuario_id));
+  });
+
+  // ── POST /salas/:id/juego/abandonar ───────────────
+  // El jugador deja la partida: termina como derrota suya. guardarPartida
+  // finaliza la sala y (si es ranked) aplica el ELO del equipo rival.
+  app.post<{
+    Params: { id: string };
+    Body:   { usuario_id: string };
+  }>('/salas/:id/juego/abandonar', {
+    schema: {
+      tags:    ['juego'],
+      summary: 'Abandonar la partida (cuenta como derrota; aplica ELO en ranked)',
+      params: {
+        type: 'object',
+        properties: { id: { type: 'string', format: 'uuid' } },
+      },
+      body: {
+        type: 'object',
+        required: ['usuario_id'],
+        properties: { usuario_id: { type: 'string', format: 'uuid' } },
+      },
+      response: {
+        200: { ...PartidaPublicaSchema },
+        400: { ...ErrorSchema },
+        404: { ...ErrorSchema },
+      },
+    },
+  }, async (req, reply) => {
+    const juego = await getJuegoActivo(req.params.id);
+    if (!juego) return reply.code(404).send({ error: 'No hay partida para esta sala' });
+
+    const partida = parsePartida(juego);
+    const resultado = aplicarAbandono(partida, req.body.usuario_id);
 
     if (!resultado.ok) return reply.code(400).send({ error: resultado.error });
 
