@@ -424,6 +424,30 @@ button:active { transform: scale(0.97); }
   text-transform: uppercase;
 }
 
+/* ELO ranked del usuario */
+.lobby-elo {
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: rgba(250, 204, 21, 0.10);
+  border: 1px solid rgba(250, 204, 21, 0.35);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #facc15;
+  white-space: nowrap;
+}
+
+/* Badge de sala ranked en la lista */
+.sala-ranked-badge {
+  padding: 2px 7px;
+  border-radius: 12px;
+  background: rgba(250, 204, 21, 0.10);
+  border: 1px solid rgba(250, 204, 21, 0.35);
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #facc15;
+  letter-spacing: 0.6px;
+}
+
 .btn-nav-logout {
   padding: 6px 14px;
   font-size: 0.8rem;

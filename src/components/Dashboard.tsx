@@ -1,5 +1,6 @@
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { AuthUser, UserConfig } from '../api';
+import { api, type AuthUser, type UserConfig } from '../api';
 import { DominoTile, SunIcon, MoonIcon, CasualIcon, RankedIcon, SalasIcon } from './icons';
 
 type Props = {
@@ -41,6 +42,14 @@ function ModeCard({ title, desc, icon, action, variant, soon = true, onClick }: 
 
 // ── Dashboard / Lobby ─────────────────────────────
 export default function Dashboard({ user, config, dark, onToggleTheme, onLogout, onGoToSalas, onPieceDemo }: Props) {
+  const [elo, setElo] = useState<number | null>(null);
+
+  useEffect(() => {
+    api.ranked.me()
+      .then(r => setElo(r.elo))
+      .catch(() => setElo(null)); // sin ranked aún: no romper el lobby
+  }, []);
+
   return (
     <div className="lobby-shell">
 
@@ -64,6 +73,7 @@ export default function Dashboard({ user, config, dark, onToggleTheme, onLogout,
             <span className="lobby-avatar">{user.username[0].toUpperCase()}</span>
             <span className="lobby-username">@{user.username}</span>
             <span className="lobby-badge">{config.segmento}</span>
+            {elo !== null && <span className="lobby-elo" title="ELO ranked">⭐ {elo}</span>}
           </div>
 
           <button

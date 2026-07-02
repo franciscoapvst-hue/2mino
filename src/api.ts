@@ -72,6 +72,23 @@ export type AuthUser = {
   email: string;
 };
 
+// ── Ranked / ELO ───────────────────────────────────
+export type RankedInfo = {
+  usuario_id: string;
+  elo:        number;
+  partidas:   number;
+  ganadas:    number;
+  historial: {
+    sala_id: string; elo_antes: number; elo_despues: number;
+    delta: number; gano: boolean; created_at: string;
+  }[];
+};
+
+export type LeaderboardEntry = {
+  usuario_id: string; username: string;
+  elo: number; partidas: number; ganadas: number;
+};
+
 export type UserConfig = {
   usuario_id: string;
   segmento: string;
@@ -178,5 +195,11 @@ export const api = {
       req<PartidaPublica>(`/salas/${salaId}/juego/pasar`, { method: 'POST', body: '{}' }),
     listo: (salaId: string) =>
       req<PartidaPublica>(`/salas/${salaId}/juego/listo`, { method: 'POST', body: '{}' }),
+  },
+
+  ranked: {
+    me: () => req<RankedInfo>('/ranked/me'),
+    leaderboard: (limit = 20) =>
+      req<LeaderboardEntry[]>(`/ranked/leaderboard?limit=${limit}`),
   },
 };

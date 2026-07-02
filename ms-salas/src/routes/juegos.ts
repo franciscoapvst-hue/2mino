@@ -4,6 +4,7 @@ import {
   crearPartida, aplicarJugada, aplicarPase, marcarListo, vistaPublica,
 } from '../game/logic';
 import type { PartidaState, Pieza } from '../game/logic';
+import { aplicarEloRanked } from './ranked';
 
 const ErrorSchema = {
   type: 'object',
@@ -41,6 +42,13 @@ async function guardarPartida(juegoId: string, salaId: string, partida: PartidaS
       `UPDATE salas SET estado = 'finalizada', finished_at = NOW(), updated_at = NOW() WHERE id = $1`,
       [salaId],
     );
+    // ELO solo en salas ranked (la función lo verifica y es idempotente).
+    // Un fallo aquí no debe tumbar la jugada ya guardada.
+    try {
+      await aplicarEloRanked(salaId, partida);
+    } catch (e) {
+      console.error('Error aplicando ELO ranked:', e);
+    }
   }
 }
 

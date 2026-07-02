@@ -394,4 +394,42 @@ export async function salasGatewayRoutes(app: FastifyInstance) {
     });
     return reply.code(status).send(data);
   });
+
+  // ── GET /ranked/me ────────────────────────────────
+  app.get('/ranked/me', {
+    schema: {
+      tags:     ['ranked'],
+      summary:  'Mi ELO, récord e historial ranked',
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: { ...SalaResumenSchema },
+        401: { ...ErrorSchema },
+      },
+    },
+  }, async (req, reply) => {
+    const payload = verifyToken(req.headers.authorization);
+    if (!payload) return reply.code(401).send({ error: 'Token requerido' });
+
+    const { status, data } = await callSalas(`/ranked/${payload.sub}`, 'GET');
+    return reply.code(status).send(data);
+  });
+
+  // ── GET /ranked/leaderboard ───────────────────────
+  app.get<{ Querystring: { limit?: number } }>('/ranked/leaderboard', {
+    schema: {
+      tags:    ['ranked'],
+      summary: 'Top de jugadores por ELO',
+      querystring: {
+        type: 'object',
+        properties: { limit: { type: 'integer', minimum: 1, maximum: 100 } },
+      },
+      response: {
+        200: { type: 'array', items: SalaResumenSchema },
+      },
+    },
+  }, async (req, reply) => {
+    const qs = req.query.limit ? `?limit=${req.query.limit}` : '';
+    const { status, data } = await callSalas(`/ranked/leaderboard${qs}`, 'GET');
+    return reply.code(status).send(data);
+  });
 }

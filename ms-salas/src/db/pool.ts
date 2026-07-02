@@ -61,6 +61,35 @@ const SCHEMA = `
   );
 
   CREATE INDEX IF NOT EXISTS idx_juegos_sala_id ON juegos(sala_id);
+
+  -- ── Ranked / ELO ─────────────────────────────────────────────────
+  -- Rating vigente por usuario. Lo escribe SOLO ms-salas al terminar
+  -- una partida ranked. username desnormalizado para el leaderboard.
+  CREATE TABLE IF NOT EXISTS ranked_ratings (
+    usuario_id  UUID        PRIMARY KEY,
+    username    VARCHAR(20) NOT NULL,
+    elo         INT         NOT NULL DEFAULT 1000,
+    partidas    INT         NOT NULL DEFAULT 0,
+    ganadas     INT         NOT NULL DEFAULT 0,
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  -- Historial: una fila por jugador por partida ranked (progreso/auditoría).
+  -- UNIQUE(usuario_id, sala_id) hace idempotente la aplicación del ELO.
+  CREATE TABLE IF NOT EXISTS ranked_historial (
+    id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    usuario_id   UUID        NOT NULL,
+    sala_id      UUID        NOT NULL REFERENCES salas(id) ON DELETE CASCADE,
+    elo_antes    INT         NOT NULL,
+    elo_despues  INT         NOT NULL,
+    delta        INT         NOT NULL,
+    gano         BOOLEAN     NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (usuario_id, sala_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_ranked_hist_usuario ON ranked_historial(usuario_id, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_ranked_ratings_elo  ON ranked_ratings(elo DESC);
 `;
 
 export async function runMigrations() {
