@@ -62,10 +62,11 @@ function SalaCard({
 
 // ── Sala de espera ────────────────────────────────
 function WaitingRoom({
-  sala, userId, onSalir, saliendo, onIniciar, iniciando,
+  sala, userId, onSalir, saliendo, onIniciar, iniciando, onCambiarPosicion,
 }: {
   sala: Sala; userId: string; onSalir: () => void; saliendo: boolean;
   onIniciar: () => void; iniciando: boolean;
+  onCambiarPosicion: (posicion: number) => void;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -104,6 +105,10 @@ function WaitingRoom({
         {sala.nombre && <p className="waiting-nombre">{sala.nombre}</p>}
       </div>
 
+      {sala.max_jugadores === 4 && (
+        <p className="teams-hint">Parejas: asientos 1 y 3 vs 2 y 4 — toca un asiento libre para moverte</p>
+      )}
+
       <div className="slot-grid" style={{ gridTemplateColumns: `repeat(${sala.max_jugadores}, 1fr)` }}>
         {slots.map(({ posicion, jugador }) => (
           <SlotCard
@@ -112,6 +117,8 @@ function WaitingRoom({
             jugador={jugador}
             esMio={jugador?.usuario_id === userId}
             esCreador={jugador?.usuario_id === sala.creador_id}
+            equipo={sala.max_jugadores === 4 ? (posicion % 2 === 1 ? 'A' : 'B') : null}
+            onSentarme={jugador ? undefined : () => onCambiarPosicion(posicion)}
           />
         ))}
       </div>
@@ -134,15 +141,17 @@ function WaitingRoom({
   );
 }
 
-function SlotCard({ posicion, jugador, esMio, esCreador }: {
+function SlotCard({ posicion, jugador, esMio, esCreador, equipo, onSentarme }: {
   posicion: number; jugador: SalaJugador | null; esMio: boolean; esCreador: boolean;
+  equipo: 'A' | 'B' | null;
+  onSentarme?: () => void;
 }) {
   if (!jugador) {
     return (
-      <div className="slot slot-empty">
-        <span className="slot-pos">{posicion}</span>
-        <span className="slot-waiting">Esperando…</span>
-      </div>
+      <button type="button" className="slot slot-empty slot-clickable" onClick={onSentarme}>
+        <span className="slot-pos">{posicion}{equipo ? ` · ${equipo}` : ''}</span>
+        <span className="slot-waiting">Sentarme aquí</span>
+      </button>
     );
   }
 
@@ -150,22 +159,27 @@ function SlotCard({ posicion, jugador, esMio, esCreador }: {
     <div className={`slot slot-filled${esMio ? ' slot-me' : ''}`}>
       <span className="slot-avatar">{jugador.username[0].toUpperCase()}</span>
       <span className="slot-username">@{jugador.username}</span>
+      {equipo && <span className="slot-pos">{posicion} · Equipo {equipo}</span>}
       {esCreador && <span className="slot-host-badge">creador</span>}
     </div>
   );
 }
 
 // ── Create form ───────────────────────────────────
-type CreateBody = { nombre: string; modo: 'clasico'|'rapido'|'torneo'; max_jugadores: 2|4 };
+type CreateBody = {
+  nombre: string; modo: 'clasico'|'rapido'|'torneo'; max_jugadores: 2|4;
+  config: { puntosObjetivo: 100|150|200 };
+};
 
 function CreateForm({ onCrear, creating }: { onCrear: (b: CreateBody) => void; creating: boolean }) {
   const [nombre, setNombre] = useState('');
   const [modo,   setModo]   = useState<'clasico'|'rapido'|'torneo'>('clasico');
   const [max,    setMax]    = useState<2|4>(4);
+  const [puntos, setPuntos] = useState<100|150|200>(100);
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    onCrear({ nombre, modo, max_jugadores: max });
+    onCrear({ nombre, modo, max_jugadores: max, config: { puntosObjetivo: puntos } });
   }
 
   return (
@@ -200,6 +214,19 @@ function CreateForm({ onCrear, creating }: { onCrear: (b: CreateBody) => void; c
                 <button key={n} type="button"
                   className={`toggle-btn${max === n ? ' active' : ''}`}
                   onClick={() => setMax(n)} disabled={creating}>
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="option-group">
+            <span className="field-label">Partida a</span>
+            <div className="toggle-row">
+              {([100, 150, 200] as const).map(n => (
+                <button key={n} type="button"
+                  className={`toggle-btn${puntos === n ? ' active' : ''}`}
+                  onClick={() => setPuntos(n)} disabled={creating}>
                   {n}
                 </button>
               ))}
@@ -312,6 +339,15 @@ export default function SalasView({ user, onBack, onGameStart }: Props) {
     }
   }
 
+  async function handleCambiarPosicion(posicion: number) {
+    if (!sala) return;
+    try {
+      setSala(await api.salas.cambiarPosicion(sala.id, posicion));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'No se pudo cambiar de asiento');
+    }
+  }
+
   async function handleIniciar() {
     if (!sala) return;
     setIniciando(true);
@@ -364,6 +400,7 @@ export default function SalasView({ user, onBack, onGameStart }: Props) {
             saliendo={saliendo}
             onIniciar={handleIniciar}
             iniciando={iniciando}
+            onCambiarPosicion={handleCambiarPosicion}
           />
         </div>
       </div>

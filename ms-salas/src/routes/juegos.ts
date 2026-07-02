@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { pool } from '../db/pool';
 import {
-  crearPartida, aplicarJugada, aplicarPase, vistaPublica,
+  crearPartida, aplicarJugada, aplicarPase, marcarListo, vistaPublica,
 } from '../game/logic';
 import type { PartidaState, Pieza } from '../game/logic';
 
@@ -29,12 +29,14 @@ function parsePartida(row: { partida: string }): PartidaState {
 }
 
 async function guardarPartida(juegoId: string, salaId: string, partida: PartidaState) {
-  const estado = partida.resultado ? 'terminado' : 'jugando';
+  // La sala solo se finaliza cuando la PARTIDA completa termina (alguien
+  // alcanzó el objetivo); entre manos sigue en juego.
+  const terminada = partida.fase === 'fin_partida';
   await pool.query(
     `UPDATE juegos SET partida = $1, estado = $2, updated_at = NOW() WHERE id = $3`,
-    [JSON.stringify(partida), estado, juegoId],
+    [JSON.stringify(partida), terminada ? 'terminado' : 'jugando', juegoId],
   );
-  if (partida.resultado) {
+  if (terminada) {
     await pool.query(
       `UPDATE salas SET estado = 'finalizada', finished_at = NOW(), updated_at = NOW() WHERE id = $1`,
       [salaId],
@@ -91,7 +93,11 @@ export async function juegosRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: `Se necesitan ${sala.max_jugadores} jugadores para iniciar` });
     }
 
-    const partida = crearPartida(jugadores);
+    // Objetivo de puntos definido al crear la sala (100/150/200)
+    const config = typeof sala.config === 'string' ? JSON.parse(sala.config) : (sala.config ?? {});
+    const objetivo = [100, 150, 200].includes(config.puntosObjetivo) ? config.puntosObjetivo : 100;
+
+    const partida = crearPartida(jugadores, objetivo);
 
     await pool.query(
       `INSERT INTO juegos (sala_id, partida) VALUES ($1, $2)`,
@@ -209,6 +215,42 @@ export async function juegosRoutes(app: FastifyInstance) {
 
     const partida = parsePartida(juego);
     const resultado = aplicarPase(partida, req.body.usuario_id);
+
+    if (!resultado.ok) return reply.code(400).send({ error: resultado.error });
+
+    await guardarPartida(juego.id, juego.sala_id, resultado.partida);
+    return reply.send(vistaPublica(resultado.partida, req.body.usuario_id));
+  });
+
+  // ── POST /salas/:id/juego/listo ───────────────────
+  app.post<{
+    Params: { id: string };
+    Body:   { usuario_id: string };
+  }>('/salas/:id/juego/listo', {
+    schema: {
+      tags:    ['juego'],
+      summary: 'Confirmar listo para la siguiente mano (reparte cuando todos confirman)',
+      params: {
+        type: 'object',
+        properties: { id: { type: 'string', format: 'uuid' } },
+      },
+      body: {
+        type: 'object',
+        required: ['usuario_id'],
+        properties: { usuario_id: { type: 'string', format: 'uuid' } },
+      },
+      response: {
+        200: { ...PartidaPublicaSchema },
+        400: { ...ErrorSchema },
+        404: { ...ErrorSchema },
+      },
+    },
+  }, async (req, reply) => {
+    const juego = await getJuegoActivo(req.params.id);
+    if (!juego) return reply.code(404).send({ error: 'No hay partida para esta sala' });
+
+    const partida = parsePartida(juego);
+    const resultado = marcarListo(partida, req.body.usuario_id);
 
     if (!resultado.ok) return reply.code(400).send({ error: resultado.error });
 
