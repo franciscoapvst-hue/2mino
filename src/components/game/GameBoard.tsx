@@ -43,6 +43,22 @@ export default function GameBoard({ sala, user, onExit }: Props) {
   const [boardWidth, boardRef] = useMeasuredWidth();
   const [handWidth,  handRef]  = useMeasuredWidth();
 
+  // Aviso efímero del bonus "+30 pasó a todos"
+  const [eventoVisible, setEventoVisible] = useState<{ seat: number } | null>(null);
+  const eventoPrevRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const ev = partida?.ultimoEvento;
+    if (!ev) return;
+    // Firma única por evento (el polling repite el mismo estado)
+    const firma = `${partida.numeroMano}:${ev.seat}:${partida.marcador[0]}-${partida.marcador[1]}`;
+    if (eventoPrevRef.current === firma) return;
+    eventoPrevRef.current = firma;
+    setEventoVisible({ seat: ev.seat });
+    const id = setTimeout(() => setEventoVisible(null), 3000);
+    return () => clearTimeout(id);
+  }, [partida?.ultimoEvento, partida?.marcador, partida?.numeroMano]);
+
   // ── Carga y polling ────────────────────────────
   const fetchPartida = useCallback(async () => {
     try {
@@ -84,6 +100,20 @@ export default function GameBoard({ sala, user, onExit }: Props) {
       setPartida(nueva);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Jugada inválida');
+      setTimeout(() => setError(null), 2500);
+    } finally {
+      setJugando(false);
+    }
+  }
+
+  // ── Listo para la siguiente mano ──────────────
+  async function handleListo() {
+    if (jugando) return;
+    setJugando(true);
+    try {
+      setPartida(await api.juego.listo(sala.id));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'No se pudo confirmar');
       setTimeout(() => setError(null), 2500);
     } finally {
       setJugando(false);
@@ -184,8 +214,13 @@ export default function GameBoard({ sala, user, onExit }: Props) {
 
   // ── Derivados ─────────────────────────────────
   const ext       = getExtremos(partida.tablero);
-  const esMiTurno = partida.turno === partida.miSeat && !partida.resultado;
+  const esMiTurno = partida.fase === 'jugando' && partida.turno === partida.miSeat;
   const maxJ      = partida.maxJugadores;
+
+  // Mano 1: apertura obligada (p. ej. el 6-6) — solo esa ficha es jugable
+  const forzada = partida.tablero.length === 0 ? partida.salidaForzada : null;
+  const esForzada = (p: Pieza) =>
+    !forzada || (p.a === forzada.a && p.b === forzada.b) || (p.a === forzada.b && p.b === forzada.a);
 
   const puedoPasar = esMiTurno && ext !== null &&
     !partida.miMano.some(p => { const o = puedeJugar(p, ext); return o.izq || o.der; });
@@ -208,9 +243,15 @@ export default function GameBoard({ sala, user, onExit }: Props) {
   const nombreAsiento = (seat: number) => partida.asientos[seat]
     ? `@${partida.asientos[seat].username}` : '—';
 
-  const turnoLabel = partida.resultado
-    ? 'Partida terminada'
+  const turnoLabel =
+      partida.fase === 'fin_partida' ? 'Partida terminada'
+    : partida.fase === 'entre_manos' ? `Mano ${partida.numeroMano} terminada`
+    : partida.tablero.length === 0   ? (esMiTurno ? '¡Sales tú!' : `Sale ${nombreAsiento(partida.turno)}`)
     : esMiTurno ? '¡Tu turno!' : `Turno de ${nombreAsiento(partida.turno)}`;
+
+  const miEq = partida.miEquipo ?? 0;
+  const marcadorNos   = partida.marcador[miEq];
+  const marcadorEllos = partida.marcador[miEq === 0 ? 1 : 0];
 
   return (
     <div className="game-shell">
@@ -221,7 +262,23 @@ export default function GameBoard({ sala, user, onExit }: Props) {
         <span className={`game-turn-indicator${esMiTurno ? ' my-turn' : ''}`}>{turnoLabel}</span>
       </nav>
 
+      {/* ── Marcador ─────────────────────────────── */}
+      <div className="score-bar">
+        <span className="score-team score-nos">
+          Nosotros <strong>{marcadorNos}</strong>
+        </span>
+        <span className="score-target">Mano {partida.numeroMano} · a {partida.puntosObjetivo}</span>
+        <span className="score-team score-ellos">
+          <strong>{marcadorEllos}</strong> Ellos
+        </span>
+      </div>
+
       {error && <div className="game-error-banner">⚠ {error}</div>}
+      {eventoVisible && (
+        <div className="game-event-banner">
+          ⚡ +30 · ¡{nombreAsiento(eventoVisible.seat)} pasó a todos!
+        </div>
+      )}
 
       {/* ── Mesa ────────────────────────────────── */}
       <div className={`game-table table-${maxJ}p`}>
@@ -287,7 +344,7 @@ export default function GameBoard({ sala, user, onExit }: Props) {
         <div className="my-hand" ref={handRef}>
           {partida.miMano.map((p, i) => {
             const ops     = ext ? puedeJugar(p, ext) : { izq: true, der: true };
-            const jugable = ops.izq || ops.der;
+            const jugable = (ops.izq || ops.der) && esForzada(p);
             const isSel   = selectedPiece?.a === p.a && selectedPiece?.b === p.b;
             const canPlay = esMiTurno && jugable && !jugando;
             return (
@@ -319,14 +376,19 @@ export default function GameBoard({ sala, user, onExit }: Props) {
         )}
       </div>
 
-      {/* ── Resultado ────────────────────────────── */}
-      {partida.resultado && (
-        <ResultadoOverlay
-          resultado={partida.resultado}
-          miSeat={partida.miSeat}
+      {/* ── Fin de mano: resultado + listos ──────── */}
+      {partida.fase === 'entre_manos' && (
+        <ManoOverlay
+          partida={partida}
           nombreAsiento={nombreAsiento}
-          onExit={onExit}
+          onListo={handleListo}
+          confirmando={jugando}
         />
+      )}
+
+      {/* ── Fin de partida ───────────────────────── */}
+      {partida.fase === 'fin_partida' && (
+        <FinPartidaOverlay partida={partida} onExit={onExit} />
       )}
     </div>
   );
@@ -375,32 +437,85 @@ function OpSeat({ nombre, count, activo, position = 'top' }: {
   );
 }
 
-function ResultadoOverlay({ resultado, miSeat, nombreAsiento, onExit }: {
-  resultado: PartidaPublica['resultado'];
-  miSeat: number;
-  nombreAsiento: (seat: number) => string;
-  onExit: () => void;
-}) {
-  if (!resultado) return null;
+function MarcadorResumen({ partida }: { partida: PartidaPublica }) {
+  const miEq = partida.miEquipo ?? 0;
+  return (
+    <p className="result-marcador">
+      Nosotros <strong>{partida.marcador[miEq]}</strong>
+      <span className="result-marcador-sep"> — </span>
+      <strong>{partida.marcador[miEq === 0 ? 1 : 0]}</strong> Ellos
+      <span className="result-marcador-obj"> · a {partida.puntosObjetivo}</span>
+    </p>
+  );
+}
 
-  let titulo: string, detalle: string;
-  if (resultado.tipo === 'tranca') {
-    titulo  = '🔒 Tranca';
-    detalle = `Gana el equipo ${resultado.equipoGanador === 0 ? 'A' : 'B'} con menos pips`;
-  } else if (resultado.tipo === 'capicua') {
-    titulo  = '⚡ ¡Capicúa!';
-    detalle = resultado.ganadorSeat === miSeat ? '¡Ganaste tú!' : `Ganó ${nombreAsiento(resultado.ganadorSeat)}`;
-  } else {
-    titulo  = resultado.ganadorSeat === miSeat ? '🏆 ¡Ganaste!' : '😓 Perdiste';
-    detalle = resultado.ganadorSeat === miSeat ? '¡Bien jugado!' : `Ganó ${nombreAsiento(resultado.ganadorSeat)}`;
+function tituloResultado(
+  r: NonNullable<PartidaPublica['resultadoMano']>,
+  partida: PartidaPublica,
+  nombreAsiento: (seat: number) => string,
+): { titulo: string; detalle: string } {
+  const miEq = partida.miEquipo ?? 0;
+  if (r.tipo === 'tranca') {
+    return {
+      titulo: '🔒 Tranca',
+      detalle: r.equipoGanador === null ? 'Empate: nadie suma'
+             : r.equipoGanador === miEq ? '¡Menos pips: sumamos nosotros!'
+             : 'Menos pips: suman ellos',
+    };
   }
+  const gane = equipoDeSeat(r.ganadorSeat) === miEq;
+  return {
+    titulo:  r.tipo === 'capicua' ? '⚡ ¡Capicúa!' : gane ? '🏆 Mano ganada' : '😓 Mano perdida',
+    detalle: gane ? '¡Bien jugado!' : `Cerró ${nombreAsiento(r.ganadorSeat)}`,
+  };
+}
+
+const equipoDeSeat = (seat: number) => seat % 2;
+
+function ManoOverlay({ partida, nombreAsiento, onListo, confirmando }: {
+  partida: PartidaPublica;
+  nombreAsiento: (seat: number) => string;
+  onListo: () => void;
+  confirmando: boolean;
+}) {
+  const r = partida.resultadoMano;
+  if (!r) return null;
+  const { titulo, detalle } = tituloResultado(r, partida, nombreAsiento);
+  const yaListo = partida.miSeat >= 0 && partida.listos[partida.miSeat];
+  const nListos = partida.listos.filter(Boolean).length;
 
   return (
     <div className="game-result-overlay">
       <div className="game-result-card">
         <h2>{titulo}</h2>
-        <p className="result-points">+{resultado.puntos} pts</p>
+        <p className="result-points">+{r.puntos} pts</p>
         <p className="result-detail">{detalle}</p>
+        <MarcadorResumen partida={partida} />
+        <p className="result-detail">Sale {nombreAsiento(partida.salida)}</p>
+        <button className="btn-primary" onClick={onListo} disabled={yaListo || confirmando}>
+          {yaListo
+            ? `Esperando… (${nListos}/${partida.maxJugadores})`
+            : 'Listo para la siguiente mano'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FinPartidaOverlay({ partida, onExit }: {
+  partida: PartidaPublica;
+  onExit: () => void;
+}) {
+  const miEq = partida.miEquipo ?? 0;
+  const gane = partida.equipoGanadorPartida === miEq;
+  return (
+    <div className="game-result-overlay">
+      <div className="game-result-card">
+        <h2>{gane ? '🏆 ¡Partida ganada!' : '😓 Partida perdida'}</h2>
+        <MarcadorResumen partida={partida} />
+        <p className="result-detail">
+          {gane ? '¡Alcanzaron el objetivo!' : 'El rival alcanzó el objetivo'}
+        </p>
         <button className="btn-primary" onClick={onExit}>Volver a la sala</button>
       </div>
     </div>

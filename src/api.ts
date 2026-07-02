@@ -36,21 +36,34 @@ export type Asiento = { usuario_id: string; username: string; posicion: number }
 
 export type ResultadoMano =
   | { tipo: 'normal';  ganadorSeat: number; puntos: number }
-  | { tipo: 'capicua'; ganadorSeat: number; puntos: 30 }
-  | { tipo: 'tranca';  equipoGanador: 0 | 1; puntos: 30 };
+  | { tipo: 'capicua'; ganadorSeat: number; puntos: number }
+  | { tipo: 'tranca';  equipoGanador: 0 | 1 | null; puntos: number };
+
+export type Fase = 'jugando' | 'entre_manos' | 'fin_partida';
 
 export type PartidaPublica = {
   maxJugadores: number;
   asientos:     Asiento[];
   miSeat:       number;
+  miEquipo:     0 | 1 | null;
   miMano:       Pieza[];
   conteoManos:  number[];
   tablero:      FichaTablero[];
   turno:        number;
   pasadas:      number;
   ultimaJugada: { lado: 'izq' | 'der' } | null;
-  resultado:    ResultadoMano | null;
-  estado:       'jugando' | 'terminado';
+  // — partida a puntos —
+  puntosObjetivo: number;
+  marcador:       [number, number];
+  numeroMano:     number;
+  salida:         number;
+  fase:           Fase;
+  listos:         boolean[];
+  salidaForzada:  Pieza | null;
+  resultadoMano:  ResultadoMano | null;
+  equipoGanadorPartida: 0 | 1 | null;
+  ultimoEvento:   { tipo: 'paso_a_todos'; seat: number } | null;
+  estado:         'jugando' | 'entre_manos' | 'terminado';
 };
 
 export type AuthUser = {
@@ -133,8 +146,13 @@ export const api = {
       const qs = q ? '?' + new URLSearchParams(q as Record<string, string>) : '';
       return req<Sala[]>(`/salas${qs}`);
     },
-    crear: (body: { nombre?: string; tipo?: string; modo?: string; max_jugadores?: number }) =>
+    crear: (body: {
+      nombre?: string; tipo?: string; modo?: string; max_jugadores?: number;
+      config?: { puntosObjetivo?: number };
+    }) =>
       req<Sala>('/salas', { method: 'POST', body: JSON.stringify(body) }),
+    cambiarPosicion: (id: string, posicion: number) =>
+      req<Sala>(`/salas/${id}/posicion`, { method: 'POST', body: JSON.stringify({ posicion }) }),
     porCodigo: (codigo: string) =>
       req<Sala>(`/salas/codigo/${codigo.trim().toUpperCase()}`),
     detalle: (id: string) =>
@@ -158,5 +176,7 @@ export const api = {
       }),
     pasar: (salaId: string) =>
       req<PartidaPublica>(`/salas/${salaId}/juego/pasar`, { method: 'POST', body: '{}' }),
+    listo: (salaId: string) =>
+      req<PartidaPublica>(`/salas/${salaId}/juego/listo`, { method: 'POST', body: '{}' }),
   },
 };

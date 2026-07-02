@@ -367,6 +367,61 @@ export async function salasRoutes(app: FastifyInstance) {
     return reply.send(actualizada);
   });
 
+  // ── POST /salas/:id/posicion ─────────────────────
+  // Cambiar de asiento en la sala de espera. Los equipos son los
+  // asientos enfrentados (1&3 vs 2&4), así que elegir posición = elegir pareja.
+  app.post<{
+    Params: { id: string };
+    Body:   { usuario_id: string; posicion: number };
+  }>('/salas/:id/posicion', {
+    schema: {
+      tags:    ['salas'],
+      summary: 'Cambiar de posición/asiento (define los equipos)',
+      params: {
+        type: 'object',
+        properties: { id: { type: 'string', format: 'uuid' } },
+      },
+      body: {
+        type: 'object',
+        required: ['usuario_id', 'posicion'],
+        properties: {
+          usuario_id: { type: 'string', format: 'uuid' },
+          posicion:   { type: 'integer', minimum: 1, maximum: 4 },
+        },
+      },
+      response: {
+        200: { ...SalaSchema },
+        400: { ...ErrorSchema },
+        404: { ...ErrorSchema },
+        409: { ...ErrorSchema },
+      },
+    },
+  }, async (req, reply) => {
+    const { id } = req.params;
+    const { usuario_id, posicion } = req.body;
+
+    const sala = await getSalaConJugadores(id);
+    if (!sala) return reply.code(404).send({ error: 'Sala no encontrada' });
+    if (sala.estado !== 'esperando') return reply.code(400).send({ error: 'La partida ya empezó' });
+    if (posicion > sala.max_jugadores) return reply.code(400).send({ error: 'Posición fuera de rango' });
+
+    const yo = sala.jugadores.find((j: any) => j.usuario_id === usuario_id);
+    if (!yo) return reply.code(400).send({ error: 'No estás en esta sala' });
+
+    const ocupada = sala.jugadores.some(
+      (j: any) => j.posicion === posicion && j.usuario_id !== usuario_id,
+    );
+    if (ocupada) return reply.code(409).send({ error: 'Ese asiento está ocupado' });
+
+    await pool.query(
+      'UPDATE sala_jugadores SET posicion=$1 WHERE sala_id=$2 AND usuario_id=$3',
+      [posicion, id, usuario_id],
+    );
+
+    const actualizada = await getSalaConJugadores(id);
+    return reply.send(actualizada);
+  });
+
   // ── POST /salas/:id/salir ────────────────────────
   app.post<{
     Params: { id: string };
