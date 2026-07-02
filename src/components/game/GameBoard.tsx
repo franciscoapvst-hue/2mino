@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import DominoPiece from './DominoPiece';
 import SnakeBoard from './SnakeBoard';
-import { puedeJugar, getExtremos } from '../../game/types';
+import { puedeJugar, getExtremos } from '../../game/local-rules';
 import { api } from '../../api';
 import type { PartidaPublica, Pieza, Sala, AuthUser } from '../../api';
 
