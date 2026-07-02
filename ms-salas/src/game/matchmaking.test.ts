@@ -23,6 +23,22 @@ describe('rangoPermitido', () => {
     expect(rangoPermitido(60_000)).toBe(800);
     expect(rangoPermitido(999_999)).toBe(800); // se topa, no crece infinito
   });
+  it('espera negativa (ticket recién creado, reloj DB adelantado) → rango base, no undefined', () => {
+    expect(rangoPermitido(-0.5)).toBe(50);
+    expect(rangoPermitido(-5000)).toBe(50);
+    expect(rangoPermitido(0)).toBe(50);
+  });
+});
+
+describe('regresión: match inmediato de tickets recién creados', () => {
+  it('dos tickets con creadoEn en el "futuro" respecto a ahora igual emparejan', () => {
+    // Simula el instante del INSERT: created_at de la DB queda ~1ms por
+    // delante del Date.now() usado como `ahora`.
+    const ahora = T0;
+    const a = solo(2, 1000, ahora + 0.4);
+    const b = solo(2, 1000, ahora + 0.9);
+    expect(tryMatch2p([a, b], ahora)).not.toBeNull();
+  });
 });
 
 describe('tryMatch2p', () => {

@@ -22,7 +22,12 @@ const ESCALONES_RANGO = [50, 100, 200, 400, 800];
 const PASO_MS = 15_000;
 
 export function rangoPermitido(esperaMs: number): number {
-  const idx = Math.min(Math.floor(esperaMs / PASO_MS), ESCALONES_RANGO.length - 1);
+  // esperaMs puede ser levemente negativo: un ticket recién insertado tiene
+  // created_at (reloj de la DB) una fracción de ms por delante del Date.now()
+  // usado como "ahora". Sin el max(0,…), floor da -1 e indexa fuera del array
+  // (undefined) → toda comparación de rango falla y NO empareja al entrar.
+  const paso = Math.max(0, Math.floor(esperaMs / PASO_MS));
+  const idx = Math.min(paso, ESCALONES_RANGO.length - 1);
   return ESCALONES_RANGO[idx];
 }
 

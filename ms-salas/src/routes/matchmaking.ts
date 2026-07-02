@@ -363,7 +363,27 @@ export async function matchmakingRoutes(app: FastifyInstance) {
     );
 
     const ticket = soloRows[0] ?? partyRows[0];
-    if (!ticket) return reply.send({ en_cola: false });
+    if (!ticket) {
+      // Sin ticket puede significar dos cosas muy distintas:
+      //  (a) el usuario canceló / nunca entró, o
+      //  (b) OTRO jugador disparó el match y consumió este ticket — este
+      //      usuario fue emparejado pero aún no lo sabe.
+      // Distinguimos (b) buscando una sala ranked recién iniciada donde
+      // este usuario ya es jugador. Sin esto, quien no dispara el match
+      // se va al menú por error ("saca a uno de los dos").
+      const { rows: salaReciente } = await pool.query(
+        `SELECT s.id FROM salas s
+         JOIN sala_jugadores sj ON sj.sala_id = s.id
+         WHERE sj.usuario_id = $1 AND s.tipo = 'ranked' AND s.estado = 'en_juego'
+           AND s.started_at > NOW() - INTERVAL '60 seconds'
+         ORDER BY s.started_at DESC LIMIT 1`,
+        [usuario_id],
+      );
+      if (salaReciente.length) {
+        return reply.send({ en_cola: false, matched: true, sala_id: salaReciente[0].id });
+      }
+      return reply.send({ en_cola: false });
+    }
 
     const resultado = await intentarEmparejar(ticket.modo);
     if (resultado.matched) {
