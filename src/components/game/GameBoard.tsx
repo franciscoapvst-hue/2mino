@@ -127,7 +127,7 @@ export default function GameBoard({ sala, user, onExit }: Props) {
 
   function onClickSalir() {
     const enCurso = partida && partida.fase !== 'fin_partida';
-    if (sala.tipo === 'ranked' && enCurso) setConfirmSalir(true);
+    if (enCurso) setConfirmSalir(true);   // confirma en ranked Y casual
     else onExit();
   }
 
@@ -416,10 +416,13 @@ export default function GameBoard({ sala, user, onExit }: Props) {
           <div className="game-result-card">
             <h2>¿Abandonar la partida?</h2>
             <p className="result-detail">
-              Es una partida ranked. Si sales ahora <strong>cuentas como derrota</strong>:
-              pierdes ELO y el rival lo gana.
+              {sala.tipo === 'ranked'
+                ? <>Es una partida ranked. Si sales ahora <strong>cuentas como derrota</strong>: pierdes ELO y el rival lo gana.</>
+                : <>Si sales ahora <strong>se termina la partida</strong> para todos.</>}
             </p>
-            <button className="btn-primary" onClick={handleAbandonar}>Salir y perder</button>
+            <button className="btn-primary" onClick={handleAbandonar}>
+              {sala.tipo === 'ranked' ? 'Salir y perder' : 'Salir'}
+            </button>
             <button className="btn-salir" onClick={() => setConfirmSalir(false)}>Seguir jugando</button>
           </div>
         </div>
