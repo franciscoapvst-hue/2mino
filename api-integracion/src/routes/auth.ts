@@ -1,9 +1,6 @@
 import { FastifyInstance } from 'fastify';
-import jwt from 'jsonwebtoken';
 import { callMs } from '../http';
-
-const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-secret-change-in-production';
-const JWT_EXPIRY  = '7d';
+import { signToken, verifyToken } from '../jwt';
 
 // ── Schemas reutilizables ─────────────────────────
 const UserSchema = {
@@ -66,11 +63,7 @@ export async function authRoutes(app: FastifyInstance) {
       if (status !== 201) return reply.code(status).send(data);
 
       const user = data as { id: string; username: string };
-      const token = jwt.sign(
-        { sub: user.id, username: user.username },
-        JWT_SECRET,
-        { expiresIn: JWT_EXPIRY },
-      );
+      const token = signToken(user);
       return reply.code(201).send({ token, user });
     },
   );
@@ -102,11 +95,7 @@ export async function authRoutes(app: FastifyInstance) {
       if (status !== 200) return reply.code(status).send(data);
 
       const user = data as { id: string; username: string };
-      const token = jwt.sign(
-        { sub: user.id, username: user.username },
-        JWT_SECRET,
-        { expiresIn: JWT_EXPIRY },
-      );
+      const token = signToken(user);
       return reply.send({ token, user });
     },
   );
@@ -188,17 +177,10 @@ export async function authRoutes(app: FastifyInstance) {
       },
     },
     async (req, reply) => {
-      const authHeader = req.headers.authorization;
-      if (!authHeader?.startsWith('Bearer ')) {
-        return reply.code(401).send({ error: 'Token requerido' });
-      }
-      try {
-        const payload = jwt.verify(authHeader.slice(7), JWT_SECRET) as jwt.JwtPayload;
-        const { status, data } = await callMs(`/usuarios/${payload.sub}`, 'GET');
-        return reply.code(status).send(data);
-      } catch {
-        return reply.code(401).send({ error: 'Token inválido o expirado' });
-      }
+      const payload = verifyToken(req.headers.authorization);
+      if (!payload) return reply.code(401).send({ error: 'Token inválido o expirado' });
+      const { status, data } = await callMs(`/usuarios/${payload.sub}`, 'GET');
+      return reply.code(status).send(data);
     },
   );
 }
