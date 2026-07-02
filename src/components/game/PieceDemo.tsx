@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import DominoPiece from './DominoPiece';
-import { crearSet } from '../../game/types';
-import type { Val } from '../../game/types';
+import { crearSet } from '../../game/local-rules';
+import type { Val } from '../../game/local-rules';
 
 const SET = crearSet(); // 28 fichas
 
