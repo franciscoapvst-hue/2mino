@@ -4,6 +4,7 @@ import SnakeBoard from './SnakeBoard';
 import { puedeJugar, getExtremos } from '../../game/local-rules';
 import { api } from '../../api';
 import type { PartidaPublica, Pieza, Sala, AuthUser } from '../../api';
+import { BackIcon } from '../icons';
 
 type Props = { sala: Sala; user: AuthUser; onExit: () => void };
 
@@ -28,15 +29,6 @@ function useMeasuredWidth(): [number, (el: HTMLElement | null) => void] {
   }, []);
 
   return [width, refCb];
-}
-
-function BackIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M19 12H5M12 5l-7 7 7 7" />
-    </svg>
-  );
 }
 
 export default function GameBoard({ sala, user, onExit }: Props) {

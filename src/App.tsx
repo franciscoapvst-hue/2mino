@@ -7,49 +7,12 @@ import SalasView from './components/SalasView';
 import PieceDemo from './components/game/PieceDemo';
 import GameBoard from './components/game/GameBoard';
 import { api, tokenStore, type AuthUser, type UserConfig, type Sala } from './api';
+import { DominoTile, SunIcon, MoonIcon } from './components/icons';
 
 export type View = 'login' | 'register' | 'forgot';
 type AppView = View | 'dashboard' | 'salas' | 'piece-demo' | 'game';
 
 type Session = { user: AuthUser; config: UserConfig };
-
-function DominoTile() {
-  return (
-    <svg width="52" height="26" viewBox="0 0 52 26" aria-hidden>
-      <rect width="52" height="26" rx="5" fill="#0d0520" stroke="#a855f7" strokeWidth="1.5" />
-      <line x1="26" y1="4" x2="26" y2="22" stroke="#a855f7" strokeWidth="1" />
-      <circle cx="13" cy="9"  r="2.4" fill="#e9d5ff" />
-      <circle cx="13" cy="17" r="2.4" fill="#e9d5ff" />
-      <circle cx="37" cy="8"  r="2.4" fill="#e9d5ff" />
-      <circle cx="42" cy="13" r="2.4" fill="#e9d5ff" />
-      <circle cx="37" cy="18" r="2.4" fill="#e9d5ff" />
-    </svg>
-  );
-}
-
-function SunIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-      <circle cx="12" cy="12" r="4" />
-      <line x1="12" y1="2"  x2="12" y2="5" />
-      <line x1="12" y1="19" x2="12" y2="22" />
-      <line x1="4.22" y1="4.22"   x2="6.34"  y2="6.34" />
-      <line x1="17.66" y1="17.66" x2="19.78" y2="19.78" />
-      <line x1="2"  y1="12" x2="5"  y2="12" />
-      <line x1="19" y1="12" x2="22" y2="12" />
-      <line x1="4.22"  y1="19.78" x2="6.34"  y2="17.66" />
-      <line x1="17.66" y1="6.34"  x2="19.78" y2="4.22" />
-    </svg>
-  );
-}
-
-function MoonIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-    </svg>
-  );
-}
 
 export default function App() {
   const [view,     setView]     = useState<AppView>('login');

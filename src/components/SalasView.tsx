@@ -1,39 +1,12 @@
 import { useState, useEffect, useCallback, FormEvent } from 'react';
 import { api, type Sala, type SalaJugador, type AuthUser } from '../api';
+import { BackIcon, RefreshIcon, CopyIcon } from './icons';
 
 type Props = {
   user:         AuthUser;
   onBack:       () => void;
   onGameStart:  (sala: Sala) => void;
 };
-
-// ── Iconos ────────────────────────────────────────
-function BackIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M19 12H5M12 5l-7 7 7 7" />
-    </svg>
-  );
-}
-
-function RefreshIcon({ spinning }: { spinning?: boolean }) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"
-      style={spinning ? { animation: 'spin 0.7s linear infinite' } : undefined}>
-      <path d="M23 4v6h-6M1 20v-6h6" />
-      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-    </svg>
-  );
-}
-
-function CopyIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-      <rect x="9" y="9" width="13" height="13" rx="2" />
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-    </svg>
-  );
-}
 
 // ── Helpers ───────────────────────────────────────
 const MODO_LABEL: Record<string, string> = {
