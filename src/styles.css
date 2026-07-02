@@ -1307,9 +1307,11 @@ button:active { transform: scale(0.97); }
    ══════════════════════════════════════════════════ */
 .game-shell {
   min-height: 100vh;
+  width: 100%;
   background: var(--bg-base);
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
 }
 
 .game-nav {
@@ -1361,6 +1363,14 @@ button:active { transform: scale(0.97); }
 .seat-top   { grid-area: top; }
 .seat-left  { grid-area: left; }
 .seat-right { grid-area: right; }
+/* Los items del grid no deben expandir la columna más allá del track:
+   sin esto, las fichas sin escalar fuerzan min-width:auto > viewport
+   y el ResizeObserver nunca ve el ancho real disponible. */
+.seat-top, .seat-left, .seat-right, .board-center {
+  min-width: 0;
+  min-height: 0;
+  max-width: 100%;
+}
 
 .opponent-seat {
   display: flex;
@@ -1382,16 +1392,17 @@ button:active { transform: scale(0.97); }
 }
 .opponent-pieces {
   display: flex;
-  gap: -8px;
-  flex-wrap: wrap;
+  flex-direction: row;
+  gap: 3px;
+  flex-wrap: nowrap;
+  align-items: center;
   justify-content: center;
-  max-width: 220px;
+  width: 100%;
 }
-.opponent-pieces .dp {
-  margin-left: -14px;
-}
-.opponent-pieces .dp:first-child {
-  margin-left: 0;
+/* Asientos laterales (izq/der): fichas apiladas verticalmente */
+.opponent-pieces.pieces-side {
+  flex-direction: column;
+  gap: 2px;
 }
 
 .board-center {
@@ -1460,10 +1471,11 @@ button:active { transform: scale(0.97); }
 }
 .my-hand {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 6px;
+  flex-wrap: nowrap;       /* una sola fila — la escala evita el overflow */
   justify-content: center;
-  max-width: 100%;
+  align-items: flex-end;
+  width: 100%;
 }
 
 .btn-pasar {
@@ -1670,16 +1682,21 @@ button:active { transform: scale(0.97); }
   transform: scale(1.12);
 }
 
-/* board-center scrollable horizontalmente en mobile */
+/* board-center es siempre un cuadrado.
+   aspect-ratio lo fuerza en CSS; flexbox centra el snake-board-wrap
+   (más angosto/corto que el cuadrado) horizontal y verticalmente.
+   El max-width limita el cuadrado a la altura libre del viewport
+   (nav + asiento superior + mano ≈ 440px) para que la mano no quede
+   por debajo del fold en pantallas anchas. */
 .board-center {
-  overflow-x: auto;
-  overflow-y: visible;
-  -webkit-overflow-scrolling: touch;
-  padding: 12px 8px;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 120px;
+  max-width: min(100%, max(260px, calc(100dvh - 440px)));
+  margin-inline: auto;
 }
 .board-empty-wrap {
   display: flex;
@@ -1691,28 +1708,31 @@ button:active { transform: scale(0.97); }
 /* Mano en mobile: scroll horizontal */
 @media (max-width: 640px) {
   .my-hand {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 4px;
-    justify-content: center;
-    width: 100%;
+    /* Las piezas escalan en JS — sin scroll horizontal */
+    overflow-x: visible;
   }
   .game-table {
-    grid-template-columns: 80px 1fr 80px;
-    gap: 8px;
-    padding: 12px 8px;
+    /* Asientos más estrechos → más espacio para el tablero central */
+    grid-template-columns: 50px 1fr 50px;
+    gap: 6px;
+    padding: 8px 4px;
   }
   .table-2p {
     grid-template-columns: 1fr;
+    padding: 8px;
   }
-  .opponent-pieces .dp {
-    margin-left: -18px;
+  .opponent-name {
+    font-size: .7rem;
+    max-width: 48px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
   }
   .game-nav {
-    padding: 10px 14px;
-    gap: 8px;
+    padding: 10px 12px;
+    gap: 6px;
   }
-  .game-room-code { font-size: .75rem; }
-  .game-turn-indicator { font-size: .78rem; padding: 5px 10px; }
+  .game-room-code { font-size: .72rem; }
+  .game-turn-indicator { font-size: .75rem; padding: 4px 8px; }
 }

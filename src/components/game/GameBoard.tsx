@@ -4,16 +4,31 @@ import SnakeBoard from './SnakeBoard';
 import { puedeJugar, getExtremos } from '../../game/local-rules';
 import { api } from '../../api';
 import type { PartidaPublica, Pieza, Sala, AuthUser } from '../../api';
+import { BackIcon } from '../icons';
 
 type Props = { sala: Sala; user: AuthUser; onExit: () => void };
 
-function BackIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M19 12H5M12 5l-7 7 7 7" />
-    </svg>
-  );
+/**
+ * Mide el ancho de un contenedor con ResizeObserver.
+ * Usa callback ref: funciona aunque el nodo se monte tarde
+ * (p. ej. tras el guard de carga) o se desmonte.
+ */
+function useMeasuredWidth(): [number, (el: HTMLElement | null) => void] {
+  const [width, setWidth] = useState(0);
+  const roRef = useRef<ResizeObserver | null>(null);
+
+  const refCb = useCallback((el: HTMLElement | null) => {
+    roRef.current?.disconnect();
+    roRef.current = null;
+    if (!el) return;
+    const ro = new ResizeObserver(entries =>
+      setWidth(entries[0].contentRect.width));
+    ro.observe(el);
+    setWidth(el.getBoundingClientRect().width);
+    roRef.current = ro;
+  }, []);
+
+  return [width, refCb];
 }
 
 export default function GameBoard({ sala, user, onExit }: Props) {
@@ -25,9 +40,8 @@ export default function GameBoard({ sala, user, onExit }: Props) {
   const [selectedPiece, setSelectedPiece] = useState<Pieza | null>(null);
   const [sobreZona,     setSobreZona]     = useState<'izq' | 'der' | null>(null);
   const [nuevaFichaIdx, setNuevaFichaIdx] = useState<number | null>(null);
-  const [boardWidth,    setBoardWidth]    = useState(600);
-
-  const boardRef = useRef<HTMLDivElement>(null);
+  const [boardWidth, boardRef] = useMeasuredWidth();
+  const [handWidth,  handRef]  = useMeasuredWidth();
 
   // ── Carga y polling ────────────────────────────
   const fetchPartida = useCallback(async () => {
@@ -54,16 +68,6 @@ export default function GameBoard({ sala, user, onExit }: Props) {
     const id = setInterval(fetchPartida, 2000);
     return () => clearInterval(id);
   }, [fetchPartida]);
-
-  // Mide el ancho del contenedor
-  useEffect(() => {
-    const el = boardRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([e]) => setBoardWidth(e.contentRect.width));
-    ro.observe(el);
-    setBoardWidth(el.clientWidth);
-    return () => ro.disconnect();
-  }, []);
 
   // ── Jugar ficha (API) ─────────────────────────
   async function handleJugar(pieza: Pieza, lado?: 'izq' | 'der') {
@@ -192,6 +196,15 @@ export default function GameBoard({ sala, user, onExit }: Props) {
   const canIzq = showZones && (arrastrando !== null ? true : (selOps?.izq ?? false));
   const canDer = showZones && (arrastrando !== null ? true : (selOps?.der ?? false));
 
+  // Escala de piezas en la mano: ajusta para que quepan todas en el ancho disponible
+  const HAND_VW = 54, HAND_VH = 100, HAND_GAP = 6;
+  const nPiezas = Math.max(1, partida.miMano.length);
+  const handScale = handWidth > 0
+    ? Math.min(1, (handWidth - (nPiezas - 1) * HAND_GAP) / (nPiezas * HAND_VW))
+    : 1;
+  const pieceW = Math.floor(HAND_VW * handScale);
+  const pieceH = Math.floor(HAND_VH * handScale);
+
   const nombreAsiento = (seat: number) => partida.asientos[seat]
     ? `@${partida.asientos[seat].username}` : '—';
 
@@ -214,7 +227,7 @@ export default function GameBoard({ sala, user, onExit }: Props) {
       <div className={`game-table table-${maxJ}p`}>
         {maxJ === 4 && (
           <div className="seat seat-left">
-            <OpSeat nombre={nombreAsiento(1)} count={partida.conteoManos[1] ?? 0} activo={partida.turno === 1} />
+            <OpSeat nombre={nombreAsiento(1)} count={partida.conteoManos[1] ?? 0} activo={partida.turno === 1} position="side" />
           </div>
         )}
         <div className="seat seat-top">
@@ -226,7 +239,7 @@ export default function GameBoard({ sala, user, onExit }: Props) {
         </div>
         {maxJ === 4 && (
           <div className="seat seat-right">
-            <OpSeat nombre={nombreAsiento(3)} count={partida.conteoManos[3] ?? 0} activo={partida.turno === 3} />
+            <OpSeat nombre={nombreAsiento(3)} count={partida.conteoManos[3] ?? 0} activo={partida.turno === 3} position="side" />
           </div>
         )}
 
@@ -249,7 +262,7 @@ export default function GameBoard({ sala, user, onExit }: Props) {
                 </div>
               )}
             </div>
-          ) : (
+          ) : boardWidth > 0 ? (
             <SnakeBoard
               tablero={partida.tablero}
               containerWidth={boardWidth}
@@ -265,18 +278,18 @@ export default function GameBoard({ sala, user, onExit }: Props) {
               onDragOverDer={e => { e.preventDefault(); setSobreZona('der'); }}
               onDragLeave={() => setSobreZona(null)}
             />
-          )}
+          ) : null}
         </div>
       </div>
 
       {/* ── Mi mano ──────────────────────────────── */}
       <div className="my-hand-zone">
-        <div className="my-hand">
+        <div className="my-hand" ref={handRef}>
           {partida.miMano.map((p, i) => {
-            const ops    = ext ? puedeJugar(p, ext) : { izq: true, der: true };
+            const ops     = ext ? puedeJugar(p, ext) : { izq: true, der: true };
             const jugable = ops.izq || ops.der;
             const isSel   = selectedPiece?.a === p.a && selectedPiece?.b === p.b;
-            const canPlay  = esMiTurno && jugable && !jugando;
+            const canPlay = esMiTurno && jugable && !jugando;
             return (
               <DominoPiece
                 key={i}
@@ -289,6 +302,7 @@ export default function GameBoard({ sala, user, onExit }: Props) {
                 onDragStart={canPlay ? e => onDragStart(e, p) : undefined}
                 onDragEnd={onDragEnd}
                 onClick={canPlay ? () => onTapPieza(p) : undefined}
+                style={{ width: pieceW, height: pieceH }}
               />
             );
           })}
@@ -319,15 +333,42 @@ export default function GameBoard({ sala, user, onExit }: Props) {
 }
 
 // ── Sub-componentes ─────────────────────────────
-function OpSeat({ nombre, count, activo }: {
+function OpSeat({ nombre, count, activo, position = 'top' }: {
   nombre: string; count: number; activo: boolean;
+  position?: 'top' | 'side';
 }) {
+  const [cw, ref] = useMeasuredWidth();
+
+  const n   = Math.max(1, count);
+  const GAP = 3;
+
+  let orient: 'h' | 'v', pW: number, pH: number;
+  if (position === 'side') {
+    // Columna estrecha → fichas horizontales apiladas verticalmente
+    const s = cw > 0 ? Math.min(1, cw / 100) : 1;
+    orient = 'h';
+    pW = Math.floor(100 * s);
+    pH = Math.floor(54 * s);
+  } else {
+    // Fila ancha → fichas verticales en fila horizontal
+    const s = cw > 0 ? Math.min(1, (cw - (n - 1) * GAP) / (n * 54)) : 1;
+    orient = 'v';
+    pW = Math.floor(54 * s);
+    pH = Math.floor(100 * s);
+  }
+
   return (
     <div className={`opponent-seat${activo ? ' seat-active' : ''}`}>
       <span className="opponent-name">{nombre}</span>
-      <div className="opponent-pieces">
+      <div
+        ref={ref}
+        className={`opponent-pieces${position === 'side' ? ' pieces-side' : ''}`}
+      >
         {Array.from({ length: count }).map((_, i) => (
-          <DominoPiece key={i} a={0} b={0} faceDown orient="v" />
+          <DominoPiece
+            key={i} a={0} b={0} faceDown orient={orient}
+            style={{ width: pW, height: pH }}
+          />
         ))}
       </div>
     </div>
