@@ -1,8 +1,6 @@
 import { FastifyInstance } from 'fastify';
-import jwt from 'jsonwebtoken';
 import { callSalas } from '../http';
-
-const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-secret-change-in-production';
+import { verifyToken } from '../jwt';
 
 const ErrorSchema = {
   type: 'object',
@@ -13,15 +11,6 @@ const SalaResumenSchema = {
   type: 'object',
   additionalProperties: true,
 } as const;
-
-function getJwtPayload(authHeader: string | undefined): { sub: string; username: string } | null {
-  if (!authHeader?.startsWith('Bearer ')) return null;
-  try {
-    return jwt.verify(authHeader.slice(7), JWT_SECRET) as { sub: string; username: string };
-  } catch {
-    return null;
-  }
-}
 
 export async function salasGatewayRoutes(app: FastifyInstance) {
 
@@ -81,7 +70,7 @@ export async function salasGatewayRoutes(app: FastifyInstance) {
       },
     },
   }, async (req, reply) => {
-    const payload = getJwtPayload(req.headers.authorization);
+    const payload = verifyToken(req.headers.authorization);
     if (!payload) return reply.code(401).send({ error: 'Token requerido' });
 
     const { status, data } = await callSalas('/salas', 'POST', {
@@ -149,7 +138,7 @@ export async function salasGatewayRoutes(app: FastifyInstance) {
       },
     },
   }, async (req, reply) => {
-    const payload = getJwtPayload(req.headers.authorization);
+    const payload = verifyToken(req.headers.authorization);
     if (!payload) return reply.code(401).send({ error: 'Token requerido' });
 
     const { status, data } = await callSalas(`/salas/${req.params.id}/unirse`, 'POST', {
@@ -176,7 +165,7 @@ export async function salasGatewayRoutes(app: FastifyInstance) {
       },
     },
   }, async (req, reply) => {
-    const payload = getJwtPayload(req.headers.authorization);
+    const payload = verifyToken(req.headers.authorization);
     if (!payload) return reply.code(401).send({ error: 'Token requerido' });
 
     const { status, data } = await callSalas(`/salas/${req.params.id}/salir`, 'POST', {
@@ -210,7 +199,7 @@ export async function salasGatewayRoutes(app: FastifyInstance) {
       },
     },
   }, async (req, reply) => {
-    const payload = getJwtPayload(req.headers.authorization);
+    const payload = verifyToken(req.headers.authorization);
     if (!payload) return reply.code(401).send({ error: 'Token requerido' });
 
     const { status, data } = await callSalas(`/salas/${req.params.id}/estado`, 'PATCH', {
@@ -239,7 +228,7 @@ export async function salasGatewayRoutes(app: FastifyInstance) {
       },
     },
   }, async (req, reply) => {
-    const payload = getJwtPayload(req.headers.authorization);
+    const payload = verifyToken(req.headers.authorization);
     if (!payload) return reply.code(401).send({ error: 'Token requerido' });
 
     const { status, data } = await callSalas(`/salas/${req.params.id}/juego/iniciar`, 'POST', {
@@ -265,7 +254,7 @@ export async function salasGatewayRoutes(app: FastifyInstance) {
       },
     },
   }, async (req, reply) => {
-    const payload = getJwtPayload(req.headers.authorization);
+    const payload = verifyToken(req.headers.authorization);
     if (!payload) return reply.code(401).send({ error: 'Token requerido' });
 
     const { status, data } = await callSalas(
@@ -307,7 +296,7 @@ export async function salasGatewayRoutes(app: FastifyInstance) {
       },
     },
   }, async (req, reply) => {
-    const payload = getJwtPayload(req.headers.authorization);
+    const payload = verifyToken(req.headers.authorization);
     if (!payload) return reply.code(401).send({ error: 'Token requerido' });
 
     const { status, data } = await callSalas(`/salas/${req.params.id}/juego/jugar`, 'POST', {
@@ -336,7 +325,7 @@ export async function salasGatewayRoutes(app: FastifyInstance) {
       },
     },
   }, async (req, reply) => {
-    const payload = getJwtPayload(req.headers.authorization);
+    const payload = verifyToken(req.headers.authorization);
     if (!payload) return reply.code(401).send({ error: 'Token requerido' });
 
     const { status, data } = await callSalas(`/salas/${req.params.id}/juego/pasar`, 'POST', {

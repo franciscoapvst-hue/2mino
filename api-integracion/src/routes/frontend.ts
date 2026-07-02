@@ -1,8 +1,7 @@
 import { FastifyInstance } from 'fastify';
-import jwt from 'jsonwebtoken';
 import { callMs, callService } from '../http';
+import { verifyToken } from '../jwt';
 
-const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-secret-change-in-production';
 const MS_LANDING = () => (process.env.MS_FRONTEND_LANDING_URL ?? 'http://localhost:5000').trim();
 
 // ── Schemas reutilizables ─────────────────────────
@@ -25,13 +24,7 @@ const ConfigResueltaSchema = {
 } as const;
 
 function getUserIdFromToken(authHeader: string | undefined): string | null {
-  if (!authHeader?.startsWith('Bearer ')) return null;
-  try {
-    const payload = jwt.verify(authHeader.slice(7), JWT_SECRET) as jwt.JwtPayload;
-    return payload.sub ?? null;
-  } catch {
-    return null;
-  }
+  return verifyToken(authHeader)?.sub ?? null;
 }
 
 // ─────────────────────────────────────────────────
