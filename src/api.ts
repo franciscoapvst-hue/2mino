@@ -89,6 +89,20 @@ export type LeaderboardEntry = {
   elo: number; partidas: number; ganadas: number;
 };
 
+// ── Matchmaking ranked ─────────────────────────────
+export type PartyMiembro = { usuario_id: string; username: string };
+
+export type Party = {
+  id: string; codigo: string; creador_id: string;
+  estado: 'esperando' | 'en_cola' | 'matched' | 'cancelada';
+  miembros: PartyMiembro[];
+};
+
+export type ColaEstado =
+  | { en_cola: false; matched?: false }
+  | { en_cola: false; matched: true; sala_id: string }
+  | { en_cola: true; modo: 2 | 4; es_party: boolean; espera_ms: number; rango_actual: number };
+
 export type UserConfig = {
   usuario_id: string;
   segmento: string;
@@ -201,5 +215,19 @@ export const api = {
     me: () => req<RankedInfo>('/ranked/me'),
     leaderboard: (limit = 20) =>
       req<LeaderboardEntry[]>(`/ranked/leaderboard?limit=${limit}`),
+
+    crearParty: () => req<Party>('/ranked/party', { method: 'POST', body: '{}' }),
+    party: (codigo: string) => req<Party>(`/ranked/party/${codigo}`),
+    unirseParty: (codigo: string) =>
+      req<Party>(`/ranked/party/${codigo}/unirse`, { method: 'POST', body: '{}' }),
+    salirParty: (codigo: string) =>
+      req<{ ok: true }>(`/ranked/party/${codigo}/salir`, { method: 'POST', body: '{}' }),
+    partyACola: (codigo: string) =>
+      req<ColaEstado>(`/ranked/party/${codigo}/cola`, { method: 'POST', body: '{}' }),
+
+    entrarCola: (modo: 2 | 4) =>
+      req<ColaEstado>('/ranked/cola/entrar', { method: 'POST', body: JSON.stringify({ modo }) }),
+    estadoCola: () => req<ColaEstado>('/ranked/cola/estado'),
+    salirCola: () => req<{ ok: true }>('/ranked/cola/salir', { method: 'POST', body: '{}' }),
   },
 };

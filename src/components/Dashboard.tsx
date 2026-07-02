@@ -10,6 +10,7 @@ type Props = {
   onToggleTheme: () => void;
   onLogout:      () => void;
   onGoToSalas:   () => void;
+  onGoToRanked:  () => void;
   onPieceDemo:   () => void;
 };
 
@@ -41,7 +42,7 @@ function ModeCard({ title, desc, icon, action, variant, soon = true, onClick }: 
 }
 
 // ── Dashboard / Lobby ─────────────────────────────
-export default function Dashboard({ user, config, dark, onToggleTheme, onLogout, onGoToSalas, onPieceDemo }: Props) {
+export default function Dashboard({ user, config, dark, onToggleTheme, onLogout, onGoToSalas, onGoToRanked, onPieceDemo }: Props) {
   const [elo, setElo] = useState<number | null>(null);
 
   useEffect(() => {
@@ -114,6 +115,8 @@ export default function Dashboard({ user, config, dark, onToggleTheme, onLogout,
             desc="Compite por tu posición. Cada partida cuenta hacia tu clasificación global."
             icon={<RankedIcon />}
             action="Buscar ranked"
+            soon={false}
+            onClick={onGoToRanked}
           />
           <ModeCard
             variant="salas"

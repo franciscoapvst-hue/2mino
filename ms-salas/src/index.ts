@@ -5,6 +5,7 @@ import { runMigrations } from './db/pool';
 import { salasRoutes } from './routes/salas';
 import { juegosRoutes } from './routes/juegos';
 import { rankedRoutes } from './routes/ranked';
+import { matchmakingRoutes } from './routes/matchmaking';
 
 const app = Fastify({
   logger: true,
@@ -32,6 +33,7 @@ app.register(swaggerUi, { routePrefix: '/docs' });
 app.register(salasRoutes);
 app.register(juegosRoutes);
 app.register(rankedRoutes);
+app.register(matchmakingRoutes);
 
 app.get('/health', {
   schema: {
