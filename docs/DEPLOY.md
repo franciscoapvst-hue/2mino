@@ -49,9 +49,9 @@ Archivos clave del frontend en la raíz del repo:
 ## Requisitos previos
 
 - Acceso SSH al VPS (`root` + contraseña, o mejor una **clave SSH**).
-- El proyecto completo en tu máquina (esta carpeta `2mino`).
-- `ssh` y `scp` disponibles en tu PC (Windows 10/11 ya los traen; también sirve
-  Git Bash).
+- El código en GitHub: `https://github.com/franciscoapvst-hue/2mino.git`
+  (rama de trabajo actual: `feat/ranked-elo`).
+- `ssh` disponible en tu PC (Windows 10/11 ya lo trae; también sirve Git Bash).
 
 ---
 
@@ -80,16 +80,35 @@ ENABLE_EMAIL=false
 
 ## Pasos de deploy
 
-### 1. Subir el proyecto al VPS
+### 1. Traer el proyecto al VPS (git clone)
 
-Desde tu PC, en la carpeta `2mino`:
+Método recomendado: clonar el repo directamente en el VPS. Así el redeploy futuro
+es solo `git pull` (ver sección Operación diaria).
+
+Dentro del VPS (`ssh root@74.208.119.150`):
 
 ```bash
-scp -r . root@74.208.119.150:/opt/2mino
+cd /opt
+git clone -b feat/ranked-elo https://github.com/franciscoapvst-hue/2mino.git 2mino
+cd 2mino
 ```
 
-Alternativa recomendada a mediano plazo: `git clone` del repo dentro del VPS,
-así el redeploy es `git pull` en vez de re-`scp`.
+> El repo es **privado**: `git clone` pedirá usuario de GitHub + un **Personal
+> Access Token** (GitHub ya no acepta la contraseña de la cuenta).
+> Generarlo en: GitHub → Settings → Developer settings → Personal access tokens →
+> *Fine-grained tokens* → dar acceso de solo lectura (`Contents: Read`) al repo
+> `2mino`. Pegar el token cuando pida la "password".
+>
+> Si `git` no está instalado en el VPS: `apt update && apt install -y git`.
+
+**Alternativa sin git** (subir por `scp` desde tu PC): más lento porque copia
+`node_modules`. Si la usas, borra primero esas carpetas o el `.env` no se sube
+(está en `.gitignore` pero `scp` no respeta ignore). En general, preferir git.
+
+```bash
+# solo si NO usas git — desde tu PC, en la carpeta 2mino:
+scp -r . root@74.208.119.150:/opt/2mino
+```
 
 ### 2. Instalar Docker
 
@@ -162,12 +181,12 @@ docker compose up -d --build          # reconstruir y levantar
 
 ### Redeploy tras cambios de código
 
-```bash
-# opción scp: volver a subir desde tu PC, luego en el VPS:
-docker compose up -d --build
+Con el repo clonado, dentro del VPS:
 
-# opción git: dentro del VPS
-git pull && docker compose up -d --build
+```bash
+cd /opt/2mino
+git pull
+docker compose up -d --build
 ```
 
 `--build` es necesario cuando cambió el código; sin él reusa las imágenes viejas.
