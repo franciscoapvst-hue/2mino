@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api, type Sala, type AuthUser, type Party, type ColaEstado, type TipoJuego } from '../api';
 import { BackIcon } from './icons';
+import { rangoDeElo } from '../ranks';
 
 type Props = {
   user: AuthUser;
@@ -110,7 +111,13 @@ export default function MatchmakingView({ user, tipo, onBack, onGameStart, autoJ
   const [cola, setCola]           = useState<ColaEstado | null>(null);
   const [error, setError]         = useState<string | null>(null);
   const [busy, setBusy]           = useState(false);
+  const [elo, setElo]             = useState<number | null>(null);
   const partyCodeRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (tipo !== 'ranked') return;
+    api.ranked.me().then(r => setElo(r.elo)).catch(() => setElo(null));
+  }, [tipo]);
 
   // Invite link consumido al entrar a esta vista: unirse automáticamente.
   useEffect(() => {
@@ -233,6 +240,12 @@ export default function MatchmakingView({ user, tipo, onBack, onGameStart, autoJ
       <nav className="salas-nav">
         <button className="btn-back" onClick={salirMatchmaking}><BackIcon /> Lobby</button>
         <h2>{titulo}</h2>
+        {elo !== null && (
+          <span className="lobby-elo" title={`${rangoDeElo(elo).nombre} · ELO ranked`}>
+            {rangoDeElo(elo).url && <img className="lobby-rank-badge" src={rangoDeElo(elo).url!} alt="" />}
+            {elo}
+          </span>
+        )}
       </nav>
 
       <div className="salas-content ranked-content">

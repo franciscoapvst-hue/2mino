@@ -71,6 +71,7 @@ export type AuthUser = {
   id: string;
   username: string;
   email: string;
+  avatar?: string | null;
 };
 
 // ── Ranked / ELO ───────────────────────────────────
@@ -170,6 +171,9 @@ export const api = {
     }),
 
   me: () => req<AuthUser>('/auth/me'),
+
+  setAvatar: (avatar: string) =>
+    req<AuthUser>('/auth/avatar', { method: 'PATCH', body: JSON.stringify({ avatar }) }),
 
   getPreferencias: () => req<UserConfig>('/frontend/preferencias'),
 

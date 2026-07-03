@@ -68,8 +68,16 @@ services:
       CORS_ORIGIN:      ${CORS_ORIGIN:-*}
     depends_on:
       - ms-usuarios
+    # Sin puerto externo: el frontend lo alcanza vía la red Docker (proxy /api de nginx)
+
+  # ── Frontend (build estático servido por nginx) ──
+  frontend:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - api-integracion
     ports:
-      - "3000:3000"
+      - "80:80"
 
 volumes:
   postgres_data:

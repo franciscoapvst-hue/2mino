@@ -130,6 +130,9 @@ export default function App() {
         onGoToRanked={() => setView('ranked')}
         onGoToCasual={() => setView('casual')}
         onPieceDemo={() => setView('piece-demo')}
+        onAvatarChange={(avatar) =>
+          setSession(s => s && { ...s, user: { ...s.user, avatar } })
+        }
       />
     );
   }

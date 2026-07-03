@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { api, type AuthUser, type UserConfig } from '../api';
 import { DominoTile, SunIcon, MoonIcon, CasualIcon, RankedIcon, SalasIcon } from './icons';
+import { avatarUrl } from '../avatars';
+import { rangoDeElo } from '../ranks';
+import AvatarPicker from './AvatarPicker';
 
 type Props = {
   user:          AuthUser;
@@ -13,6 +16,7 @@ type Props = {
   onGoToRanked:  () => void;
   onGoToCasual:  () => void;
   onPieceDemo:   () => void;
+  onAvatarChange: (avatar: string) => void;
 };
 
 // ── Mode card ─────────────────────────────────────
@@ -23,10 +27,11 @@ type ModeCardProps = {
   action:  string;
   variant: 'casual' | 'ranked' | 'salas';
   soon?:   boolean;
+  badge?:  ReactNode;
   onClick?: () => void;
 };
 
-function ModeCard({ title, desc, icon, action, variant, soon = true, onClick }: ModeCardProps) {
+function ModeCard({ title, desc, icon, action, variant, soon = true, badge, onClick }: ModeCardProps) {
   return (
     <div className={`mode-card mode-${variant}`}>
       {soon && <span className="mode-soon">Próximamente</span>}
@@ -37,14 +42,17 @@ function ModeCard({ title, desc, icon, action, variant, soon = true, onClick }: 
       </div>
       <button className="mode-btn" disabled={soon} onClick={onClick}>
         {action}
+        {badge}
       </button>
     </div>
   );
 }
 
 // ── Dashboard / Lobby ─────────────────────────────
-export default function Dashboard({ user, config, dark, onToggleTheme, onLogout, onGoToSalas, onGoToRanked, onGoToCasual, onPieceDemo }: Props) {
+export default function Dashboard({ user, config, dark, onToggleTheme, onLogout, onGoToSalas, onGoToRanked, onGoToCasual, onPieceDemo, onAvatarChange }: Props) {
   const [elo, setElo] = useState<number | null>(null);
+  const [avatarAbierto, setAvatarAbierto] = useState(false);
+  const foto = avatarUrl(user.avatar);
 
   useEffect(() => {
     api.ranked.me()
@@ -72,10 +80,21 @@ export default function Dashboard({ user, config, dark, onToggleTheme, onLogout,
           </button>
 
           <div className="lobby-user">
-            <span className="lobby-avatar">{user.username[0].toUpperCase()}</span>
+            <button
+              className="lobby-avatar lobby-avatar-btn"
+              onClick={() => setAvatarAbierto(true)}
+              title="Cambiar foto de perfil"
+            >
+              {foto ? <img src={foto} alt="" /> : user.username[0].toUpperCase()}
+            </button>
             <span className="lobby-username">@{user.username}</span>
             <span className="lobby-badge">{config.segmento}</span>
-            {elo !== null && <span className="lobby-elo" title="ELO ranked">⭐ {elo}</span>}
+            {elo !== null && (
+              <span className="lobby-elo" title={`${rangoDeElo(elo).nombre} · ELO ranked`}>
+                {rangoDeElo(elo).url && <img className="lobby-rank-badge" src={rangoDeElo(elo).url!} alt="" />}
+                {elo}
+              </span>
+            )}
           </div>
 
           <button
@@ -120,6 +139,12 @@ export default function Dashboard({ user, config, dark, onToggleTheme, onLogout,
             action="Buscar ranked"
             soon={false}
             onClick={onGoToRanked}
+            badge={elo !== null && (
+              <span className="lobby-elo" title={`${rangoDeElo(elo).nombre} · ELO ranked`}>
+                {rangoDeElo(elo).url && <img className="lobby-rank-badge" src={rangoDeElo(elo).url!} alt="" />}
+                {elo}
+              </span>
+            )}
           />
           <ModeCard
             variant="salas"
@@ -140,6 +165,17 @@ export default function Dashboard({ user, config, dark, onToggleTheme, onLogout,
           ))}
         </div>
       </main>
+
+      {avatarAbierto && (
+        <AvatarPicker
+          actual={user.avatar}
+          onClose={() => setAvatarAbierto(false)}
+          onElegir={async (avatar) => {
+            await api.setAvatar(avatar);
+            onAvatarChange(avatar);
+          }}
+        />
+      )}
     </div>
   );
 }
