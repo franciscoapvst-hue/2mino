@@ -139,6 +139,9 @@ const SCHEMA = `
 // (CREATE TABLE IF NOT EXISTS no las actualiza). Cada ALTER es idempotente.
 const ALTERS = `
   ALTER TABLE ranked_cola ADD COLUMN IF NOT EXISTS username VARCHAR(20);
+  -- Matchmaking sirve para casual y ranked: se distinguen por tipo.
+  ALTER TABLE ranked_cola    ADD COLUMN IF NOT EXISTS tipo VARCHAR(20) NOT NULL DEFAULT 'ranked';
+  ALTER TABLE ranked_parties ADD COLUMN IF NOT EXISTS tipo VARCHAR(20) NOT NULL DEFAULT 'ranked';
 `;
 
 export async function runMigrations() {

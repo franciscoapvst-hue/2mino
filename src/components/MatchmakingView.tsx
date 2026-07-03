@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { api, type Sala, type AuthUser, type Party, type ColaEstado } from '../api';
+import { api, type Sala, type AuthUser, type Party, type ColaEstado, type TipoJuego } from '../api';
 import { BackIcon } from './icons';
 
 type Props = {
   user: AuthUser;
+  tipo: TipoJuego;               // 'casual' | 'ranked'
   onBack: () => void;
   onGameStart: (sala: Sala) => void;
   /** Código de party a unirse automáticamente (viene de un link de invitación). */
@@ -103,7 +104,7 @@ function PartyView({ party, userId, onBuscar, buscando, onSalir, onCopyLink }: {
   );
 }
 
-export default function RankedView({ user, onBack, onGameStart, autoJoinCodigo }: Props) {
+export default function MatchmakingView({ user, tipo, onBack, onGameStart, autoJoinCodigo }: Props) {
   const [pantalla, setPantalla]   = useState<Pantalla>('menu');
   const [party, setParty]         = useState<Party | null>(null);
   const [cola, setCola]           = useState<ColaEstado | null>(null);
@@ -152,7 +153,7 @@ export default function RankedView({ user, onBack, onGameStart, autoJoinCodigo }
   const buscarSolo = useCallback(async (modo: 2 | 4) => {
     setBusy(true); setError(null);
     try {
-      const st = await api.ranked.entrarCola(modo);
+      const st = await api.ranked.entrarCola(modo, tipo);
       if (st.en_cola) { setCola(st); setPantalla('cola'); }
       else if (st.matched) {
         const sala = await api.salas.detalle(st.sala_id);
@@ -163,12 +164,12 @@ export default function RankedView({ user, onBack, onGameStart, autoJoinCodigo }
     } finally {
       setBusy(false);
     }
-  }, [onGameStart]);
+  }, [onGameStart, tipo]);
 
   async function crearParty() {
     setBusy(true); setError(null);
     try {
-      const p = await api.ranked.crearParty();
+      const p = await api.ranked.crearParty(tipo);
       setParty(p);
       partyCodeRef.current = p.codigo;
       setPantalla('party');
@@ -217,19 +218,21 @@ export default function RankedView({ user, onBack, onGameStart, autoJoinCodigo }
     navigator.clipboard.writeText(url).catch(() => {});
   }
 
-  // Salir de Ranked: limpia cualquier ticket de cola y/o party para no
-  // dejar al usuario "buscando" fantasma tras volver al lobby.
-  async function salirDeRanked() {
+  // Salir: limpia cualquier ticket de cola y/o party para no dejar al
+  // usuario "buscando" fantasma tras volver al lobby.
+  async function salirMatchmaking() {
     if (pantalla === 'cola') { try { await api.ranked.salirCola(); } catch { /* noop */ } }
     if (party) { try { await api.ranked.salirParty(party.codigo); } catch { /* noop */ } }
     onBack();
   }
 
+  const titulo = tipo === 'ranked' ? 'Partida Ranked' : 'Partida Casual';
+
   return (
     <div className="salas-page">
       <nav className="salas-nav">
-        <button className="btn-back" onClick={salirDeRanked}><BackIcon /> Lobby</button>
-        <h2>Partida Ranked</h2>
+        <button className="btn-back" onClick={salirMatchmaking}><BackIcon /> Lobby</button>
+        <h2>{titulo}</h2>
       </nav>
 
       <div className="salas-content ranked-content">

@@ -4,14 +4,14 @@ import RegisterForm from './components/RegisterForm';
 import ForgotPasswordForm from './components/ForgotPasswordForm';
 import Dashboard from './components/Dashboard';
 import SalasView from './components/SalasView';
-import RankedView from './components/RankedView';
+import MatchmakingView from './components/MatchmakingView';
 import PieceDemo from './components/game/PieceDemo';
 import GameBoard from './components/game/GameBoard';
 import { api, tokenStore, type AuthUser, type UserConfig, type Sala } from './api';
 import { DominoTile, SunIcon, MoonIcon } from './components/icons';
 
 export type View = 'login' | 'register' | 'forgot';
-type AppView = View | 'dashboard' | 'salas' | 'ranked' | 'piece-demo' | 'game';
+type AppView = View | 'dashboard' | 'salas' | 'ranked' | 'casual' | 'piece-demo' | 'game';
 
 type Session = { user: AuthUser; config: UserConfig };
 
@@ -106,13 +106,14 @@ export default function App() {
     );
   }
 
-  if (view === 'ranked' && session) {
+  if ((view === 'ranked' || view === 'casual') && session) {
     return (
-      <RankedView
+      <MatchmakingView
         user={session.user}
+        tipo={view}
         onBack={() => setView('dashboard')}
         onGameStart={(sala) => { setGameSala(sala); setGameOrigin('dashboard'); setView('game'); }}
-        autoJoinCodigo={partyCodigo}
+        autoJoinCodigo={view === 'ranked' ? partyCodigo : null}
       />
     );
   }
@@ -127,6 +128,7 @@ export default function App() {
         onLogout={handleLogout}
         onGoToSalas={() => setView('salas')}
         onGoToRanked={() => setView('ranked')}
+        onGoToCasual={() => setView('casual')}
         onPieceDemo={() => setView('piece-demo')}
       />
     );

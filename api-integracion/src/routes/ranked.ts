@@ -41,16 +41,17 @@ export async function rankedGatewayRoutes(app: FastifyInstance) {
 
   // ── Party ──────────────────────────────────────────
 
-  app.post('/ranked/party', {
+  app.post<{ Body: { tipo?: 'casual' | 'ranked' } }>('/ranked/party', {
     schema: {
       tags: ['ranked'], summary: 'Crear party (equipo por invitación)',
       security: [{ bearerAuth: [] }],
+      body: { type: 'object', properties: { tipo: { type: 'string', enum: ['casual', 'ranked'] } } },
       response: { 201: AnySchema, 401: { ...ErrorSchema } },
     },
   }, async (req, reply) => {
     const payload = auth(req, reply); if (!payload) return;
     const { status, data } = await callSalas('/ranked/party', 'POST', {
-      usuario_id: payload.sub, username: payload.username,
+      usuario_id: payload.sub, username: payload.username, tipo: req.body?.tipo,
     });
     return reply.code(status).send(data);
   });
@@ -115,17 +116,23 @@ export async function rankedGatewayRoutes(app: FastifyInstance) {
 
   // ── Cola (solo) ─────────────────────────────────────
 
-  app.post<{ Body: { modo: 2 | 4 } }>('/ranked/cola/entrar', {
+  app.post<{ Body: { modo: 2 | 4; tipo?: 'casual' | 'ranked' } }>('/ranked/cola/entrar', {
     schema: {
-      tags: ['ranked'], summary: 'Entrar a la cola ranked (solo, sin equipo)',
+      tags: ['ranked'], summary: 'Entrar a la cola (solo, sin equipo)',
       security: [{ bearerAuth: [] }],
-      body: { type: 'object', required: ['modo'], properties: { modo: { type: 'integer', enum: [2, 4] } } },
+      body: {
+        type: 'object', required: ['modo'],
+        properties: {
+          modo: { type: 'integer', enum: [2, 4] },
+          tipo: { type: 'string', enum: ['casual', 'ranked'] },
+        },
+      },
       response: { 200: AnySchema, 400: { ...ErrorSchema }, 401: { ...ErrorSchema } },
     },
   }, async (req, reply) => {
     const payload = auth(req, reply); if (!payload) return;
     const { status, data } = await callSalas('/ranked/cola/entrar', 'POST', {
-      usuario_id: payload.sub, username: payload.username, modo: req.body.modo,
+      usuario_id: payload.sub, username: payload.username, modo: req.body.modo, tipo: req.body?.tipo,
     });
     return reply.code(status).send(data);
   });

@@ -14,22 +14,30 @@ const ErrorSchema = {
 
 const AnySchema = { type: 'object', additionalProperties: true } as const;
 
-// Partida ranked estándar: sin selector de puntos en matchmaking (a
-// diferencia de las salas manuales, que sí lo eligen).
-const PUNTOS_RANKED = 100;
+// Matchmaking sirve casual y ranked. Partida estándar a 100 puntos, sin
+// selector (las salas manuales sí lo eligen).
+const PUNTOS_MM = 100;
+
+type Tipo = 'casual' | 'ranked';
 
 async function getElo(usuarioId: string): Promise<number> {
   const { rows } = await pool.query('SELECT elo FROM ranked_ratings WHERE usuario_id = $1', [usuarioId]);
   return rows[0]?.elo ?? ELO_INICIAL;
 }
 
-// ── Carga los tickets vigentes de un modo como Ticket[] ─────────────
-async function cargarTickets(client: import('pg').PoolClient, modo: 2 | 4): Promise<Ticket[]> {
+// ELO de referencia para la cola. Casual empareja por orden de llegada
+// (FIFO): todos con el mismo valor → el rango de ELO nunca bloquea.
+async function eloRef(usuarioId: string, tipo: Tipo): Promise<number> {
+  return tipo === 'casual' ? ELO_INICIAL : getElo(usuarioId);
+}
+
+// ── Carga los tickets vigentes de un modo+tipo como Ticket[] ────────
+async function cargarTickets(client: import('pg').PoolClient, modo: 2 | 4, tipo: Tipo): Promise<Ticket[]> {
   const { rows: colas } = await client.query(
     `SELECT id, modo, usuario_id, username, party_id, elo_referencia,
             EXTRACT(EPOCH FROM created_at) * 1000 AS creado_en
-     FROM ranked_cola WHERE modo = $1`,
-    [modo],
+     FROM ranked_cola WHERE modo = $1 AND tipo = $2`,
+    [modo, tipo],
   );
   const partyIds = colas.filter(c => c.party_id).map(c => c.party_id);
   const miembrosPorParty = new Map<string, { usuario_id: string; username: string }[]>();
@@ -58,18 +66,19 @@ async function cargarTickets(client: import('pg').PoolClient, modo: 2 | 4): Prom
   });
 }
 
-// ── Crea sala + partida ranked ya en juego, para un grupo de asientos ──
-async function crearSalaRanked(
+// ── Crea sala + partida ya en juego para un grupo de asientos ───────
+async function crearSala(
   client: import('pg').PoolClient,
   modo: 2 | 4,
+  tipo: Tipo,
   asientos: Asiento[],
 ): Promise<string> {
   const codigo = await codigoDisponibleEn('salas', '2M-');
   const { rows: salaRows } = await client.query(
     `INSERT INTO salas (codigo, creador_id, tipo, modo, max_jugadores, estado, started_at, config)
-     VALUES ($1, $2, 'ranked', 'clasico', $3, 'en_juego', NOW(), $4)
+     VALUES ($1, $2, $3, 'clasico', $4, 'en_juego', NOW(), $5)
      RETURNING id`,
-    [codigo, asientos[0].usuario_id, modo, JSON.stringify({ puntosObjetivo: PUNTOS_RANKED })],
+    [codigo, asientos[0].usuario_id, tipo, modo, JSON.stringify({ puntosObjetivo: PUNTOS_MM })],
   );
   const salaId = salaRows[0].id;
 
@@ -81,7 +90,7 @@ async function crearSalaRanked(
     );
   }
 
-  const partida = crearPartida(asientos, PUNTOS_RANKED);
+  const partida = crearPartida(asientos, PUNTOS_MM);
   await client.query('INSERT INTO juegos (sala_id, partida) VALUES ($1, $2)', [salaId, JSON.stringify(partida)]);
 
   return salaId;
@@ -99,16 +108,16 @@ function asientosDesdeEquipos(equipoA: Ticket[], equipoB: Ticket[]): Asiento[] {
   ];
 }
 
-// ── Intenta emparejar el modo dado; crea la sala si hay match ───────
-// Serializado con un advisory lock por modo: dos polls simultáneos no
-// pueden emparejar al mismo ticket dos veces.
-async function intentarEmparejar(modo: 2 | 4): Promise<{ matched: boolean; salaId?: string }> {
+// ── Intenta emparejar modo+tipo; crea la sala si hay match ──────────
+// Serializado con un advisory lock por (modo,tipo): dos polls simultáneos
+// no pueden emparejar al mismo ticket dos veces.
+async function intentarEmparejar(modo: 2 | 4, tipo: Tipo): Promise<{ matched: boolean; salaId?: string }> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    await client.query('SELECT pg_advisory_xact_lock($1)', [90000 + modo]);
+    await client.query('SELECT pg_advisory_xact_lock($1)', [90000 + modo * 10 + (tipo === 'casual' ? 1 : 0)]);
 
-    const tickets = await cargarTickets(client, modo);
+    const tickets = await cargarTickets(client, modo, tipo);
     const ahora = Date.now();
 
     let asientos: Asiento[] | null = null;
@@ -142,7 +151,7 @@ async function intentarEmparejar(modo: 2 | 4): Promise<{ matched: boolean; salaI
       [idsAEliminar],
     );
 
-    const salaId = await crearSalaRanked(client, modo, asientos);
+    const salaId = await crearSala(client, modo, tipo, asientos);
 
     await client.query('DELETE FROM ranked_cola WHERE id = ANY($1)', [idsAEliminar]);
 
@@ -178,21 +187,25 @@ export async function matchmakingRoutes(app: FastifyInstance) {
 
   // ── PARTY ──────────────────────────────────────────
 
-  app.post<{ Body: { usuario_id: string; username: string } }>('/ranked/party', {
+  app.post<{ Body: { usuario_id: string; username: string; tipo?: Tipo } }>('/ranked/party', {
     schema: {
-      tags: ['ranked'], summary: 'Crear party (equipo por invitación, ranked 4P)',
+      tags: ['ranked'], summary: 'Crear party (equipo por invitación, 4P)',
       body: {
         type: 'object', required: ['usuario_id', 'username'],
-        properties: { usuario_id: { type: 'string' }, username: { type: 'string' } },
+        properties: {
+          usuario_id: { type: 'string' }, username: { type: 'string' },
+          tipo: { type: 'string', enum: ['casual', 'ranked'] },
+        },
       },
       response: { 201: AnySchema },
     },
   }, async (req, reply) => {
     const { usuario_id, username } = req.body;
+    const tipo: Tipo = req.body.tipo === 'casual' ? 'casual' : 'ranked';
     const codigo = await codigoDisponibleEn('ranked_parties', 'PT-');
     const { rows } = await pool.query(
-      `INSERT INTO ranked_parties (codigo, creador_id) VALUES ($1, $2) RETURNING id, codigo, estado, creador_id`,
-      [codigo, usuario_id],
+      `INSERT INTO ranked_parties (codigo, creador_id, tipo) VALUES ($1, $2, $3) RETURNING id, codigo, estado, creador_id, tipo`,
+      [codigo, usuario_id, tipo],
     );
     await pool.query(
       'INSERT INTO ranked_party_miembros (party_id, usuario_id, username) VALUES ($1, $2, $3)',
@@ -297,47 +310,50 @@ export async function matchmakingRoutes(app: FastifyInstance) {
         'SELECT usuario_id FROM ranked_party_miembros WHERE party_id = $1', [party.id]);
       if (miembros.length !== 2) return reply.code(400).send({ error: 'La party necesita 2 jugadores para buscar partida' });
 
-      const elos = await Promise.all(miembros.map((m: any) => getElo(m.usuario_id)));
-      const eloRef = Math.round((elos[0] + elos[1]) / 2);
+      const tipo: Tipo = party.tipo === 'casual' ? 'casual' : 'ranked';
+      const refs = await Promise.all(miembros.map((m: any) => eloRef(m.usuario_id, tipo)));
+      const ref = Math.round((refs[0] + refs[1]) / 2);
 
       await pool.query(
-        'INSERT INTO ranked_cola (modo, party_id, elo_referencia) VALUES (4, $1, $2)',
-        [party.id, eloRef],
+        'INSERT INTO ranked_cola (modo, tipo, party_id, elo_referencia) VALUES (4, $1, $2, $3)',
+        [tipo, party.id, ref],
       );
       await pool.query(`UPDATE ranked_parties SET estado = 'en_cola', updated_at = NOW() WHERE id = $1`, [party.id]);
 
-      const resultado = await intentarEmparejar(4);
+      const resultado = await intentarEmparejar(4, tipo);
       return reply.send(respuestaCola(resultado, 4, true));
     });
 
   // ── COLA (solo) ─────────────────────────────────────
 
-  app.post<{ Body: { usuario_id: string; username: string; modo: 2 | 4 } }>('/ranked/cola/entrar', {
+  app.post<{ Body: { usuario_id: string; username: string; modo: 2 | 4; tipo?: Tipo } }>('/ranked/cola/entrar', {
     schema: {
-      tags: ['ranked'], summary: 'Entrar a la cola ranked (solo, sin equipo)',
+      tags: ['ranked'], summary: 'Entrar a la cola (solo, sin equipo)',
       body: {
         type: 'object', required: ['usuario_id', 'username', 'modo'],
         properties: {
           usuario_id: { type: 'string' }, username: { type: 'string' },
           modo: { type: 'integer', enum: [2, 4] },
+          tipo: { type: 'string', enum: ['casual', 'ranked'] },
         },
       },
       response: { 200: AnySchema, 400: { ...ErrorSchema } },
     },
   }, async (req, reply) => {
     const { usuario_id, username, modo } = req.body;
+    const tipo: Tipo = req.body.tipo === 'casual' ? 'casual' : 'ranked';
 
     const { rows: yaEnCola } = await pool.query(
       'SELECT 1 FROM ranked_cola WHERE usuario_id = $1', [usuario_id]);
     if (yaEnCola.length) return reply.code(400).send({ error: 'Ya estás en cola' });
 
-    const elo = await getElo(usuario_id);
+    const ref = await eloRef(usuario_id, tipo);
     await pool.query(
-      'INSERT INTO ranked_cola (modo, usuario_id, username, elo_referencia) VALUES ($1, $2, $3, $4)',
-      [modo, usuario_id, username, elo],
+      'INSERT INTO ranked_cola (modo, tipo, usuario_id, username, elo_referencia) VALUES ($1, $2, $3, $4, $5)',
+      [modo, tipo, usuario_id, username, ref],
     );
 
-    const resultado = await intentarEmparejar(modo);
+    const resultado = await intentarEmparejar(modo, tipo);
     return reply.send(respuestaCola(resultado, modo, false));
   });
 
@@ -368,13 +384,13 @@ export async function matchmakingRoutes(app: FastifyInstance) {
       //  (a) el usuario canceló / nunca entró, o
       //  (b) OTRO jugador disparó el match y consumió este ticket — este
       //      usuario fue emparejado pero aún no lo sabe.
-      // Distinguimos (b) buscando una sala ranked recién iniciada donde
-      // este usuario ya es jugador. Sin esto, quien no dispara el match
-      // se va al menú por error ("saca a uno de los dos").
+      // Distinguimos (b) buscando una sala recién iniciada por matchmaking
+      // donde este usuario ya es jugador. Sin esto, quien no dispara el
+      // match se va al menú por error ("saca a uno de los dos").
       const { rows: salaReciente } = await pool.query(
         `SELECT s.id FROM salas s
          JOIN sala_jugadores sj ON sj.sala_id = s.id
-         WHERE sj.usuario_id = $1 AND s.tipo = 'ranked' AND s.estado = 'en_juego'
+         WHERE sj.usuario_id = $1 AND s.estado = 'en_juego'
            AND s.started_at > NOW() - INTERVAL '60 seconds'
          ORDER BY s.started_at DESC LIMIT 1`,
         [usuario_id],
@@ -385,7 +401,7 @@ export async function matchmakingRoutes(app: FastifyInstance) {
       return reply.send({ en_cola: false });
     }
 
-    const resultado = await intentarEmparejar(ticket.modo);
+    const resultado = await intentarEmparejar(ticket.modo, ticket.tipo);
     if (resultado.matched) {
       return reply.send({ en_cola: false, matched: true, sala_id: resultado.salaId });
     }

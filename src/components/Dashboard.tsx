@@ -11,6 +11,7 @@ type Props = {
   onLogout:      () => void;
   onGoToSalas:   () => void;
   onGoToRanked:  () => void;
+  onGoToCasual:  () => void;
   onPieceDemo:   () => void;
 };
 
@@ -42,7 +43,7 @@ function ModeCard({ title, desc, icon, action, variant, soon = true, onClick }: 
 }
 
 // ── Dashboard / Lobby ─────────────────────────────
-export default function Dashboard({ user, config, dark, onToggleTheme, onLogout, onGoToSalas, onGoToRanked, onPieceDemo }: Props) {
+export default function Dashboard({ user, config, dark, onToggleTheme, onLogout, onGoToSalas, onGoToRanked, onGoToCasual, onPieceDemo }: Props) {
   const [elo, setElo] = useState<number | null>(null);
 
   useEffect(() => {
@@ -108,6 +109,8 @@ export default function Dashboard({ user, config, dark, onToggleTheme, onLogout,
             desc="Juega sin presión. Practica, diviértete y mejora tu juego sin afectar tu ranking."
             icon={<CasualIcon />}
             action="Buscar partida"
+            soon={false}
+            onClick={onGoToCasual}
           />
           <ModeCard
             variant="ranked"
