@@ -27,7 +27,7 @@ se exponen al exterior:
 | `api-integracion`     | 3000           | —        | Gateway público (solo vía red interna)          |
 | `ms-usuarios`         | 4000           | —        | Usuarios / auth                                 |
 | `ms-frontend-landing` | 5000           | —        | Config del landing / preferencias               |
-| `ms-salas`            | 6000           | —        | Salas, juego, ELO, matchmaking                  |
+| `ms-salas`            | 6001           | —        | Salas, juego, ELO, matchmaking                  |
 | `postgres`            | 5432           | 5432 *   | Base de datos                                   |
 
 \* Postgres se expone en el compose para debug local. **En producción comenta ese

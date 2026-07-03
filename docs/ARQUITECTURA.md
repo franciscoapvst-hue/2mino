@@ -48,7 +48,7 @@ Configuración del landing y overrides de preferencias por usuario.
 
 La respuesta de `/frontend/preferencias` fusiona segmento + overrides + landing.
 
-### ms-salas (puerto 6000 en Docker, 6001 en dev local)
+### ms-salas (puerto 6001)
 
 Salas multijugador y partidas de dominó.
 

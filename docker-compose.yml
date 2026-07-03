@@ -49,7 +49,7 @@ services:
     build: ./ms-salas
     restart: unless-stopped
     environment:
-      PORT:   6000
+      PORT:   6001
       DB_URL: postgres://2mino:${POSTGRES_PASSWORD}@postgres:5432/2mino
     depends_on:
       postgres:
@@ -63,7 +63,7 @@ services:
       PORT:             3000
       MS_USUARIOS_URL:          http://ms-usuarios:4000
       MS_FRONTEND_LANDING_URL:  http://ms-frontend-landing:5000
-      MS_SALAS_URL:             http://ms-salas:6000
+      MS_SALAS_URL:             http://ms-salas:6001
       JWT_SECRET:       ${JWT_SECRET}
       CORS_ORIGIN:      ${CORS_ORIGIN:-*}
     depends_on:

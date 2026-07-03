@@ -186,9 +186,10 @@ El riesgo es bajo porque el juego es por turnos, pero es barato de blindar.
 **Qué:** valores de entorno con defaults repartidos y contradictorios.
 
 **Evidencia:**
-- `MS_SALAS_URL` default `http://localhost:6001` (`http.ts:5`) pero
+- ~~`MS_SALAS_URL` default `http://localhost:6001` (`http.ts:5`) pero
   `docker-compose.yml` usa el puerto **6000**, que además está en la lista de
-  "bad ports" de `fetch`/undici → rompe las llamadas. (Ya trackeado aparte.)
+  "bad ports" de `fetch`/undici → rompe las llamadas.~~ **Corregido:**
+  `docker-compose.yml` y `ms-salas/Dockerfile` ahora usan **6001** en todos lados.
 - Secreto JWT por defecto (ver P2).
 
 **Propuesta:** un módulo de config por servicio que lea y **valide** el entorno al

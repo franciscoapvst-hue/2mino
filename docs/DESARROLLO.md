@@ -71,11 +71,11 @@ Cada uno en su propia terminal:
 ```powershell
 .\ms-usuarios\dev.ps1          # :4000
 .\ms-frontend-landing\dev.ps1  # :5000
-.\ms-salas\dev.ps1             # :6001  ← nota: distinto al puerto Docker (6000)
+.\ms-salas\dev.ps1             # :6001
 .\api-integracion\dev.ps1      # :3000
 ```
 
-> **Nota de puertos:** En desarrollo local, `ms-salas` corre en **6001** (`ms-salas/dev.ps1` y `api-integracion/dev.ps1`). En Docker Compose usa **6000**. No mezclar configuraciones.
+> **Nota de puertos:** `ms-salas` corre en **6001** tanto en desarrollo local como en Docker Compose (el puerto 6000 está bloqueado por el `fetch`/undici de Node — está en la lista de puertos "inseguros", igual que en los navegadores).
 
 ### 3. Frontend
 
@@ -132,7 +132,7 @@ npm run start --prefix api-integracion
 | Error de DB al arrancar MS | Comprobar PostgreSQL y credenciales en `DB_URL` |
 | CORS en producción | Definir `CORS_ORIGIN` con el dominio exacto del frontend |
 | JWT inválido | Regenerar `JWT_SECRET`; los tokens previos dejan de valer |
-| ms-salas no responde | Confirmar puerto 6001 (local) o 6000 (Docker) según el entorno |
+| ms-salas no responde | Confirmar que corre en el puerto 6001 |
 
 ## Branches
 
