@@ -21,7 +21,7 @@ flowchart TB
     subgraph Microservicios["Microservicios internos"]
         MU["ms-usuarios<br/><b>:4000</b><br/>Identidad y credenciales"]
         MFL["ms-frontend-landing<br/><b>:5000</b><br/>Landing y preferencias UI"]
-        MS["ms-salas<br/><b>:6000</b> Docker · <b>:6001</b> local<br/>Salas y partidas"]
+        MS["ms-salas<br/><b>:6001</b><br/>Salas y partidas"]
     end
 
     subgraph Persistencia["Persistencia"]
