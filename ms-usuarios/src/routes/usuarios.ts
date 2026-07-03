@@ -28,6 +28,7 @@ const UserSchema = {
     segmento_id:     { type: 'string', format: 'uuid' },
     segmento:        { type: 'string' },
     segmento_config: { type: 'object', additionalProperties: true },
+    avatar:          { type: 'string', nullable: true },
     created_at:      { type: 'string', format: 'date-time' },
     updated_at:      { type: 'string', format: 'date-time' },
   },
@@ -190,12 +191,48 @@ export async function usuariosRoutes(app: FastifyInstance) {
     },
     async (req, reply) => {
       const { rows } = await pool.query(
-        `SELECT u.id, u.username, u.email, u.segmento_id, u.created_at, u.updated_at,
+        `SELECT u.id, u.username, u.email, u.segmento_id, u.avatar, u.created_at, u.updated_at,
                 s.nombre as segmento, s.config as segmento_config
          FROM usuarios u
          LEFT JOIN segmentos s ON s.id = u.segmento_id
          WHERE u.id = $1`,
         [req.params.id],
+      );
+      if (!rows.length) return reply.code(404).send({ error: 'Usuario no encontrado' });
+      return reply.send(rows[0]);
+    },
+  );
+
+  // ── PATCH /usuarios/:id/avatar ──────────────────
+  app.patch<{ Params: { id: string }; Body: { avatar: string } }>(
+    '/usuarios/:id/avatar',
+    {
+      schema: {
+        tags:        ['usuarios'],
+        summary:     'Actualizar avatar del usuario',
+        description: 'Guarda el nombre de archivo del avatar elegido de la carpeta de fotos de perfil.',
+        params: {
+          type: 'object',
+          properties: { id: { type: 'string', format: 'uuid' } },
+        },
+        body: {
+          type: 'object',
+          required: ['avatar'],
+          properties: {
+            avatar: { type: 'string', minLength: 1, maxLength: 100, example: 'avatar-01.png' },
+          },
+        },
+        response: {
+          200: { description: 'Avatar actualizado',    ...UserSchema },
+          404: { description: 'Usuario no encontrado', ...ErrorSchema },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { rows } = await pool.query(
+        `UPDATE usuarios SET avatar = $1, updated_at = NOW() WHERE id = $2
+         RETURNING id, username, email, segmento_id, avatar, created_at, updated_at`,
+        [req.body.avatar, req.params.id],
       );
       if (!rows.length) return reply.code(404).send({ error: 'Usuario no encontrado' });
       return reply.send(rows[0]);

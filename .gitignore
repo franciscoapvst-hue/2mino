@@ -19,6 +19,9 @@ Thumbs.db
 .vscode/
 .idea/
 
+# credenciales de prueba locales
+usuarios-prueba.txt
+
 # build outputs
 ms-usuarios/dist/
 ms-frontend-landing/dist/

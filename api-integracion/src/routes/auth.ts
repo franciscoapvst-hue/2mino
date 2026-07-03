@@ -9,6 +9,7 @@ const UserSchema = {
     id:         { type: 'string', format: 'uuid' },
     username:   { type: 'string', example: 'jugador42' },
     email:      { type: 'string', format: 'email' },
+    avatar:     { type: 'string', nullable: true },
     created_at: { type: 'string', format: 'date-time' },
   },
 } as const;
@@ -180,6 +181,35 @@ export async function authRoutes(app: FastifyInstance) {
       const payload = verifyToken(req.headers.authorization);
       if (!payload) return reply.code(401).send({ error: 'Token inválido o expirado' });
       const { status, data } = await callMs(`/usuarios/${payload.sub}`, 'GET');
+      return reply.code(status).send(data);
+    },
+  );
+
+  // ── PATCH /auth/avatar ──────────────────────────
+  app.patch<{ Body: { avatar: string } }>(
+    '/auth/avatar',
+    {
+      schema: {
+        tags:        ['auth'],
+        summary:     'Elegir avatar de la carpeta de fotos de perfil',
+        security:    [{ bearerAuth: [] }],
+        body: {
+          type: 'object',
+          required: ['avatar'],
+          properties: {
+            avatar: { type: 'string', minLength: 1, maxLength: 100, example: 'avatar-01.png' },
+          },
+        },
+        response: {
+          200: { description: 'Avatar actualizado',       ...UserSchema },
+          401: { description: 'Token ausente o inválido', ...ErrorSchema },
+        },
+      },
+    },
+    async (req, reply) => {
+      const payload = verifyToken(req.headers.authorization);
+      if (!payload) return reply.code(401).send({ error: 'Token inválido o expirado' });
+      const { status, data } = await callMs(`/usuarios/${payload.sub}/avatar`, 'PATCH', req.body);
       return reply.code(status).send(data);
     },
   );

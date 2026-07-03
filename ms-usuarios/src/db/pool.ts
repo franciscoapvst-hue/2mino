@@ -30,12 +30,14 @@ const SCHEMA = `
     email         VARCHAR(255) UNIQUE NOT NULL,
     password_hash TEXT        NOT NULL,
     segmento_id   UUID        REFERENCES segmentos(id),
+    avatar        VARCHAR(100),
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );
 
   -- Agrega segmento_id a tablas existentes que no lo tengan
   ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS segmento_id UUID REFERENCES segmentos(id);
+  ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS avatar VARCHAR(100);
 
   -- Asigna segmento tester a usuarios sin segmento
   UPDATE usuarios

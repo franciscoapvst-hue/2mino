@@ -4,6 +4,8 @@ import swaggerUi from '@fastify/swagger-ui';
 import { runMigrations } from './db/pool';
 import { salasRoutes } from './routes/salas';
 import { juegosRoutes } from './routes/juegos';
+import { rankedRoutes } from './routes/ranked';
+import { matchmakingRoutes } from './routes/matchmaking';
 
 const app = Fastify({
   logger: true,
@@ -19,8 +21,9 @@ app.register(swagger, {
       version:     '1.0.0',
     },
     tags: [
-      { name: 'salas', description: 'Operaciones sobre salas de juego' },
-      { name: 'juego', description: 'Estado y movimientos de la partida' },
+      { name: 'salas',  description: 'Operaciones sobre salas de juego' },
+      { name: 'juego',  description: 'Estado y movimientos de la partida' },
+      { name: 'ranked', description: 'ELO y clasificación' },
     ],
   },
 });
@@ -29,6 +32,8 @@ app.register(swaggerUi, { routePrefix: '/docs' });
 
 app.register(salasRoutes);
 app.register(juegosRoutes);
+app.register(rankedRoutes);
+app.register(matchmakingRoutes);
 
 app.get('/health', {
   schema: {

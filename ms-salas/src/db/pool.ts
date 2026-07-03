@@ -61,9 +61,91 @@ const SCHEMA = `
   );
 
   CREATE INDEX IF NOT EXISTS idx_juegos_sala_id ON juegos(sala_id);
+
+  -- ── Ranked / ELO ─────────────────────────────────────────────────
+  -- Rating vigente por usuario. Lo escribe SOLO ms-salas al terminar
+  -- una partida ranked. username desnormalizado para el leaderboard.
+  CREATE TABLE IF NOT EXISTS ranked_ratings (
+    usuario_id  UUID        PRIMARY KEY,
+    username    VARCHAR(20) NOT NULL,
+    elo         INT         NOT NULL DEFAULT 1000,
+    partidas    INT         NOT NULL DEFAULT 0,
+    ganadas     INT         NOT NULL DEFAULT 0,
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  -- Historial: una fila por jugador por partida ranked (progreso/auditoría).
+  -- UNIQUE(usuario_id, sala_id) hace idempotente la aplicación del ELO.
+  CREATE TABLE IF NOT EXISTS ranked_historial (
+    id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    usuario_id   UUID        NOT NULL,
+    sala_id      UUID        NOT NULL REFERENCES salas(id) ON DELETE CASCADE,
+    elo_antes    INT         NOT NULL,
+    elo_despues  INT         NOT NULL,
+    delta        INT         NOT NULL,
+    gano         BOOLEAN     NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (usuario_id, sala_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_ranked_hist_usuario ON ranked_historial(usuario_id, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_ranked_ratings_elo  ON ranked_ratings(elo DESC);
+
+  -- ── Matchmaking ranked ───────────────────────────────────────────
+  -- Party: pareja que quiere entrar junta a la cola 2v2 (mismo equipo).
+  -- Tamaño fijo 2; solo aplica a ranked 4P.
+  CREATE TABLE IF NOT EXISTS ranked_parties (
+    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    codigo      VARCHAR(8)  UNIQUE NOT NULL,
+    creador_id  UUID        NOT NULL,
+    estado      VARCHAR(20) NOT NULL DEFAULT 'esperando'
+                CHECK (estado IN ('esperando','en_cola','matched','cancelada')),
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  CREATE TABLE IF NOT EXISTS ranked_party_miembros (
+    party_id    UUID        NOT NULL REFERENCES ranked_parties(id) ON DELETE CASCADE,
+    usuario_id  UUID        NOT NULL,
+    username    VARCHAR(20) NOT NULL,
+    joined_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (party_id, usuario_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_ranked_party_codigo ON ranked_parties(codigo);
+
+  -- Cola de emparejamiento. Un ticket es SOLO (un usuario) o de PARTY
+  -- (party_id set, los miembros salen de ranked_party_miembros).
+  -- elo_referencia = elo propio (solo) o promedio de la pareja (party).
+  CREATE TABLE IF NOT EXISTS ranked_cola (
+    id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    modo            INT         NOT NULL CHECK (modo IN (2, 4)),
+    usuario_id      UUID,                 -- set si es ticket solo
+    username        VARCHAR(20),          -- idem, solo para ticket solo
+    party_id        UUID        REFERENCES ranked_parties(id) ON DELETE CASCADE,
+    elo_referencia  INT         NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CHECK ((usuario_id IS NOT NULL) <> (party_id IS NOT NULL)) -- exactamente uno
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_ranked_cola_usuario
+    ON ranked_cola(usuario_id) WHERE usuario_id IS NOT NULL;
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_ranked_cola_party
+    ON ranked_cola(party_id) WHERE party_id IS NOT NULL;
+  CREATE INDEX IF NOT EXISTS idx_ranked_cola_modo ON ranked_cola(modo, created_at);
+`;
+
+// Cambios sobre tablas que pueden ya existir de un arranque previo
+// (CREATE TABLE IF NOT EXISTS no las actualiza). Cada ALTER es idempotente.
+const ALTERS = `
+  ALTER TABLE ranked_cola ADD COLUMN IF NOT EXISTS username VARCHAR(20);
+  -- Matchmaking sirve para casual y ranked: se distinguen por tipo.
+  ALTER TABLE ranked_cola    ADD COLUMN IF NOT EXISTS tipo VARCHAR(20) NOT NULL DEFAULT 'ranked';
+  ALTER TABLE ranked_parties ADD COLUMN IF NOT EXISTS tipo VARCHAR(20) NOT NULL DEFAULT 'ranked';
 `;
 
 export async function runMigrations() {
   await pool.query(SCHEMA);
+  await pool.query(ALTERS);
   console.log('✓ Migrations OK (ms-salas)');
 }

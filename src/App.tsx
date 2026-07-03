@@ -4,21 +4,39 @@ import RegisterForm from './components/RegisterForm';
 import ForgotPasswordForm from './components/ForgotPasswordForm';
 import Dashboard from './components/Dashboard';
 import SalasView from './components/SalasView';
+import MatchmakingView from './components/MatchmakingView';
 import PieceDemo from './components/game/PieceDemo';
 import GameBoard from './components/game/GameBoard';
 import { api, tokenStore, type AuthUser, type UserConfig, type Sala } from './api';
 import { DominoTile, SunIcon, MoonIcon } from './components/icons';
 
 export type View = 'login' | 'register' | 'forgot';
-type AppView = View | 'dashboard' | 'salas' | 'piece-demo' | 'game';
+type AppView = View | 'dashboard' | 'salas' | 'ranked' | 'casual' | 'piece-demo' | 'game';
 
 type Session = { user: AuthUser; config: UserConfig };
+
+// Sin router todavía (ver docs/REFACTOR.md P4): un link de invitación a
+// party tiene forma /party/:codigo. Se parsea una sola vez al cargar y
+// se limpia la URL, para no tener que instalar react-router por esto.
+function leerCodigoPartyDeUrl(): string | null {
+  const m = window.location.pathname.match(/^\/party\/([A-Za-z0-9-]+)/);
+  if (!m) return null;
+  window.history.replaceState(null, '', '/');
+  return m[1];
+}
 
 export default function App() {
   const [view,     setView]     = useState<AppView>('login');
   const [session,  setSession]  = useState<Session | null>(null);
   const [booting,  setBooting]  = useState(true);
-  const [gameSala, setGameSala] = useState<Sala | null>(null);
+  const [gameSala, setGameSala]   = useState<Sala | null>(null);
+  // A dónde volver al salir de una partida terminada.
+  const [gameOrigin, setGameOrigin] = useState<'salas' | 'dashboard'>('salas');
+  // Invitación a party vía link (/party/ABCD). El inicializador de useState
+  // corre síncrono en el primer render, ANTES que cualquier efecto —
+  // evita que el .then() del restore de sesión capture un valor null por
+  // clausura si en vez usáramos un efecto separado para parsear la URL.
+  const [partyCodigo] = useState<string | null>(() => leerCodigoPartyDeUrl());
   const [dark,    setDark]    = useState<boolean>(
     () => localStorage.getItem('2mino-theme') !== 'light'
   );
@@ -37,16 +55,17 @@ export default function App() {
       .then(([user, config]) => {
         if (config.tema) setDark(config.tema === 'dark');
         setSession({ user, config });
-        setView('dashboard');
+        setView(partyCodigo ? 'ranked' : 'dashboard');
       })
       .catch(() => tokenStore.clear())
       .finally(() => setBooting(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function handleSuccess(user: AuthUser, config: UserConfig) {
     if (config.tema) setDark(config.tema === 'dark');
     setSession({ user, config });
-    setView('dashboard');
+    setView(partyCodigo ? 'ranked' : 'dashboard');
   }
 
   function handleLogout() {
@@ -72,7 +91,7 @@ export default function App() {
       <GameBoard
         sala={gameSala}
         user={session.user}
-        onExit={() => { setGameSala(null); setView('salas'); }}
+        onExit={() => { setGameSala(null); setView(gameOrigin); }}
       />
     );
   }
@@ -82,7 +101,19 @@ export default function App() {
       <SalasView
         user={session.user}
         onBack={() => setView('dashboard')}
-        onGameStart={(sala) => { setGameSala(sala); setView('game'); }}
+        onGameStart={(sala) => { setGameSala(sala); setGameOrigin('salas'); setView('game'); }}
+      />
+    );
+  }
+
+  if ((view === 'ranked' || view === 'casual') && session) {
+    return (
+      <MatchmakingView
+        user={session.user}
+        tipo={view}
+        onBack={() => setView('dashboard')}
+        onGameStart={(sala) => { setGameSala(sala); setGameOrigin('dashboard'); setView('game'); }}
+        autoJoinCodigo={view === 'ranked' ? partyCodigo : null}
       />
     );
   }
@@ -96,7 +127,12 @@ export default function App() {
         onToggleTheme={() => setDark(d => !d)}
         onLogout={handleLogout}
         onGoToSalas={() => setView('salas')}
+        onGoToRanked={() => setView('ranked')}
+        onGoToCasual={() => setView('casual')}
         onPieceDemo={() => setView('piece-demo')}
+        onAvatarChange={(avatar) =>
+          setSession(s => s && { ...s, user: { ...s.user, avatar } })
+        }
       />
     );
   }

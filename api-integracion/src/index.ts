@@ -5,6 +5,7 @@ import swaggerUi from '@fastify/swagger-ui';
 import { authRoutes } from './routes/auth';
 import { frontendRoutes } from './routes/frontend';
 import { salasGatewayRoutes } from './routes/salas';
+import { rankedGatewayRoutes } from './routes/ranked';
 
 const app = Fastify({
   logger: true,
@@ -35,6 +36,7 @@ app.register(swagger, {
       { name: 'frontend', description: 'Configuración del landing y preferencias de usuario' },
       { name: 'salas',    description: 'Salas de juego: crear, listar, unirse y salir' },
       { name: 'juego',    description: 'Estado y movimientos de la partida' },
+      { name: 'ranked',   description: 'ELO, leaderboard y matchmaking' },
       { name: 'system',   description: 'Estado del servicio' },
     ],
     components: {
@@ -63,6 +65,7 @@ app.register(swaggerUi, {
 app.register(authRoutes);
 app.register(frontendRoutes);
 app.register(salasGatewayRoutes);
+app.register(rankedGatewayRoutes);
 
 app.get('/health', {
   schema: {

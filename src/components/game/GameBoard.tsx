@@ -120,6 +120,25 @@ export default function GameBoard({ sala, user, onExit }: Props) {
     }
   }
 
+  // ── Salir de la partida ───────────────────────
+  // En ranked, salir a mitad = derrota (aplica ELO). Se confirma antes.
+  // En casual o si ya terminó, se sale sin más.
+  const [confirmSalir, setConfirmSalir] = useState(false);
+
+  function onClickSalir() {
+    const enCurso = partida && partida.fase !== 'fin_partida';
+    if (enCurso) setConfirmSalir(true);   // confirma en ranked Y casual
+    else onExit();
+  }
+
+  async function handleAbandonar() {
+    setConfirmSalir(false);
+    try {
+      await api.juego.abandonar(sala.id);
+    } catch { /* aunque falle, salimos igual */ }
+    onExit();
+  }
+
   // ── Pasar turno ───────────────────────────────
   async function handlePasar() {
     if (jugando) return;
@@ -257,7 +276,7 @@ export default function GameBoard({ sala, user, onExit }: Props) {
     <div className="game-shell">
       {/* ── Nav ─────────────────────────────────── */}
       <nav className="game-nav">
-        <button className="btn-back" onClick={onExit}><BackIcon /> Salir</button>
+        <button className="btn-back" onClick={onClickSalir}><BackIcon /> Salir</button>
         <span className="game-room-code">{sala.codigo}</span>
         <span className={`game-turn-indicator${esMiTurno ? ' my-turn' : ''}`}>{turnoLabel}</span>
       </nav>
@@ -390,6 +409,24 @@ export default function GameBoard({ sala, user, onExit }: Props) {
       {partida.fase === 'fin_partida' && (
         <FinPartidaOverlay partida={partida} onExit={onExit} />
       )}
+
+      {/* ── Confirmar abandono (ranked) ──────────── */}
+      {confirmSalir && (
+        <div className="game-result-overlay">
+          <div className="game-result-card">
+            <h2>¿Abandonar la partida?</h2>
+            <p className="result-detail">
+              {sala.tipo === 'ranked'
+                ? <>Es una partida ranked. Si sales ahora <strong>cuentas como derrota</strong>: pierdes ELO y el rival lo gana.</>
+                : <>Si sales ahora <strong>se termina la partida</strong> para todos.</>}
+            </p>
+            <button className="btn-primary" onClick={handleAbandonar}>
+              {sala.tipo === 'ranked' ? 'Salir y perder' : 'Salir'}
+            </button>
+            <button className="btn-salir" onClick={() => setConfirmSalir(false)}>Seguir jugando</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -508,14 +545,24 @@ function FinPartidaOverlay({ partida, onExit }: {
 }) {
   const miEq = partida.miEquipo ?? 0;
   const gane = partida.equipoGanadorPartida === miEq;
+  // ¿Terminó por abandono? (y no fui yo quien se fue)
+  const abandono = partida.abandonadoPorSeat !== null;
+  const abandonoDeOtro = abandono && partida.abandonadoPorSeat !== partida.miSeat;
+
+  const titulo = abandonoDeOtro && gane ? '🏆 ¡Ganaste! el rival abandonó'
+               : gane ? '🏆 ¡Partida ganada!'
+               : '😓 Partida perdida';
+  const detalle = abandonoDeOtro && gane ? 'Un rival dejó la partida.'
+                : abandono && !gane ? 'Tu equipo abandonó la partida.'
+                : gane ? '¡Alcanzaron el objetivo!'
+                : 'El rival alcanzó el objetivo';
+
   return (
     <div className="game-result-overlay">
       <div className="game-result-card">
-        <h2>{gane ? '🏆 ¡Partida ganada!' : '😓 Partida perdida'}</h2>
+        <h2>{titulo}</h2>
         <MarcadorResumen partida={partida} />
-        <p className="result-detail">
-          {gane ? '¡Alcanzaron el objetivo!' : 'El rival alcanzó el objetivo'}
-        </p>
+        <p className="result-detail">{detalle}</p>
         <button className="btn-primary" onClick={onExit}>Volver a la sala</button>
       </div>
     </div>

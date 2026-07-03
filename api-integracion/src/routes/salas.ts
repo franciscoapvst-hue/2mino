@@ -394,4 +394,31 @@ export async function salasGatewayRoutes(app: FastifyInstance) {
     });
     return reply.code(status).send(data);
   });
+
+  // ── POST /salas/:id/juego/abandonar ───────────────
+  app.post<{ Params: { id: string } }>('/salas/:id/juego/abandonar', {
+    schema: {
+      tags:     ['juego'],
+      summary:  'Abandonar la partida (derrota; aplica ELO en ranked)',
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: { id: { type: 'string', format: 'uuid' } },
+      },
+      response: {
+        200: { ...SalaResumenSchema },
+        400: { ...ErrorSchema },
+        401: { ...ErrorSchema },
+        404: { ...ErrorSchema },
+      },
+    },
+  }, async (req, reply) => {
+    const payload = verifyToken(req.headers.authorization);
+    if (!payload) return reply.code(401).send({ error: 'Token requerido' });
+
+    const { status, data } = await callSalas(`/salas/${req.params.id}/juego/abandonar`, 'POST', {
+      usuario_id: payload.sub,
+    });
+    return reply.code(status).send(data);
+  });
 }

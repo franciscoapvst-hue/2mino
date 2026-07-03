@@ -110,6 +110,7 @@ export type PartidaState = {
   salidaForzada:  Pieza | null;  // mano 1: obligado a abrir con esta ficha
   resultadoMano:  ResultadoMano | null; // de la mano recién cerrada
   ultimoEvento:   { tipo: 'paso_a_todos'; seat: number } | null;
+  abandonadoPorSeat: number | null;     // set si la partida terminó por abandono
 };
 
 type Resultado = { ok: true; partida: PartidaState } | { ok: false; error: string };
@@ -162,6 +163,25 @@ export function crearPartida(jugadores: Asiento[], puntosObjetivo = 100): Partid
     salidaForzada: apertura?.pieza ?? null,
     resultadoMano: null,
     ultimoEvento: null,
+    abandonadoPorSeat: null,
+  };
+}
+
+// ── Abandono: la partida termina, gana el equipo rival ──────────────
+export function aplicarAbandono(partida: PartidaState, usuarioId: string): Resultado {
+  if (partida.fase === 'fin_partida') return { ok: false, error: 'La partida ya terminó' };
+  const seat = seatDe(partida, usuarioId);
+  if (seat === -1) return { ok: false, error: 'No perteneces a esta partida' };
+
+  const ganador = equipoDe(seat) === 0 ? 1 : 0;
+  return {
+    ok: true,
+    partida: {
+      ...partida,
+      fase: 'fin_partida',
+      equipoGanadorPartida: ganador,
+      abandonadoPorSeat: seat,
+    },
   };
 }
 
@@ -402,6 +422,7 @@ export type PartidaPublica = {
   resultadoMano:  ResultadoMano | null;
   equipoGanadorPartida: 0 | 1 | null;
   ultimoEvento:   { tipo: 'paso_a_todos'; seat: number } | null;
+  abandonadoPorSeat: number | null;
   estado:         'jugando' | 'entre_manos' | 'terminado';
 };
 
@@ -428,6 +449,7 @@ export function vistaPublica(partida: PartidaState, usuarioId: string): PartidaP
     resultadoMano:  partida.resultadoMano,
     equipoGanadorPartida: partida.equipoGanadorPartida,
     ultimoEvento:   partida.ultimoEvento,
+    abandonadoPorSeat: partida.abandonadoPorSeat,
     estado: partida.fase === 'fin_partida' ? 'terminado'
           : partida.fase === 'entre_manos' ? 'entre_manos'
           : 'jugando',

@@ -1,21 +1,27 @@
 import { FastifyInstance } from 'fastify';
 import { pool } from '../db/pool';
 
-// ── Código corto único ────────────────────────────
-function generarCodigo(): string {
+// ── Código corto único (reutilizable: salas "2M-" y parties "PT-") ──
+export function generarCodigo(prefijo = '2M-'): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let c = '2M-';
+  let c = prefijo;
   for (let i = 0; i < 4; i++) c += chars[Math.floor(Math.random() * chars.length)];
   return c;
 }
 
-async function codigoDisponible(): Promise<string> {
+export async function codigoDisponibleEn(
+  tabla: 'salas' | 'ranked_parties', prefijo: string,
+): Promise<string> {
   for (let i = 0; i < 10; i++) {
-    const code = generarCodigo();
-    const { rows } = await pool.query('SELECT id FROM salas WHERE codigo = $1', [code]);
+    const code = generarCodigo(prefijo);
+    const { rows } = await pool.query(`SELECT id FROM ${tabla} WHERE codigo = $1`, [code]);
     if (!rows.length) return code;
   }
   throw new Error('No se pudo generar un código único');
+}
+
+async function codigoDisponible(): Promise<string> {
+  return codigoDisponibleEn('salas', '2M-');
 }
 
 // ── Schemas ───────────────────────────────────────
@@ -75,7 +81,7 @@ const ErrorSchema = {
 } as const;
 
 // ── Helper: sala con jugadores ────────────────────
-async function getSalaConJugadores(id: string) {
+export async function getSalaConJugadores(id: string) {
   const { rows: sala } = await pool.query(
     `SELECT s.*,
             COALESCE(

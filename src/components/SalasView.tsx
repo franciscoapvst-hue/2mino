@@ -38,6 +38,7 @@ function SalaCard({
     <div className={`sala-card${llena && !yaEstoy ? ' sala-card-full' : ''}`}>
       <div className="sala-card-top">
         <span className="sala-codigo">{sala.codigo}</span>
+        {sala.tipo === 'ranked' && <span className="sala-ranked-badge">RANKED</span>}
       </div>
 
       <div className="sala-card-body">
@@ -167,19 +168,20 @@ function SlotCard({ posicion, jugador, esMio, esCreador, equipo, onSentarme }: {
 
 // ── Create form ───────────────────────────────────
 type CreateBody = {
-  nombre: string; modo: 'clasico'|'rapido'|'torneo'; max_jugadores: 2|4;
+  nombre: string; tipo: 'casual'|'ranked'; modo: 'clasico'|'rapido'|'torneo'; max_jugadores: 2|4;
   config: { puntosObjetivo: 100|150|200 };
 };
 
 function CreateForm({ onCrear, creating }: { onCrear: (b: CreateBody) => void; creating: boolean }) {
   const [nombre, setNombre] = useState('');
+  const [tipo,   setTipo]   = useState<'casual'|'ranked'>('casual');
   const [modo,   setModo]   = useState<'clasico'|'rapido'|'torneo'>('clasico');
   const [max,    setMax]    = useState<2|4>(4);
   const [puntos, setPuntos] = useState<100|150|200>(100);
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    onCrear({ nombre, modo, max_jugadores: max, config: { puntosObjetivo: puntos } });
+    onCrear({ nombre, tipo, modo, max_jugadores: max, config: { puntosObjetivo: puntos } });
   }
 
   return (
@@ -215,6 +217,19 @@ function CreateForm({ onCrear, creating }: { onCrear: (b: CreateBody) => void; c
                   className={`toggle-btn${max === n ? ' active' : ''}`}
                   onClick={() => setMax(n)} disabled={creating}>
                   {n}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="option-group">
+            <span className="field-label">Tipo</span>
+            <div className="toggle-row">
+              {(['casual', 'ranked'] as const).map(t => (
+                <button key={t} type="button"
+                  className={`toggle-btn${tipo === t ? ' active' : ''}`}
+                  onClick={() => setTipo(t)} disabled={creating}>
+                  {t === 'casual' ? 'Casual' : 'Ranked'}
                 </button>
               ))}
             </div>

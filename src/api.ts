@@ -63,6 +63,7 @@ export type PartidaPublica = {
   resultadoMano:  ResultadoMano | null;
   equipoGanadorPartida: 0 | 1 | null;
   ultimoEvento:   { tipo: 'paso_a_todos'; seat: number } | null;
+  abandonadoPorSeat: number | null;
   estado:         'jugando' | 'entre_manos' | 'terminado';
 };
 
@@ -70,7 +71,42 @@ export type AuthUser = {
   id: string;
   username: string;
   email: string;
+  avatar?: string | null;
 };
+
+// ── Ranked / ELO ───────────────────────────────────
+export type RankedInfo = {
+  usuario_id: string;
+  elo:        number;
+  partidas:   number;
+  ganadas:    number;
+  historial: {
+    sala_id: string; elo_antes: number; elo_despues: number;
+    delta: number; gano: boolean; created_at: string;
+  }[];
+};
+
+export type LeaderboardEntry = {
+  usuario_id: string; username: string;
+  elo: number; partidas: number; ganadas: number;
+};
+
+// ── Matchmaking (casual y ranked) ──────────────────
+export type TipoJuego = 'casual' | 'ranked';
+
+export type PartyMiembro = { usuario_id: string; username: string };
+
+export type Party = {
+  id: string; codigo: string; creador_id: string;
+  estado: 'esperando' | 'en_cola' | 'matched' | 'cancelada';
+  tipo?: TipoJuego;
+  miembros: PartyMiembro[];
+};
+
+export type ColaEstado =
+  | { en_cola: false; matched?: false }
+  | { en_cola: false; matched: true; sala_id: string }
+  | { en_cola: true; modo: 2 | 4; es_party: boolean; espera_ms: number; rango_actual: number };
 
 export type UserConfig = {
   usuario_id: string;
@@ -136,6 +172,9 @@ export const api = {
 
   me: () => req<AuthUser>('/auth/me'),
 
+  setAvatar: (avatar: string) =>
+    req<AuthUser>('/auth/avatar', { method: 'PATCH', body: JSON.stringify({ avatar }) }),
+
   getPreferencias: () => req<UserConfig>('/frontend/preferencias'),
 
   putPreferencias: (body: Partial<Pick<UserConfig, 'tema' | 'idioma' | 'opciones'>>) =>
@@ -178,5 +217,28 @@ export const api = {
       req<PartidaPublica>(`/salas/${salaId}/juego/pasar`, { method: 'POST', body: '{}' }),
     listo: (salaId: string) =>
       req<PartidaPublica>(`/salas/${salaId}/juego/listo`, { method: 'POST', body: '{}' }),
+    abandonar: (salaId: string) =>
+      req<PartidaPublica>(`/salas/${salaId}/juego/abandonar`, { method: 'POST', body: '{}' }),
+  },
+
+  ranked: {
+    me: () => req<RankedInfo>('/ranked/me'),
+    leaderboard: (limit = 20) =>
+      req<LeaderboardEntry[]>(`/ranked/leaderboard?limit=${limit}`),
+
+    crearParty: (tipo: TipoJuego = 'ranked') =>
+      req<Party>('/ranked/party', { method: 'POST', body: JSON.stringify({ tipo }) }),
+    party: (codigo: string) => req<Party>(`/ranked/party/${codigo}`),
+    unirseParty: (codigo: string) =>
+      req<Party>(`/ranked/party/${codigo}/unirse`, { method: 'POST', body: '{}' }),
+    salirParty: (codigo: string) =>
+      req<{ ok: true }>(`/ranked/party/${codigo}/salir`, { method: 'POST', body: '{}' }),
+    partyACola: (codigo: string) =>
+      req<ColaEstado>(`/ranked/party/${codigo}/cola`, { method: 'POST', body: '{}' }),
+
+    entrarCola: (modo: 2 | 4, tipo: TipoJuego = 'ranked') =>
+      req<ColaEstado>('/ranked/cola/entrar', { method: 'POST', body: JSON.stringify({ modo, tipo }) }),
+    estadoCola: () => req<ColaEstado>('/ranked/cola/estado'),
+    salirCola: () => req<{ ok: true }>('/ranked/cola/salir', { method: 'POST', body: '{}' }),
   },
 };

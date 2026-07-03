@@ -1,0 +1,9 @@
+node_modules
+dist
+.env
+.env.local
+ms-usuarios
+ms-frontend-landing
+ms-salas
+api-integracion
+docs
