@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import LoginForm from './components/LoginForm';
+import LoginScreen from './components/LoginScreen';
+import RegisterScreen from './components/RegisterScreen';
+import ForgotScreen from './components/ForgotScreen';
 import RegisterForm from './components/RegisterForm';
 import ForgotPasswordForm from './components/ForgotPasswordForm';
 import Dashboard from './components/Dashboard';
@@ -84,6 +87,39 @@ export default function App() {
 
   if (view === 'piece-demo') {
     return <PieceDemo onBack={() => setView(session ? 'dashboard' : 'login')} />;
+  }
+
+  // Login / registro: pantallas completas dedicadas (forgot sigue en la card)
+  if (view === 'login' && !session) {
+    return (
+      <LoginScreen
+        onSwitch={setView}
+        onSuccess={handleSuccess}
+        dark={dark}
+        onToggleTheme={() => setDark(d => !d)}
+      />
+    );
+  }
+
+  if (view === 'register' && !session) {
+    return (
+      <RegisterScreen
+        onSwitch={setView}
+        onSuccess={handleSuccess}
+        dark={dark}
+        onToggleTheme={() => setDark(d => !d)}
+      />
+    );
+  }
+
+  if (view === 'forgot' && !session) {
+    return (
+      <ForgotScreen
+        onSwitch={setView}
+        dark={dark}
+        onToggleTheme={() => setDark(d => !d)}
+      />
+    );
   }
 
   if (view === 'game' && session && gameSala) {

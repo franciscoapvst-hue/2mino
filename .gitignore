@@ -27,3 +27,5 @@ ms-usuarios/dist/
 ms-frontend-landing/dist/
 ms-salas/dist/
 api-integracion/dist/
+
+docker-compose.override.yml
