@@ -16,6 +16,8 @@ export type Ticket = {
   creadoEn:   number;     // epoch ms
 };
 
+import { BOT_FILL_MS, BOT_IDS, BOT_USERNAMES } from './bots';
+
 // ── Rango de ELO aceptable, creciente con el tiempo de espera ──────
 // 0-15s: ±50 · 15-30s: ±100 · 30-45s: ±200 · 45-60s: ±400 · 60s+: ±800
 const ESCALONES_RANGO = [50, 100, 200, 400, 800];
@@ -109,4 +111,60 @@ export function tryMatch4p(tickets: Ticket[], ahora: number): Match4p | null {
   }
 
   return null;
+}
+
+// ── Relleno con bots (solo casual) ──────────────────────────────────
+// Si nadie emparejó de forma real y algún ticket lleva esperando
+// BOT_FILL_MS, arma la sala con los jugadores reales ya en cola (sin
+// partir parties, que quedan siempre en el mismo equipo) y rellena los
+// asientos sobrantes con bots. El caller (rutas) filtra por tipo==='casual'
+// antes de llamar a esto — el ranked nunca debe emparejar contra bots.
+export type AsientoRelleno = { usuario_id: string; username: string; posicion: number };
+
+export function rellenoConBots(
+  tickets: Ticket[], modo: 2 | 4, ahora: number,
+): { asientos: AsientoRelleno[]; idsAEliminar: string[] } | null {
+  const cola = tickets.filter(t => t.modo === modo).sort((a, b) => a.creadoEn - b.creadoEn);
+  if (!cola.length) return null;
+  if (!cola.some(t => ahora - t.creadoEn >= BOT_FILL_MS)) return null;
+
+  // Toma tickets completos (sin partir parties) hasta llenar los asientos.
+  const usados: Ticket[] = [];
+  let ocupados = 0;
+  for (const t of cola) {
+    if (ocupados + t.usuarioIds.length > modo) continue;
+    usados.push(t);
+    ocupados += t.usuarioIds.length;
+    if (ocupados === modo) break;
+  }
+
+  // Una party ocupa un par de posiciones del mismo equipo (1&3 o 2&4).
+  // Los tickets sueltos van a la próxima posición libre siguiendo el
+  // orden [1,3,2,4]: así, si hay varios sueltos reales en cola, quedan
+  // agrupados en el mismo equipo antes de empezar a ocupar el otro
+  // (en vez de terminar enfrentados entre sí por casualidad de orden).
+  const paresEquipo: [number, number][] = modo === 4 ? [[1, 3], [2, 4]] : [[1, 2]];
+  const ordenSueltos = modo === 4 ? [1, 3, 2, 4] : [1, 2];
+  const asientos: AsientoRelleno[] = [];
+  const libres = new Set(Array.from({ length: modo }, (_, i) => i + 1));
+
+  for (const t of usados) {
+    if (t.usuarioIds.length === 2) {
+      const par = paresEquipo.find(([a, b]) => libres.has(a) && libres.has(b));
+      if (!par) continue; // no debería pasar (no hay 2 posiciones libres del mismo equipo)
+      asientos.push({ usuario_id: t.usuarioIds[0], username: t.usernames[0], posicion: par[0] });
+      asientos.push({ usuario_id: t.usuarioIds[1], username: t.usernames[1], posicion: par[1] });
+      libres.delete(par[0]); libres.delete(par[1]);
+    } else {
+      const pos = ordenSueltos.find(p => libres.has(p))!;
+      asientos.push({ usuario_id: t.usuarioIds[0], username: t.usernames[0], posicion: pos });
+      libres.delete(pos);
+    }
+  }
+
+  [...libres].sort((a, b) => a - b).forEach((pos, i) => {
+    asientos.push({ usuario_id: BOT_IDS[i], username: BOT_USERNAMES[i], posicion: pos });
+  });
+
+  return { asientos, idsAEliminar: usados.map(t => t.id) };
 }

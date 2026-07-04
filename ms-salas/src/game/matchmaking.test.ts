@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { rangoPermitido, tryMatch2p, tryMatch4p, type Ticket } from './matchmaking';
+import { rangoPermitido, tryMatch2p, tryMatch4p, rellenoConBots, type Ticket } from './matchmaking';
+import { BOT_FILL_MS, BOT_IDS } from './bots';
 
 const T0 = 1_000_000; // época base arbitraria
 
@@ -155,3 +156,68 @@ describe('tryMatch4p — puro solo, balanceado', () => {
 });
 
 function UMBRAL() { return 15_000; }
+
+describe('rellenoConBots', () => {
+  it('sin tickets, no rellena', () => {
+    expect(rellenoConBots([], 2, T0)).toBeNull();
+  });
+
+  it('antes de BOT_FILL_MS, no rellena aunque esté solo en cola', () => {
+    const s = solo(2, 1000, T0);
+    expect(rellenoConBots([s], 2, T0 + BOT_FILL_MS - 1)).toBeNull();
+  });
+
+  it('1v1: tras BOT_FILL_MS, rellena el otro asiento con un bot', () => {
+    const s = solo(2, 1000, T0);
+    const r = rellenoConBots([s], 2, T0 + BOT_FILL_MS)!;
+    expect(r).not.toBeNull();
+    expect(r.idsAEliminar).toEqual([s.id]);
+    expect(r.asientos).toHaveLength(2);
+    const real = r.asientos.find(a => a.usuario_id === s.usuarioIds[0])!;
+    const bot = r.asientos.find(a => a.usuario_id !== s.usuarioIds[0])!;
+    expect(real.posicion).toBe(1);
+    expect(BOT_IDS as readonly string[]).toContain(bot.usuario_id);
+    expect(bot.posicion).toBe(2);
+  });
+
+  it('4P solo (1 humano): rellena los otros 3 asientos con bots', () => {
+    const s = solo(4, 1000, T0);
+    const r = rellenoConBots([s], 4, T0 + BOT_FILL_MS)!;
+    expect(r.asientos).toHaveLength(4);
+    const bots = r.asientos.filter(a => a.usuario_id !== s.usuarioIds[0]);
+    expect(bots).toHaveLength(3);
+    expect(bots.every(b => (BOT_IDS as readonly string[]).includes(b.usuario_id))).toBe(true);
+  });
+
+  it('4P party (2 humanos): quedan en el mismo equipo (1&3 o 2&4), bots rellenan el rival', () => {
+    const p = party(1000, T0);
+    const r = rellenoConBots([p], 4, T0 + BOT_FILL_MS)!;
+    expect(r.idsAEliminar).toEqual([p.id]);
+    const posReales = r.asientos
+      .filter(a => p.usuarioIds.includes(a.usuario_id))
+      .map(a => a.posicion)
+      .sort();
+    expect([[1, 3], [2, 4]]).toContainEqual(posReales);
+    const bots = r.asientos.filter(a => !p.usuarioIds.includes(a.usuario_id));
+    expect(bots).toHaveLength(2);
+  });
+
+  it('4P: dos solos esperando (sin party) terminan en el mismo equipo, bots rellenan el resto', () => {
+    const s1 = solo(4, 1000, T0);
+    const s2 = solo(4, 1000, T0 + 2000); // llegó después, aún no expiró por su cuenta
+    const r = rellenoConBots([s1, s2], 4, T0 + BOT_FILL_MS)!;
+    expect(r).not.toBeNull();
+    const posReales = r.asientos
+      .filter(a => a.usuario_id === s1.usuarioIds[0] || a.usuario_id === s2.usuarioIds[0])
+      .map(a => a.posicion)
+      .sort();
+    expect([[1, 3], [2, 4]]).toContainEqual(posReales);
+  });
+
+  it('ignora tickets de otro modo', () => {
+    const s2 = solo(2, 1000, T0);
+    const s4 = solo(4, 1000, T0);
+    expect(rellenoConBots([s2], 4, T0 + BOT_FILL_MS)).toBeNull(); // ticket 2P no cuenta para cola 4P
+    expect(rellenoConBots([s4, s2], 4, T0 + BOT_FILL_MS)).not.toBeNull(); // pero el 4P sí, aunque haya un 2P mezclado
+  });
+});

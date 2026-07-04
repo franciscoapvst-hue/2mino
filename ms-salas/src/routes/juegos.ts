@@ -5,6 +5,7 @@ import {
 } from '../game/logic';
 import type { PartidaState, Pieza } from '../game/logic';
 import { aplicarEloRanked } from './ranked';
+import { resolverTurnosBot } from '../game/bots';
 
 const ErrorSchema = {
   type: 'object',
@@ -146,7 +147,15 @@ export async function juegosRoutes(app: FastifyInstance) {
     const juego = await getJuegoActivo(req.params.id);
     if (!juego) return reply.code(404).send({ error: 'No hay partida para esta sala' });
     const partida = parsePartida(juego);
-    return reply.send(vistaPublica(partida, req.query.usuario_id));
+    // Red de seguridad: si por lo que sea el turno quedó en un bot sin
+    // resolver (p. ej. un guardado previo a este cambio), lo resuelve acá
+    // también. resolverTurnosBot devuelve la MISMA referencia si no hay
+    // nada que hacer, así que esto no persiste en el caso normal.
+    const partidaFinal = resolverTurnosBot(partida);
+    if (partidaFinal !== partida) {
+      await guardarPartida(juego.id, juego.sala_id, partidaFinal);
+    }
+    return reply.send(vistaPublica(partidaFinal, req.query.usuario_id));
   });
 
   // ── POST /salas/:id/juego/jugar ───────────────────
@@ -190,8 +199,9 @@ export async function juegosRoutes(app: FastifyInstance) {
 
     if (!resultado.ok) return reply.code(400).send({ error: resultado.error });
 
-    await guardarPartida(juego.id, juego.sala_id, resultado.partida);
-    return reply.send(vistaPublica(resultado.partida, usuario_id));
+    const partidaFinal = resolverTurnosBot(resultado.partida);
+    await guardarPartida(juego.id, juego.sala_id, partidaFinal);
+    return reply.send(vistaPublica(partidaFinal, usuario_id));
   });
 
   // ── POST /salas/:id/juego/pasar ───────────────────
@@ -226,8 +236,9 @@ export async function juegosRoutes(app: FastifyInstance) {
 
     if (!resultado.ok) return reply.code(400).send({ error: resultado.error });
 
-    await guardarPartida(juego.id, juego.sala_id, resultado.partida);
-    return reply.send(vistaPublica(resultado.partida, req.body.usuario_id));
+    const partidaFinal = resolverTurnosBot(resultado.partida);
+    await guardarPartida(juego.id, juego.sala_id, partidaFinal);
+    return reply.send(vistaPublica(partidaFinal, req.body.usuario_id));
   });
 
   // ── POST /salas/:id/juego/listo ───────────────────
@@ -262,8 +273,9 @@ export async function juegosRoutes(app: FastifyInstance) {
 
     if (!resultado.ok) return reply.code(400).send({ error: resultado.error });
 
-    await guardarPartida(juego.id, juego.sala_id, resultado.partida);
-    return reply.send(vistaPublica(resultado.partida, req.body.usuario_id));
+    const partidaFinal = resolverTurnosBot(resultado.partida);
+    await guardarPartida(juego.id, juego.sala_id, partidaFinal);
+    return reply.send(vistaPublica(partidaFinal, req.body.usuario_id));
   });
 
   // ── POST /salas/:id/juego/abandonar ───────────────
