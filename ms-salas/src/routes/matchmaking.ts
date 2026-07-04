@@ -4,8 +4,9 @@ import { codigoDisponibleEn } from './salas';
 import { crearPartida } from '../game/logic';
 import type { Asiento } from '../game/logic';
 import { ELO_INICIAL } from '../game/elo';
-import { tryMatch2p, tryMatch4p, rangoPermitido } from '../game/matchmaking';
+import { tryMatch2p, tryMatch4p, rangoPermitido, rellenoConBots } from '../game/matchmaking';
 import type { Ticket } from '../game/matchmaking';
+import { resolverTurnosBot } from '../game/bots';
 
 const ErrorSchema = {
   type: 'object',
@@ -90,7 +91,9 @@ async function crearSala(
     );
   }
 
-  const partida = crearPartida(asientos, PUNTOS_MM);
+  // resolverTurnosBot es un no-op si no hay bots sentados; si el reparto
+  // forzó a un bot a abrir con el doble más alto, ya queda resuelto acá.
+  const partida = resolverTurnosBot(crearPartida(asientos, PUNTOS_MM));
   await client.query('INSERT INTO juegos (sala_id, partida) VALUES ($1, $2)', [salaId, JSON.stringify(partida)]);
 
   return salaId;
@@ -137,6 +140,17 @@ async function intentarEmparejar(modo: 2 | 4, tipo: Tipo): Promise<{ matched: bo
       if (m) {
         asientos = asientosDesdeEquipos(m.equipoA, m.equipoB);
         idsAEliminar = [...m.equipoA, ...m.equipoB].map(t => t.id);
+      }
+    }
+
+    // Casual: si nadie real emparejó y algún ticket ya esperó BOT_FILL_MS,
+    // rellena con bots en vez de seguir esperando. El ranked nunca toca
+    // esta rama (bots no deben afectar ELO).
+    if (!asientos && tipo === 'casual') {
+      const relleno = rellenoConBots(tickets, modo, ahora);
+      if (relleno) {
+        asientos = relleno.asientos;
+        idsAEliminar = relleno.idsAEliminar;
       }
     }
 
