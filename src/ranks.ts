@@ -25,3 +25,21 @@ export function rangoDeElo(elo: number): Rango {
   const r = [...RANGOS].reverse().find(r => elo >= r.min) ?? RANGOS[0];
   return { nombre: r.nombre, url: badgeByFile[r.file] ?? null, min: r.min };
 }
+
+// Progreso hacia el siguiente rango: para el panel de rango del dashboard.
+export function progresoRango(elo: number): {
+  siguiente: string | null;
+  faltan: number | null;
+  pct: number;
+} {
+  const idx = RANGOS.reduce((acc, r, i) => (elo >= r.min ? i : acc), 0);
+  const actual = RANGOS[idx];
+  const next = RANGOS[idx + 1];
+  if (!next) return { siguiente: null, faltan: null, pct: 100 };
+  const pct = Math.round(((elo - actual.min) / (next.min - actual.min)) * 100);
+  return {
+    siguiente: next.nombre,
+    faltan: next.min - elo,
+    pct: Math.max(0, Math.min(100, pct)),
+  };
+}
