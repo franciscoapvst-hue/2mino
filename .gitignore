@@ -29,3 +29,6 @@ ms-salas/dist/
 api-integracion/dist/
 
 docker-compose.override.yml
+
+# SonarQube scanner cache local
+.scannerwork/
