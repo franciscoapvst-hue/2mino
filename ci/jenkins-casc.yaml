@@ -42,8 +42,10 @@ tool:
         properties:
           - installSource:
               installers:
+                # >= 20.19.0: rolldown (dependencia de vitest/vite) no carga
+                # su binding nativo en versiones más viejas de Node 20.
                 - nodeJSInstaller:
-                    id: "20.18.1"
+                    id: "20.20.2"
 
 jobs:
   - script: >
