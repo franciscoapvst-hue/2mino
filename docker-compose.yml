@@ -15,9 +15,9 @@ services:
       interval: 5s
       timeout:  5s
       retries:  10
-    # Exponer en local para debug; comentar en producción si no se necesita
-    ports:
-      - "5432:5432"
+    # Sin puerto externo por defecto (no hace falta exponerlo a producción).
+    # Para debug local, agregar el mapeo en docker-compose.override.yml
+    # (gitignored) en vez de tocar este archivo.
 
   # ── Microservicio de usuarios ────────────────────
   ms-usuarios:
