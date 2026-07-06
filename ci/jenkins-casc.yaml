@@ -18,6 +18,7 @@ unclassified:
       - name: "SonarQubeLocal"
         serverUrl: "http://sonarqube:9000"
         credentialsId: "sonar-token"
+        webhookSecretId: null
 
 credentials:
   system:
@@ -34,6 +35,11 @@ credentials:
               id: "sonar-token"
               secret: "${SONAR_TOKEN}"
               description: "Token de SonarQube para el análisis"
+          - string:
+              scope: GLOBAL
+              id: "vps-password"
+              secret: "${VPS_PASSWORD}"
+              description: "Contraseña root del VPS de producción, para el deploy automático"
 
 tool:
   nodejs:
