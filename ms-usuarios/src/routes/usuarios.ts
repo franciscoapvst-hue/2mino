@@ -487,7 +487,7 @@ export async function usuariosRoutes(app: FastifyInstance) {
       // hasta encontrar uno libre (usuarios concurrentes podrían chocar igual,
       // por eso el catch de 23505 más abajo como red de seguridad final).
       for (let intento = 0; intento < 20; intento++) {
-        const username = intento === 0 ? base : `${base}${Math.floor(Math.random() * 10000)}`.slice(0, 20);
+        const username = intento === 0 ? base : `${base}${crypto.randomInt(10000)}`.slice(0, 20);
         try {
           const { rows } = await pool.query(
             `INSERT INTO usuarios (username, email, password_hash, segmento_id)
