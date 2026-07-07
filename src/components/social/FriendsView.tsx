@@ -88,6 +88,19 @@ function BuscadorAmigos({ onSolicitudEnviada }: { onSolicitudEnviada: (usuarioId
   const [buscando, setBuscando] = useState(false);
   const [abierto, setAbierto] = useState(false);
   const ultimaBusqueda = useRef(0);
+  const contenedorRef = useRef<HTMLDivElement>(null);
+
+  // Cierra al clickear afuera — más confiable que onBlur (que puede
+  // cerrar el dropdown antes de que el click en "Agregar" siquiera
+  // llegue a procesarse, según el navegador).
+  useEffect(() => {
+    if (!abierto) return;
+    function onClickFuera(e: MouseEvent) {
+      if (!contenedorRef.current?.contains(e.target as Node)) setAbierto(false);
+    }
+    document.addEventListener('mousedown', onClickFuera);
+    return () => document.removeEventListener('mousedown', onClickFuera);
+  }, [abierto]);
 
   useEffect(() => {
     const term = q.trim();
@@ -120,13 +133,20 @@ function BuscadorAmigos({ onSolicitudEnviada }: { onSolicitudEnviada: (usuarioId
       await api.social.enviarSolicitud(u.id);
       setEstados(prev => ({ ...prev, [u.id]: 'pendiente' }));
       onSolicitudEnviada(u.id);
+    } catch (e) {
+      // 409 = ya son amigos o ya había una solicitud pendiente (mandada
+      // por otra vía, ej. desde el fin de partida) — el estado real ya
+      // está resuelto, no hay que dejar el botón de "Agregar" colgado.
+      const msg = e instanceof Error ? e.message : '';
+      if (msg.includes('amigos')) setEstados(prev => ({ ...prev, [u.id]: 'amigo' }));
+      else if (msg.includes('pendiente')) setEstados(prev => ({ ...prev, [u.id]: 'pendiente' }));
     } finally {
       setEnviando(null);
     }
   }
 
   return (
-    <div className="friend-search">
+    <div className="friend-search" ref={contenedorRef}>
       <div className="friend-add-form">
         <span className="friend-add-icon"><SearchIcon /></span>
         <input
@@ -135,7 +155,6 @@ function BuscadorAmigos({ onSolicitudEnviada }: { onSolicitudEnviada: (usuarioId
           value={q}
           onChange={e => { setQ(e.target.value); setAbierto(true); }}
           onFocus={() => setAbierto(true)}
-          onBlur={() => setTimeout(() => setAbierto(false), 150)} // deja click en el resultado
         />
       </div>
 
@@ -164,7 +183,6 @@ function BuscadorAmigos({ onSolicitudEnviada }: { onSolicitudEnviada: (usuarioId
                       type="button"
                       className="friend-btn"
                       disabled={enviando === u.id}
-                      onMouseDown={e => e.preventDefault()} // evita que el blur cierre antes del click
                       onClick={() => agregar(u)}
                     >
                       <PersonAddIcon /> {enviando === u.id ? 'Enviando…' : 'Agregar'}
