@@ -8,6 +8,7 @@ import './social.css';
 import './salas.css';
 import './matchmaking.css';
 import './game.css';
+import './tutorial.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

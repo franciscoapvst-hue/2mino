@@ -14,13 +14,22 @@ import FriendsView from './components/social/FriendsView';
 import LeaderboardView from './components/social/LeaderboardView';
 import MatchHistoryView from './components/social/MatchHistoryView';
 import ReplayViewer from './components/social/ReplayViewer';
+import OnboardingLevelScreen, { type NivelDomino } from './components/tutorial/OnboardingLevelScreen';
+import TutorialGame from './components/tutorial/TutorialGame';
 import { api, tokenStore, type AuthUser, type UserConfig, type Sala } from './api';
 import { DominoTile, SunIcon, MoonIcon } from './components/icons';
 import { useSocialSocket } from './hooks/useSocialSocket';
 
 export type View = 'login' | 'register' | 'forgot';
 type AppView = View | 'dashboard' | 'salas' | 'ranked' | 'casual' | 'piece-demo' | 'game'
-  | 'amigos' | 'leaderboard' | 'historial' | 'replay';
+  | 'amigos' | 'leaderboard' | 'historial' | 'replay' | 'onboarding' | 'tutorial';
+
+// El tutorial se ofrece una sola vez: se marca en `opciones` del usuario
+// (mismo bucket genérico que ya usan tema/idioma — ver ms-frontend-landing),
+// así no hace falta ninguna tabla/columna nueva en el backend.
+function necesitaOnboarding(config: UserConfig): boolean {
+  return !config.opciones?.tutorial_estado;
+}
 
 type Session = { user: AuthUser; config: UserConfig };
 
@@ -71,7 +80,9 @@ export default function App() {
       .then(([user, config]) => {
         if (config.tema) setDark(config.tema === 'dark');
         setSession({ user, config });
-        setView(partyCodigo ? 'ranked' : 'dashboard');
+        // Un link de invitación a party siempre gana sobre el onboarding
+        // (no interrumpir a alguien que ya viene con destino claro).
+        setView(partyCodigo ? 'ranked' : necesitaOnboarding(config) ? 'onboarding' : 'dashboard');
       })
       .catch(() => tokenStore.clear())
       .finally(() => setBooting(false));
@@ -81,7 +92,33 @@ export default function App() {
   function handleSuccess(user: AuthUser, config: UserConfig) {
     if (config.tema) setDark(config.tema === 'dark');
     setSession({ user, config });
-    setView(partyCodigo ? 'ranked' : 'dashboard');
+    setView(partyCodigo ? 'ranked' : necesitaOnboarding(config) ? 'onboarding' : 'dashboard');
+  }
+
+  // Guarda dentro de `opciones` sin pisar otras claves que ya hubiera
+  // (el PUT de preferencias reemplaza `opciones` entero, no hace merge).
+  async function guardarOpcionesTutorial(partial: Record<string, unknown>) {
+    if (!session) return;
+    try {
+      const opciones = { ...(session.config.opciones ?? {}), ...partial };
+      const nuevo = await api.putPreferencias({ opciones });
+      setSession(s => s && { ...s, config: nuevo });
+    } catch { /* si falla, no bloquea la navegación */ }
+  }
+
+  async function handleNivelElegido(nivel: NivelDomino) {
+    if (nivel === 'suficiente') {
+      await guardarOpcionesTutorial({ tutorial_estado: 'completado', tutorial_nivel: nivel });
+      setView('dashboard');
+    } else {
+      await guardarOpcionesTutorial({ tutorial_nivel: nivel });
+      setView('tutorial');
+    }
+  }
+
+  async function handleTutorialResuelto() {
+    await guardarOpcionesTutorial({ tutorial_estado: 'completado' });
+    setView('dashboard');
   }
 
   function handleLogout() {
@@ -136,6 +173,19 @@ export default function App() {
 
   if (view === 'piece-demo') {
     return <PieceDemo onBack={() => setView(session ? 'dashboard' : 'login')} />;
+  }
+
+  if (view === 'onboarding' && session) {
+    return <OnboardingLevelScreen dark={dark} onElegir={handleNivelElegido} />;
+  }
+
+  if (view === 'tutorial' && session) {
+    return (
+      <TutorialGame
+        onSkip={handleTutorialResuelto}
+        onFinish={handleTutorialResuelto}
+      />
+    );
   }
 
   // Login / registro: pantallas completas dedicadas (forgot sigue en la card)
