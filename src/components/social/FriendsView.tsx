@@ -127,6 +127,19 @@ function BuscadorAmigos({ onSolicitudEnviada }: { onSolicitudEnviada: (usuarioId
     return () => clearTimeout(t);
   }, [q]);
 
+  // El estado (pendiente/amigo/ninguno) queda en memoria desde la última
+  // vez que se consultó — si el otro usuario acepta/rechaza mientras el
+  // dropdown está cerrado, no hay forma de enterarse sin volver a
+  // preguntar. Se refresca cada vez que se reabre (foco), que es cuando
+  // el usuario efectivamente vuelve a mirar el resultado.
+  async function refrescarEstados() {
+    if (!resultados?.length) return;
+    try {
+      const est = await api.social.estadoRelacion(resultados.map(u => u.id));
+      setEstados(est);
+    } catch { /* deja el estado anterior si falla */ }
+  }
+
   async function agregar(u: UsuarioBusqueda) {
     setEnviando(u.id);
     try {
@@ -154,7 +167,7 @@ function BuscadorAmigos({ onSolicitudEnviada }: { onSolicitudEnviada: (usuarioId
           placeholder="Buscar por nombre de usuario…"
           value={q}
           onChange={e => { setQ(e.target.value); setAbierto(true); }}
-          onFocus={() => setAbierto(true)}
+          onFocus={() => { setAbierto(true); refrescarEstados(); }}
         />
       </div>
 

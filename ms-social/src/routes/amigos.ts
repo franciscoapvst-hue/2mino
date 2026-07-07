@@ -95,8 +95,16 @@ export async function amigosRoutes(app: FastifyInstance) {
     );
     if (pendiente.length) return reply.code(409).send({ error: 'Ya hay una solicitud pendiente con ese usuario' });
 
+    // UPSERT, no INSERT plano: (de_usuario_id, a_usuario_id) es UNIQUE, y
+    // si ya existía una solicitud entre este mismo par (rechazada antes,
+    // o aceptada y luego se eliminaron como amigos) el INSERT chocaría
+    // con la constraint — acá se resetea a pendiente en vez de romper.
     const { rows } = await pool.query(
-      `INSERT INTO solicitudes_amistad (de_usuario_id, a_usuario_id) VALUES ($1, $2) RETURNING id`,
+      `INSERT INTO solicitudes_amistad (de_usuario_id, a_usuario_id, estado, created_at, resuelta_at)
+       VALUES ($1, $2, 'pendiente', NOW(), NULL)
+       ON CONFLICT (de_usuario_id, a_usuario_id)
+       DO UPDATE SET estado = 'pendiente', created_at = NOW(), resuelta_at = NULL
+       RETURNING id`,
       [usuario_id, a_usuario_id],
     );
 
