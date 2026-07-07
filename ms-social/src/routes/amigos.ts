@@ -142,6 +142,14 @@ export async function amigosRoutes(app: FastifyInstance) {
       await pool.query(
         `UPDATE solicitudes_amistad SET estado = 'aceptada', resuelta_at = NOW() WHERE id = $1`, [s.id],
       );
+      // Saca de la bandeja del que aceptó la notificación de la solicitud
+      // original — ya está resuelta, no tiene sentido que siga apareciendo
+      // (ni con los botones de aceptar/rechazar ni sin ellos).
+      await pool.query(
+        `DELETE FROM notificaciones
+         WHERE usuario_id = $1 AND tipo = 'solicitud_amistad' AND payload->>'solicitud_id' = $2`,
+        [s.a_usuario_id, s.id],
+      );
 
       const aceptador = await obtenerUsuario(s.a_usuario_id);
       await pool.query(
@@ -176,6 +184,12 @@ export async function amigosRoutes(app: FastifyInstance) {
       await pool.query(
         `UPDATE solicitudes_amistad SET estado = 'rechazada', resuelta_at = NOW() WHERE id = $1`,
         [req.params.id],
+      );
+      // Misma razón que en aceptar: ya está resuelta, que no siga en la bandeja.
+      await pool.query(
+        `DELETE FROM notificaciones
+         WHERE usuario_id = $1 AND tipo = 'solicitud_amistad' AND payload->>'solicitud_id' = $2`,
+        [req.body.usuario_id, req.params.id],
       );
       return reply.send({ ok: true });
     },
