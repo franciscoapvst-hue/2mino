@@ -10,7 +10,7 @@
  * - El cuadrado lo da CSS (aspect-ratio: 1 en board-center); el centrado
  *   vertical lo hace flexbox (align-items: center en board-center).
  */
-import type { Val, FichaTablero } from '../../api';
+import type { Val, Pieza, FichaTablero } from '../../api';
 import DominoPiece from './DominoPiece';
 
 const HW0 = 100, HH0 = 54;
@@ -126,14 +126,17 @@ function computeLayout(
   const contentMinX = Math.min(...pieces.map(p => p.x));
   const contentMaxX = Math.max(...pieces.map(p => p.x + p.w));
 
-  return { pieces, boardW, boardH, VW, HH, contentMinX, contentMaxX };
+  return { pieces, boardW, boardH, VW, VH, HW, HH, contentMinX, contentMaxX };
 }
 
 export type SnakeBoardProps = {
   tablero:        FichaTablero[];
   containerWidth: number;
   nuevaFichaIdx:  number | null;
-  showZones:      boolean;
+  /** Ficha activa (arrastrando o tocada) — se previsualiza en las puntas
+   *  donde de verdad se puede jugar (canIzq/canDer ya vienen evaluados
+   *  contra las reglas reales, no "siempre ambos lados" al arrastrar). */
+  piezaFantasma:  Pieza | null;
   canIzq:         boolean;
   canDer:         boolean;
   sobreIzq:       boolean;
@@ -145,32 +148,79 @@ export type SnakeBoardProps = {
   onDragLeave:    () => void;
 };
 
+/** FichaTablero sintética para la ficha fantasma: izqVal/derVal son los
+ *  valores semánticos de sus caras dentro de la cadena (independiente de
+ *  cómo se dibuje) — la cara que toca el extremo actual, y la cara nueva
+ *  que quedaría expuesta. Corriendo esto por el mismo computeLayout que
+ *  el tablero real, el fantasma hereda el mismo comportamiento de vueltas
+ *  y wrap de la serpiente, en vez de una posición calculada aparte. */
+function fichaFantasma(pieza: Pieza, valorExtremo: Val, lado: 'izq' | 'der'): FichaTablero {
+  if (pieza.a === pieza.b) return { pieza, izqVal: pieza.a, derVal: pieza.a };
+  const otro = pieza.a === valorExtremo ? pieza.b : pieza.a;
+  return lado === 'izq'
+    ? { pieza, izqVal: otro, derVal: valorExtremo }
+    : { pieza, izqVal: valorExtremo, derVal: otro };
+}
+
 export default function SnakeBoard({
-  tablero, containerWidth, nuevaFichaIdx,
-  showZones, canIzq, canDer, sobreIzq, sobreDer,
+  tablero, containerWidth, nuevaFichaIdx, piezaFantasma,
+  canIzq, canDer, sobreIzq, sobreDer,
   onPlayIzq, onPlayDer,
   onDragOverIzq, onDragOverDer, onDragLeave,
 }: SnakeBoardProps) {
   if (!tablero.length || containerWidth <= 0) return null;
 
-  const { pieces, boardW, boardH, VW, HH, contentMinX, contentMaxX } =
-    computeLayout(tablero, containerWidth, nuevaFichaIdx);
+  const real = computeLayout(tablero, containerWidth, nuevaFichaIdx);
 
-  const ZW = Math.max(38, Math.min(VW, 52));
-  const ZH = Math.max(HH, 44);
-  const ZY = Math.max(0, (boardH - ZH) / 2);
+  const izqVal = tablero[0].izqVal;
+  const derVal = tablero[tablero.length - 1].derVal;
 
-  // Junto al contenido, pero nunca fuera del tablero (board-center
-  // recorta con overflow:hidden): si no hay hueco, se superponen al borde.
-  const izqX = Math.max(0, Math.min(contentMinX - ZW - 4, boardW - ZW));
-  const derX = Math.min(contentMaxX + 4, boardW - ZW);
+  // Tablero hipotético (real + fantasma) por cada lado — el fantasma es
+  // siempre pieces[0] (se antepone) o el último (se agrega al final), y
+  // así hereda el giro/wrap de la serpiente en vez de una posición
+  // calculada aparte.
+  //
+  // OJO: el tablero real y el hipotético NO comparten sistema de
+  // coordenadas cuando la fila entra centrada (needsWrap = false) — el
+  // centrado depende del ancho TOTAL de las fichas de esa llamada
+  // puntual, y el hipotético tiene una ficha más (distinto ancho total,
+  // distinto centrado). Para que el fantasma caiga pegado a la fila real
+  // (sin superponerse), se compara una ficha de referencia presente en
+  // ambos cálculos y se corrige la diferencia horizontal.
+  const layoutIzq = piezaFantasma && canIzq
+    ? computeLayout([fichaFantasma(piezaFantasma, izqVal, 'izq'), ...tablero], containerWidth, null)
+    : null;
+  const layoutDer = piezaFantasma && canDer
+    ? computeLayout([...tablero, fichaFantasma(piezaFantasma, derVal, 'der')], containerWidth, null)
+    : null;
+
+  // pieces[1] del hipotético-izq es la misma ficha que real.pieces[0]
+  // (la primera real, corrida un lugar por el fantasma antepuesto).
+  const fantasmaIzq = layoutIzq && (() => {
+    const shiftX = real.pieces[0].x - layoutIzq.pieces[1].x;
+    const g = layoutIzq.pieces[0];
+    return { ...g, x: g.x + shiftX };
+  })();
+  // pieces[length-2] del hipotético-der es la última ficha real (el
+  // fantasma quedó agregado después, en pieces[length-1]).
+  const fantasmaDer = layoutDer && (() => {
+    const ultimoReal = real.pieces[real.pieces.length - 1];
+    const equivalente = layoutDer.pieces[layoutDer.pieces.length - 2];
+    const shiftX = ultimoReal.x - equivalente.x;
+    const g = layoutDer.pieces[layoutDer.pieces.length - 1];
+    return { ...g, x: g.x + shiftX };
+  })();
+
+  // Por si el fantasma inicia una fila nueva que el tablero real todavía
+  // no tiene: no lo recortamos, agrandamos el contenedor para mostrarlo.
+  const boardH = Math.max(real.boardH, layoutIzq?.boardH ?? 0, layoutDer?.boardH ?? 0);
 
   return (
     <div
       className="snake-board-wrap"
-      style={{ width: boardW, height: boardH }}
+      style={{ width: real.boardW, height: boardH }}
     >
-      {pieces.map((p, i) => (
+      {real.pieces.map((p, i) => (
         <DominoPiece
           key={i}
           a={p.a} b={p.b}
@@ -180,26 +230,32 @@ export default function SnakeBoard({
         />
       ))}
 
-      {showZones && canIzq && (
+      {fantasmaIzq && (
         <div
           className={`snake-drop-zone${sobreIzq ? ' dz-sobre' : ''}`}
-          style={{ position: 'absolute', left: izqX, top: ZY, width: ZW, height: ZH }}
+          style={{ position: 'absolute', left: fantasmaIzq.x, top: fantasmaIzq.y, width: fantasmaIzq.w, height: fantasmaIzq.h }}
           onClick={onPlayIzq}
           onDragOver={onDragOverIzq}
           onDrop={e => { e.preventDefault(); onPlayIzq(); }}
           onDragLeave={onDragLeave}
-        >◀</div>
+          aria-label="Jugar por la izquierda"
+        >
+          <DominoPiece a={fantasmaIzq.a} b={fantasmaIzq.b} orient={fantasmaIzq.orient} ghost style={{ width: '100%', height: '100%' }} />
+        </div>
       )}
 
-      {showZones && canDer && (
+      {fantasmaDer && (
         <div
           className={`snake-drop-zone${sobreDer ? ' dz-sobre' : ''}`}
-          style={{ position: 'absolute', left: derX, top: ZY, width: ZW, height: ZH }}
+          style={{ position: 'absolute', left: fantasmaDer.x, top: fantasmaDer.y, width: fantasmaDer.w, height: fantasmaDer.h }}
           onClick={onPlayDer}
           onDragOver={onDragOverDer}
           onDrop={e => { e.preventDefault(); onPlayDer(); }}
           onDragLeave={onDragLeave}
-        >▶</div>
+          aria-label="Jugar por la derecha"
+        >
+          <DominoPiece a={fantasmaDer.a} b={fantasmaDer.b} orient={fantasmaDer.orient} ghost style={{ width: '100%', height: '100%' }} />
+        </div>
       )}
     </div>
   );

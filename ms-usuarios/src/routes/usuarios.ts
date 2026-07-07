@@ -83,7 +83,7 @@ export async function usuariosRoutes(app: FastifyInstance) {
             username: { type: 'string', minLength: 3, maxLength: 20, example: 'jugador42' },
             email:    { type: 'string', format: 'email', example: 'jugador@correo.com' },
             password: { type: 'string', minLength: 8,   example: 'MiPass123!' },
-            segmento: { type: 'string', example: 'tester' },
+            segmento: { type: 'string', example: 'jugador' },
           },
         },
         response: {
@@ -94,7 +94,7 @@ export async function usuariosRoutes(app: FastifyInstance) {
       },
     },
     async (req, reply) => {
-      const { username, email, password, segmento = 'tester' } = req.body;
+      const { username, email, password, segmento = 'jugador' } = req.body;
       const passwordHash = await bcrypt.hash(password, ROUNDS);
 
       const { rows: segRows } = await pool.query(
@@ -473,7 +473,7 @@ export async function usuariosRoutes(app: FastifyInstance) {
       }
 
       const { rows: segRows } = await pool.query(
-        `SELECT id FROM segmentos WHERE nombre = 'tester' AND activo = true`,
+        `SELECT id FROM segmentos WHERE nombre = 'jugador' AND activo = true`,
       );
       const segmentoId = segRows[0].id;
 
@@ -495,7 +495,7 @@ export async function usuariosRoutes(app: FastifyInstance) {
              RETURNING id, username, email, segmento_id, avatar, created_at`,
             [username, email, passwordHash, segmentoId],
           );
-          return reply.code(201).send({ ...rows[0], segmento: 'tester' });
+          return reply.code(201).send({ ...rows[0], segmento: 'jugador' });
         } catch (err: any) {
           if (err.code === '23505' && err.detail?.includes('username')) continue;
           throw err;
