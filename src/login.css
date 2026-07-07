@@ -356,6 +356,12 @@
   opacity: 0.55;
 }
 
+.lg-google-btn {
+  display: flex;
+  justify-content: center;
+  /* El iframe de Google Identity Services se inyecta acá adentro */
+}
+
 .lg-foot {
   margin-top: 4px;
   text-align: center;
