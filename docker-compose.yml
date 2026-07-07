@@ -76,8 +76,25 @@ services:
     restart: unless-stopped
     depends_on:
       - api-integracion
+    # Sin puerto externo: Caddy es la única puerta pública (ver servicio `caddy`)
+
+  # ── Reverse proxy con TLS automático (Let's Encrypt) ─
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?falta DOMAIN en .env, ej. 2mino.online}
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
 
 volumes:
   postgres_data:
+  caddy_data:
+  caddy_config:

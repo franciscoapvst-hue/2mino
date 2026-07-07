@@ -18,30 +18,34 @@ Referencia del servidor actual (IONOS):
 
 ## Arquitectura del despliegue
 
-Todo corre en contenedores en una sola red Docker interna. Solo **dos puertos**
-se exponen al exterior:
+Todo corre en contenedores en una sola red Docker interna. Solo **Caddy** expone
+puertos al exterior (80 y 443); todo lo demás vive detrás de la red Docker:
 
 | Servicio              | Puerto interno | Expuesto | Rol                                             |
-|-----------------------|----------------|----------|-------------------------------------------------|
-| `frontend` (nginx)    | 80             | **80**   | Sirve el build de Vite + proxy `/api`           |
+|-----------------------|----------------|----------|--------------------------------------------------|
+| `caddy`               | 80/443         | **80/443** | Reverse proxy + TLS automático (Let's Encrypt) |
+| `frontend` (nginx)    | 80             | —        | Sirve el build de Vite + proxy `/api` y `/ws`    |
 | `api-integracion`     | 3000           | —        | Gateway público (solo vía red interna)          |
 | `ms-usuarios`         | 4000           | —        | Usuarios / auth                                 |
 | `ms-frontend-landing` | 5000           | —        | Config del landing / preferencias               |
 | `ms-salas`            | 6001           | —        | Salas, juego, ELO, matchmaking                  |
+| `ms-social`           | 6200           | —        | Amigos, notificaciones, chat (WS)               |
 | `postgres`            | 5432           | 5432 *   | Base de datos                                   |
 
 \* Postgres se expone en el compose para debug local. **En producción comenta ese
 bloque `ports:` de postgres** — los microservicios lo alcanzan por la red interna;
 no hace falta abrirlo a internet.
 
-El navegador solo habla con `http://IP` (puerto 80). nginx sirve el HTML estático
-y reenvía todo lo que empiece con `/api/` al gateway. Por eso **no** hace falta
-exponer el puerto 3000 ni configurar CORS con un dominio: el frontend y la API
-comparten origen.
+El navegador habla con `https://DOMAIN` (Caddy). Caddy termina TLS y reenvía todo
+a `frontend:80` (nginx), que sirve el HTML estático y reenvía `/api/` y `/ws/` a
+los servicios internos. Por eso **no** hace falta exponer ningún otro puerto: el
+frontend y la API comparten origen (`CORS_ORIGIN` solo importa si algo llama
+cruzado, ver más abajo).
 
 Archivos clave del frontend en la raíz del repo:
 - `Dockerfile` — build de Vite + imagen nginx
-- `nginx.conf` — sirve estáticos y proxya `/api/` → `api-integracion:3000`
+- `nginx.conf` — sirve estáticos y proxya `/api/` → `api-integracion:3000`, `/ws/` → `ms-social:6200`
+- `Caddyfile` — dominio(s) + `reverse_proxy frontend:80` (Caddy hace el resto: cert, renovación, redirect http→https)
 - `.dockerignore` — evita copiar `node_modules`, los microservicios, etc.
 
 ---
@@ -67,8 +71,12 @@ POSTGRES_PASSWORD=
 #   node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 JWT_SECRET=
 
-# CORS — con acceso por IP y proxy same-origin, dejar *
-CORS_ORIGIN=*
+# Dominio público — Caddy lo usa para pedir el certificado TLS (Let's Encrypt).
+# Requiere que el registro A (y el de www) ya apunten a la IP del VPS.
+DOMAIN=2mino.online
+
+# CORS — con dominio propio, poner el origen exacto (con https)
+CORS_ORIGIN=https://2mino.online
 
 # Email — true solo cuando se integre un proveedor (SendGrid/Resend/SES)
 ENABLE_EMAIL=false
@@ -151,6 +159,7 @@ base corren solas al arrancar cada microservicio (`CREATE TABLE IF NOT EXISTS`
 ```bash
 ufw allow OpenSSH
 ufw allow 80/tcp
+ufw allow 443/tcp
 ufw enable
 ```
 
@@ -159,9 +168,13 @@ ufw enable
 ```bash
 docker compose ps            # todos "running"/"healthy"
 curl localhost/api/health    # {"service":"api-integracion","status":"ok"}
+docker compose logs -f caddy # confirmar que obtuvo el certificado (sin errores de ACME)
 ```
 
-Abrir en el navegador: **http://74.208.119.150**
+Abrir en el navegador: **https://2mino.online**
+
+> La primera vez, Caddy necesita que el DNS ya resuelva a esta IP y que 80/443
+> estén abiertos — si no, el challenge de Let's Encrypt falla y reintenta solo.
 
 ---
 
@@ -230,10 +243,5 @@ docker compose up -d --build
 
 ## Pendiente / mejoras futuras
 
-- **Dominio + HTTPS**: cuando haya dominio, apuntar un registro `A` a la IP y
-  añadir un reverse proxy con TLS (Caddy o nginx + certbot/Let's Encrypt).
-  Entonces poner `CORS_ORIGIN=https://tudominio` en vez de `*`.
-- **CI/CD**: automatizar el redeploy con un webhook o GitHub Actions que haga
-  `git pull && docker compose up -d --build` en el VPS.
 - **Monitoreo**: `docker compose logs` sirve de arranque; a futuro, un stack de
   logs/alertas si el tráfico crece.
