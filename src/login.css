@@ -359,7 +359,9 @@
 .lg-google-btn {
   display: flex;
   justify-content: center;
-  /* El iframe de Google Identity Services se inyecta acá adentro */
+  width: 100%;
+  min-height: 44px; /* evita salto de layout mientras carga el script de Google */
+  overflow: hidden;  /* el iframe de Google Identity Services se inyecta acá adentro */
 }
 
 .lg-foot {

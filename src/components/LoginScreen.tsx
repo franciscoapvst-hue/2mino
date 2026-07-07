@@ -96,7 +96,8 @@ export default function LoginScreen({ onSwitch, onSuccess, dark, onToggleTheme }
     // estar listo todavía cuando este componente monta.
     function intentar() {
       if (cancelado) return;
-      if (!window.google || !googleBtnRef.current) {
+      const el = googleBtnRef.current;
+      if (!window.google || !el) {
         setTimeout(intentar, 100);
         return;
       }
@@ -104,13 +105,17 @@ export default function LoginScreen({ onSwitch, onSuccess, dark, onToggleTheme }
         client_id: clientId!,
         callback: (r) => handleGoogleCredential(r.credential),
       });
-      window.google.accounts.id.renderButton(googleBtnRef.current, {
+      // Limpia antes de renderizar: si el efecto corre de nuevo (toggle de
+      // tema, o el doble-mount de StrictMode en dev), Google agrega un
+      // iframe nuevo sin sacar el anterior y quedan dos botones apilados.
+      el.innerHTML = '';
+      window.google!.accounts.id.renderButton(el, {
         type: 'standard',
         theme: dark ? 'filled_black' : 'outline',
         size: 'large',
-        shape: 'pill',
+        shape: 'rectangular',
         text: 'continue_with',
-        width: 340,
+        width: el.clientWidth || 340,
       });
     }
     intentar();
