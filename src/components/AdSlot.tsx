@@ -11,17 +11,6 @@ declare global {
   }
 }
 
-let scriptSolicitado = false;
-function asegurarScriptAdsense(clientId: string) {
-  if (scriptSolicitado) return;
-  scriptSolicitado = true;
-  const script = document.createElement('script');
-  script.async = true;
-  script.crossOrigin = 'anonymous';
-  script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${clientId}`;
-  document.head.appendChild(script);
-}
-
 type Props = {
   /** Ad slot ID de AdSense (data-ad-slot) — cada ubicación tiene el suyo. */
   slot: string | undefined;
@@ -34,14 +23,15 @@ export default function AdSlot({ slot, className = '' }: Props) {
   const insertado = useRef(false);
 
   useEffect(() => {
+    // El script de AdSense ya está siempre en index.html (ver comentario
+    // ahí) — acá solo hace falta avisarle que hay un slot nuevo para llenar.
     if (!ADSENSE_CLIENT || !slot || insertado.current) return;
     insertado.current = true;
-    asegurarScriptAdsense(ADSENSE_CLIENT);
     try {
       (window.adsbygoogle = window.adsbygoogle || []).push({});
     } catch {
-      // El script todavía no cargó (primera vez en la página) — adsbygoogle
-      // lo procesa solo apenas está listo, no hace falta reintentar acá.
+      // El script todavía no terminó de cargar — adsbygoogle procesa los
+      // <ins> pendientes solo apenas está listo, no hace falta reintentar.
     }
   }, [slot]);
 

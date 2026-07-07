@@ -9,6 +9,14 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- AdSense: tiene que estar siempre en el HTML (no inyectado por JS)
+         porque Google verifica el sitio sin sesión iniciada — ve la
+         pantalla de login, no el dashboard donde recién ahí montaríamos
+         el script si fuera dinámico. Si VITE_ADSENSE_CLIENT_ID está vacío
+         (sin cuenta configurada), el src queda con client= vacío y el
+         pedido lo rechaza Google con un 400 — no rompe nada, solo no
+         hace nada. -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=%VITE_ADSENSE_CLIENT_ID%" crossorigin="anonymous"></script>
   </head>
   <body>
     <div id="root"></div>
