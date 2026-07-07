@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { api, type Amigo } from '../../api';
+import { useEffect, useRef, useState } from 'react';
+import { api, type Amigo, type EstadoRelacion, type UsuarioBusqueda } from '../../api';
 import { avatarUrl } from '../../avatars';
 import { rangoDeElo } from '../../ranks';
 import { PersonAddIcon, SearchIcon, XIcon } from '../icons';
@@ -79,12 +79,111 @@ function FriendRow({ amigo, onInvitar, onEliminado }: {
   );
 }
 
+// ── Buscador con resultados en vivo (autocompletar) ─────────────────
+function BuscadorAmigos({ onSolicitudEnviada }: { onSolicitudEnviada: (usuarioId: string) => void }) {
+  const [q, setQ] = useState('');
+  const [resultados, setResultados] = useState<UsuarioBusqueda[] | null>(null);
+  const [estados, setEstados] = useState<Record<string, EstadoRelacion>>({});
+  const [enviando, setEnviando] = useState<string | null>(null);
+  const [buscando, setBuscando] = useState(false);
+  const [abierto, setAbierto] = useState(false);
+  const ultimaBusqueda = useRef(0);
+
+  useEffect(() => {
+    const term = q.trim();
+    if (term.length < 2) { setResultados(null); setBuscando(false); return; }
+
+    setBuscando(true);
+    const id = ++ultimaBusqueda.current;
+    const t = setTimeout(async () => {
+      try {
+        const r = await api.social.buscarUsuarios(term);
+        if (ultimaBusqueda.current !== id) return; // llegó una búsqueda más nueva mientras esperaba
+        setResultados(r);
+        if (r.length) {
+          const est = await api.social.estadoRelacion(r.map(u => u.id));
+          if (ultimaBusqueda.current === id) setEstados(est);
+        }
+      } catch {
+        if (ultimaBusqueda.current === id) setResultados([]);
+      } finally {
+        if (ultimaBusqueda.current === id) setBuscando(false);
+      }
+    }, 300); // debounce: no golpear el gateway en cada tecla
+
+    return () => clearTimeout(t);
+  }, [q]);
+
+  async function agregar(u: UsuarioBusqueda) {
+    setEnviando(u.id);
+    try {
+      await api.social.enviarSolicitud(u.id);
+      setEstados(prev => ({ ...prev, [u.id]: 'pendiente' }));
+      onSolicitudEnviada(u.id);
+    } finally {
+      setEnviando(null);
+    }
+  }
+
+  return (
+    <div className="friend-search">
+      <div className="friend-add-form">
+        <span className="friend-add-icon"><SearchIcon /></span>
+        <input
+          type="text"
+          placeholder="Buscar por nombre de usuario…"
+          value={q}
+          onChange={e => { setQ(e.target.value); setAbierto(true); }}
+          onFocus={() => setAbierto(true)}
+          onBlur={() => setTimeout(() => setAbierto(false), 150)} // deja click en el resultado
+        />
+      </div>
+
+      {abierto && q.trim().length >= 2 && (
+        <div className="friend-search-results">
+          {buscando ? (
+            <div className="friend-search-loading"><div className="boot-spinner" /></div>
+          ) : resultados?.length === 0 ? (
+            <p className="friend-search-empty">No hay usuarios que coincidan con "@{q.trim()}"</p>
+          ) : (
+            resultados?.map(u => {
+              const estado = estados[u.id] ?? 'ninguno';
+              const foto = avatarUrl(u.avatar);
+              return (
+                <div key={u.id} className="friend-search-row">
+                  <span className="friend-avatar friend-avatar-sm">
+                    {foto ? <img src={foto} alt="" /> : u.username[0].toUpperCase()}
+                  </span>
+                  <span className="friend-username">@{u.username}</span>
+                  {estado === 'amigo' ? (
+                    <span className="friend-search-tag">Ya son amigos</span>
+                  ) : estado === 'pendiente' ? (
+                    <span className="friend-search-tag">Pendiente</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="friend-btn"
+                      disabled={enviando === u.id}
+                      onMouseDown={e => e.preventDefault()} // evita que el blur cierre antes del click
+                      onClick={() => agregar(u)}
+                    >
+                      <PersonAddIcon /> {enviando === u.id ? 'Enviando…' : 'Agregar'}
+                    </button>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function FriendsView({ dark, onBack, onInvitarPartida, conectadosEnVivo }: Props) {
   const [amigos, setAmigos] = useState<Amigo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [username, setUsername] = useState('');
-  const [enviando, setEnviando] = useState(false);
-  const [enviado, setEnviado] = useState<string | null>(null);
+  const [enviado, setEnviado] = useState(false);
 
   useEffect(() => {
     api.social.amigos()
@@ -92,21 +191,9 @@ export default function FriendsView({ dark, onBack, onInvitarPartida, conectados
       .catch(() => setError('No se pudo cargar tu lista de amigos'));
   }, []);
 
-  async function handleAgregar(e: FormEvent) {
-    e.preventDefault();
-    const u = username.trim().replace(/^@/, '');
-    if (!u) return;
-    setEnviando(true);
-    setEnviado(null);
-    try {
-      await api.social.enviarSolicitud(u);
-      setEnviado(u);
-      setUsername('');
-    } catch {
-      setError('No se pudo enviar la solicitud');
-    } finally {
-      setEnviando(false);
-    }
+  function handleSolicitudEnviada() {
+    setEnviado(true);
+    setTimeout(() => setEnviado(false), 2500);
   }
 
   function handleEliminado(usuarioId: string) {
@@ -131,21 +218,9 @@ export default function FriendsView({ dark, onBack, onInvitarPartida, conectados
       />
 
       <main className="social-body">
-        <form className="friend-add-form" onSubmit={handleAgregar}>
-          <span className="friend-add-icon"><SearchIcon /></span>
-          <input
-            type="text"
-            placeholder="Agregar por nombre de usuario"
-            value={username}
-            onChange={e => { setUsername(e.target.value); setEnviado(null); }}
-            disabled={enviando}
-          />
-          <button type="submit" disabled={enviando || !username.trim()}>
-            <PersonAddIcon /> {enviando ? 'Enviando…' : 'Agregar'}
-          </button>
-        </form>
+        <BuscadorAmigos onSolicitudEnviada={handleSolicitudEnviada} />
 
-        {enviado && <div className="social-toast">Solicitud enviada a @{enviado}</div>}
+        {enviado && <div className="social-toast">Solicitud enviada</div>}
         {error && <div className="social-error">⚠ {error}</div>}
 
         {amigos === null && !error ? (

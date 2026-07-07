@@ -124,6 +124,40 @@
 .friend-add-form button:hover:not(:disabled) { background: var(--amber-hi, #f7ad3f); }
 .friend-add-form button:disabled { opacity: 0.5; cursor: default; }
 
+/* Buscador con resultados en vivo (autocompletar "agregar amigo") */
+.friend-search { position: relative; margin-bottom: 24px; }
+.friend-search .friend-add-form { margin-bottom: 0; }
+.friend-search-results {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  border-radius: 12px;
+  border: 1px solid var(--d-border);
+  background: var(--d-surface);
+  box-shadow: 0 12px 28px rgba(0,0,0,.28);
+}
+.friend-search-loading { display: flex; justify-content: center; padding: 16px; }
+.friend-search-empty { padding: 14px 16px; font-size: 0.85rem; color: var(--d-muted); }
+.friend-search-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+}
+.friend-search-row + .friend-search-row { border-top: 1px solid var(--d-border); }
+.friend-search-row .friend-username { flex: 1; min-width: 0; }
+.friend-avatar-sm { width: 30px; height: 30px; font-size: 0.8rem; }
+.friend-search-tag {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--d-muted);
+  white-space: nowrap;
+}
+
 .friend-group { margin-bottom: 28px; }
 .friend-group-title {
   font-size: 0.76rem;

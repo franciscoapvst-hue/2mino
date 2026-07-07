@@ -126,16 +126,20 @@ export type AuthResponse = {
 };
 
 // ── Social: amigos, bandeja, leaderboard extendido, historial, chat ──
-// ms-social todavía no existe (ver docs/CASOS_DE_USO_SOCIAL.md). Estos
-// tipos son el contrato propuesto ahí; `api.social`/`api.historial` abajo
-// devuelven datos mock con esta misma forma hasta que el backend real
-// esté listo — solo hay que reemplazar el cuerpo de esas funciones.
+// Tipos según docs/CASOS_DE_USO_SOCIAL.md, servidos por ms-social/ms-salas
+// vía el gateway.
 export type Amigo = {
   usuario_id: string;
   username:   string;
   avatar:     string | null;
   elo:        number;
   conectado:  boolean;
+};
+
+export type UsuarioBusqueda = {
+  id:       string;
+  username: string;
+  avatar:   string | null;
 };
 
 export type TipoNotificacion = 'solicitud_amistad' | 'amistad_aceptada' | 'invitacion_partida';
@@ -146,7 +150,7 @@ export type Notificacion = {
   de_usuario_id: string;
   de_username:   string;
   de_avatar:     string | null;
-  payload:       { sala_codigo?: string; party_codigo?: string };
+  payload:       { sala_codigo?: string; party_codigo?: string; solicitud_id?: string };
   leida:         boolean;
   created_at:    string;
 };
@@ -309,6 +313,10 @@ export const api = {
   // ── Social (ms-social) ────────────────────────────
   // Cada función es 1:1 con un endpoint de docs/CASOS_DE_USO_SOCIAL.md.
   social: {
+    // Autocompletar mientras se escribe en el buscador de "agregar amigo".
+    buscarUsuarios: (q: string) =>
+      req<UsuarioBusqueda[]>(`/social/buscar-usuarios?q=${encodeURIComponent(q)}`),
+
     amigos: () => req<Amigo[]>('/amigos'),
 
     eliminarAmigo: (usuarioId: string) =>

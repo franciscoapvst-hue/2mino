@@ -25,10 +25,16 @@ export default function InboxPopover({ onClose, onUnirseSala }: Props) {
   }, []);
 
   async function responder(n: Notificacion, accion: 'aceptar' | 'rechazar') {
+    // n.id es el ID de la NOTIFICACIÓN (tabla notificaciones); los
+    // endpoints de aceptar/rechazar necesitan el ID de la SOLICITUD
+    // (tabla solicitudes_amistad), que viaja en el payload.
+    const solicitudId = n.payload.solicitud_id;
+    if (!solicitudId) return;
+
     setResolviendo(n.id);
     try {
-      if (accion === 'aceptar') await api.social.aceptarSolicitud(n.id);
-      else await api.social.rechazarSolicitud(n.id);
+      if (accion === 'aceptar') await api.social.aceptarSolicitud(solicitudId);
+      else await api.social.rechazarSolicitud(solicitudId);
       setItems(prev => prev?.filter(x => x.id !== n.id) ?? prev);
     } finally {
       setResolviendo(null);

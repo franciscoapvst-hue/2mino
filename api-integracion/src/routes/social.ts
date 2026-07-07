@@ -13,6 +13,27 @@ function auth(req: { headers: { authorization?: string } }, reply: { code: (n: n
 
 export async function socialGatewayRoutes(app: FastifyInstance) {
 
+  // ── Buscar usuarios (autocompletar "agregar amigo") ──
+
+  app.get<{ Querystring: { q: string } }>('/social/buscar-usuarios', {
+    schema: {
+      tags: ['social'], summary: 'Buscar usuarios por prefijo de username',
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object', required: ['q'],
+        properties: { q: { type: 'string', minLength: 1, maxLength: 20 } },
+      },
+      response: { 200: { type: 'array', items: AnySchema }, 401: { ...ErrorSchema } },
+    },
+  }, async (req, reply) => {
+    const payload = auth(req, reply); if (!payload) return;
+    if (!req.query.q?.trim()) return reply.send([]);
+    const { status, data } = await callMs(
+      `/usuarios/buscar?q=${encodeURIComponent(req.query.q.trim())}&excluir=${payload.sub}`, 'GET',
+    );
+    return reply.code(status).send(data);
+  });
+
   // ── Amigos ──────────────────────────────────────
 
   app.get('/amigos', {
