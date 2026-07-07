@@ -24,6 +24,16 @@ const SCHEMA = `
     '{"tema":"dark","idioma":"es","modos_juego":["clasico","rapido","torneo"],"features":{"registro_habilitado":true,"login_habilitado":true,"tabla_clasificacion":true,"perfil_publico":true,"chat_partida":true,"replay":true}}'
   ) ON CONFLICT (nombre) DO NOTHING;
 
+  -- Segmento real de producción: mismas features que 'tester' (nada que
+  -- restringir todavía), pero es el que se asigna por defecto a los
+  -- usuarios que se registran de verdad. 'tester' queda para cuentas de
+  -- prueba/QA creadas a propósito con ese segmento.
+  INSERT INTO segmentos (nombre, descripcion, config) VALUES (
+    'jugador',
+    'Segmento estándar para usuarios reales',
+    '{"tema":"dark","idioma":"es","modos_juego":["clasico","rapido","torneo"],"features":{"registro_habilitado":true,"login_habilitado":true,"tabla_clasificacion":true,"perfil_publico":true,"chat_partida":true,"replay":true}}'
+  ) ON CONFLICT (nombre) DO NOTHING;
+
   CREATE TABLE IF NOT EXISTS usuarios (
     id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     username      VARCHAR(20) UNIQUE NOT NULL,
