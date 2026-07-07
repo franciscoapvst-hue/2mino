@@ -210,6 +210,7 @@ export default function App() {
     return (
       <SalasView
         user={session.user}
+        dark={dark}
         onBack={() => setView('dashboard')}
         onGameStart={(sala) => { setGameSala(sala); setGameOrigin('salas'); setView('game'); }}
       />
@@ -221,6 +222,7 @@ export default function App() {
       <MatchmakingView
         user={session.user}
         tipo={view}
+        dark={dark}
         onBack={() => setView('dashboard')}
         onGameStart={(sala) => { setGameSala(sala); setGameOrigin('dashboard'); setView('game'); }}
         autoJoinCodigo={view === 'ranked' ? partyCodigo : null}

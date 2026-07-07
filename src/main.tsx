@@ -5,6 +5,9 @@ import './styles.css';
 import './login.css';
 import './dashboard.css';
 import './social.css';
+import './salas.css';
+import './matchmaking.css';
+import './game.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

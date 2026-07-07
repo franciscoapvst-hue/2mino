@@ -666,12 +666,12 @@
   height: 52px;
   border-radius: 50%;
   border: none;
-  background: #a855f7;
-  color: #fff;
+  background: var(--amber, #ef9f2e);
+  color: #201400;
   display: grid;
   place-items: center;
   cursor: pointer;
-  box-shadow: 0 10px 26px -8px rgba(168, 85, 247, 0.6);
+  box-shadow: 0 10px 26px -8px rgba(239, 159, 46, 0.6);
 }
 .chat-fab-badge {
   position: absolute;
@@ -695,8 +695,8 @@
   display: flex;
   flex-direction: column;
   border-radius: 16px;
-  background: #08031a;
-  border: 1px solid rgba(168, 85, 247, 0.28);
+  background: #0a1310;
+  border: 1px solid rgba(239, 159, 46, 0.28);
   box-shadow: 0 20px 50px -18px rgba(0, 0, 0, 0.6);
   overflow: hidden;
 }
@@ -709,8 +709,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 14px;
-  border-bottom: 1px solid rgba(168, 85, 247, 0.2);
-  color: #e9d5ff;
+  border-bottom: 1px solid rgba(239, 159, 46, 0.2);
+  color: #f2ede3;
   font-size: 0.86rem;
   font-weight: 700;
 }
@@ -725,29 +725,29 @@
   flex-direction: column;
   gap: 8px;
 }
-.chat-empty { color: rgba(233, 213, 255, 0.5); font-size: 0.82rem; text-align: center; padding: 20px 0; }
+.chat-empty { color: rgba(242, 237, 227, 0.5); font-size: 0.82rem; text-align: center; padding: 20px 0; }
 
 .chat-msg { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; max-width: 88%; }
 .chat-msg-mine { align-items: flex-end; align-self: flex-end; }
-.chat-msg-author { font-size: 0.7rem; color: #a855f7; font-weight: 700; }
+.chat-msg-author { font-size: 0.7rem; color: var(--teal, #34d3b4); font-weight: 700; }
 .chat-msg-bubble {
   padding: 7px 11px;
   border-radius: 12px;
-  background: rgba(168, 85, 247, 0.14);
-  color: #e9d5ff;
+  background: rgba(52, 211, 180, 0.14);
+  color: #f2ede3;
   font-size: 0.86rem;
   line-height: 1.4;
   word-break: break-word;
 }
-.chat-msg-mine .chat-msg-bubble { background: #a855f7; color: #fff; }
-.chat-msg-time { font-size: 0.66rem; color: rgba(233, 213, 255, 0.4); }
+.chat-msg-mine .chat-msg-bubble { background: var(--amber, #ef9f2e); color: #201400; }
+.chat-msg-time { font-size: 0.66rem; color: rgba(242, 237, 227, 0.4); }
 
 .chat-emoji-grid {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   gap: 4px;
   padding: 10px 14px;
-  border-top: 1px solid rgba(168, 85, 247, 0.2);
+  border-top: 1px solid rgba(239, 159, 46, 0.2);
 }
 .chat-emoji-grid button {
   background: none;
@@ -757,45 +757,45 @@
   border-radius: 6px;
   cursor: pointer;
 }
-.chat-emoji-grid button:hover { background: rgba(168, 85, 247, 0.14); }
+.chat-emoji-grid button:hover { background: rgba(239, 159, 46, 0.14); }
 
 .chat-input-row {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 10px 12px;
-  border-top: 1px solid rgba(168, 85, 247, 0.2);
+  border-top: 1px solid rgba(239, 159, 46, 0.2);
 }
 .chat-emoji-toggle {
   background: none;
   border: none;
-  color: rgba(233, 213, 255, 0.6);
+  color: rgba(242, 237, 227, 0.6);
   display: grid;
   place-items: center;
   padding: 4px;
   cursor: pointer;
   flex-shrink: 0;
 }
-.chat-emoji-toggle:hover { color: #a855f7; }
+.chat-emoji-toggle:hover { color: var(--amber, #ef9f2e); }
 .chat-input-row input {
   flex: 1;
-  background: rgba(233, 213, 255, 0.05);
-  border: 1px solid rgba(168, 85, 247, 0.18);
+  background: rgba(242, 237, 227, 0.05);
+  border: 1px solid rgba(239, 159, 46, 0.18);
   border-radius: 20px;
   padding: 8px 13px;
-  color: #e9d5ff;
+  color: #f2ede3;
   font-size: 0.85rem;
 }
-.chat-input-row input::placeholder { color: rgba(233, 213, 255, 0.4); }
-.chat-input-row input:focus { outline: none; border-color: #a855f7; }
+.chat-input-row input::placeholder { color: rgba(242, 237, 227, 0.4); }
+.chat-input-row input:focus { outline: none; border-color: var(--amber, #ef9f2e); }
 .chat-send-btn {
   width: 34px;
   height: 34px;
   flex-shrink: 0;
   border-radius: 50%;
   border: none;
-  background: #a855f7;
-  color: #fff;
+  background: var(--amber, #ef9f2e);
+  color: #201400;
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -805,3 +805,7 @@
 @media (max-width: 480px) {
   .chat-widget { right: 12px; bottom: 12px; }
 }
+
+/* Spinner compartido: ámbar dentro de las pantallas nuevas (.dash),
+   se mantiene morado en el boot screen viejo fuera de este árbol. */
+.dash .boot-spinner { border-top-color: var(--amber); }

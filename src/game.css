@@ -1,0 +1,186 @@
+/* ═══════════════════════════════════════════════════════
+   GameBoard — reskin a la identidad ámbar/teal + fieltro.
+   Mismos selectores que styles.css (GAME BOARD), importado
+   DESPUÉS para ganar la cascada — no se renombra nada del
+   JSX (evita tocar refs/drag-drop). Las fichas (DominoPiece/
+   SnakeBoard) y el verde semántico "jugable" quedan intactos.
+   ═══════════════════════════════════════════════════════ */
+
+.game-shell {
+  --g-bg:        #0a0f0d;
+  --g-surface:   #111815;
+  --g-ink:       #f2ede3;
+  --g-muted:     #b6beb4;
+  --g-border:    rgba(242, 237, 227, 0.10);
+  --amber:       #ef9f2e;
+  --amber-hi:    #f7ad3f;
+  --teal:        #34d3b4;
+
+  background:
+    radial-gradient(120% 60% at 50% -10%, rgba(239, 159, 46, 0.08) 0%, transparent 50%),
+    var(--g-bg) !important;
+  color: var(--g-ink);
+}
+:root.light .game-shell {
+  --g-bg:      #f4f4f2;
+  --g-surface: #ffffff;
+  --g-ink:     #16211d;
+  --g-muted:   #566159;
+  --g-border:  rgba(20, 30, 26, 0.10);
+  --teal:      #0f8f78;
+}
+
+/* ── Nav ─────────────────────────────────────────── */
+.game-nav {
+  padding: 12px 22px;
+  background: color-mix(in srgb, var(--g-bg) 82%, transparent) !important;
+  border-bottom: 1px solid var(--g-border);
+  backdrop-filter: blur(12px);
+}
+.game-nav .btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 13px;
+  border-radius: 9px;
+  border: 1px solid var(--g-border);
+  background: var(--g-surface);
+  color: var(--g-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: border-color .15s ease, color .15s ease;
+}
+.game-nav .btn-back:hover { border-color: var(--amber); color: var(--g-ink); }
+
+.game-room-code {
+  font-family: 'Space Grotesk', Inter, sans-serif !important;
+  font-size: 0.8rem !important;
+  font-weight: 600;
+  letter-spacing: 0.04em !important;
+  color: var(--g-muted) !important;
+  padding: 5px 11px;
+  border-radius: 8px;
+  background: var(--g-surface);
+  border: 1px solid var(--g-border);
+}
+
+.game-turn-indicator {
+  font-size: 0.84rem !important;
+  font-weight: 700 !important;
+  color: var(--g-muted) !important;
+  padding: 6px 14px !important;
+  border-radius: 20px !important;
+  background: var(--g-surface) !important;
+  border: 1px solid var(--g-border);
+}
+.game-turn-indicator.my-turn {
+  background: color-mix(in srgb, var(--amber) 16%, transparent) !important;
+  border-color: color-mix(in srgb, var(--amber) 40%, transparent);
+  color: var(--amber) !important;
+}
+
+/* ── Marcador ────────────────────────────────────── */
+.score-bar {
+  background: var(--g-surface) !important;
+  border-bottom: 1px solid var(--g-border);
+  padding: 8px 18px !important;
+}
+.score-team { color: var(--g-muted) !important; }
+.score-team strong { color: var(--g-ink) !important; }
+.score-nos strong   { color: var(--teal) !important; }
+.score-ellos strong { color: #ff8080 !important; }
+.score-target { color: var(--g-muted) !important; }
+
+/* ── Banners ─────────────────────────────────────── */
+.game-error-banner {
+  background: rgba(255, 128, 128, 0.12) !important;
+  border-bottom: 1px solid rgba(255, 128, 128, 0.3) !important;
+  color: #ff8080 !important;
+}
+.game-event-banner {
+  background: color-mix(in srgb, var(--amber) 14%, transparent) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--amber) 35%, transparent) !important;
+  color: var(--amber) !important;
+  font-weight: 700 !important;
+}
+
+/* ── Mesa / asientos ─────────────────────────────── */
+.opponent-seat.seat-active {
+  background: color-mix(in srgb, var(--amber) 10%, transparent) !important;
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--amber) 40%, transparent) !important;
+}
+.opponent-name { color: var(--g-muted) !important; font-weight: 700; }
+
+.board-empty-hint { color: var(--g-muted) !important; }
+
+/* Zonas de drop (extremos del tablero abierto) */
+.drop-zone {
+  border-color: color-mix(in srgb, var(--amber) 45%, transparent) !important;
+  background: color-mix(in srgb, var(--amber) 6%, transparent) !important;
+  color: color-mix(in srgb, var(--amber) 60%, transparent) !important;
+}
+.drop-zone.dz-sobre {
+  border-color: var(--teal) !important;
+  background: color-mix(in srgb, var(--teal) 14%, transparent) !important;
+  color: var(--teal) !important;
+}
+.drop-zone-open {
+  border-color: color-mix(in srgb, var(--amber) 50%, transparent) !important;
+  background: color-mix(in srgb, var(--amber) 7%, transparent) !important;
+  color: var(--g-muted) !important;
+}
+.drop-zone-open.dz-sobre {
+  border-color: var(--teal) !important;
+  background: color-mix(in srgb, var(--teal) 12%, transparent) !important;
+  color: var(--teal) !important;
+}
+
+/* ── Mano del jugador ────────────────────────────── */
+.my-hand-zone {
+  background: var(--g-surface) !important;
+  border-top: 1px solid var(--g-border) !important;
+}
+
+.btn-pasar {
+  border-color: rgba(255, 128, 128, 0.4) !important;
+  background: rgba(255, 128, 128, 0.06) !important;
+  color: #ff8080 !important;
+  font-weight: 700 !important;
+}
+.btn-pasar:hover:not(:disabled) { background: rgba(255, 128, 128, 0.14) !important; }
+
+/* ── Overlay de resultado (fin de mano / partida) ──── */
+.game-result-overlay {
+  background: rgba(4, 8, 6, 0.82) !important;
+}
+.game-result-card {
+  background: var(--g-surface) !important;
+  border: 1px solid var(--g-border) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.5) !important;
+}
+.game-result-card h2 {
+  font-family: 'Space Grotesk', Inter, sans-serif;
+  color: var(--g-ink) !important;
+}
+.result-points { color: var(--amber) !important; }
+.result-detail { color: var(--g-muted) !important; }
+.result-marcador { color: var(--g-muted) !important; }
+.result-marcador strong { color: var(--g-ink) !important; }
+
+.game-result-card .btn-primary {
+  background: var(--amber) !important;
+  color: #201400 !important;
+  font-weight: 700;
+  border: none;
+}
+.game-result-card .btn-primary:hover { background: var(--amber-hi) !important; opacity: 1 !important; }
+
+.game-result-card .btn-salir {
+  border-color: var(--g-border) !important;
+  color: var(--g-muted) !important;
+  background: transparent !important;
+}
+.game-result-card .btn-salir:hover:not(:disabled) { border-color: #ff8080 !important; color: #ff8080 !important; }
+
+.game-loading { color: var(--g-muted) !important; }
