@@ -53,15 +53,57 @@ function elegirJugadaBot(partida: PartidaState, seat: number): Pieza | null {
 }
 
 /**
- * Resuelve todos los turnos de bots consecutivos a partir del estado
- * actual: juega/pasa mientras le toque a un bot, y confirma "listo"
- * entre manos por cada bot pendiente. Se detiene en cuanto le toca a
- * un humano o la partida no tiene más que resolver.
+ * Resuelve UN solo paso de bot a partir del estado actual: una jugada, un
+ * pase, o una confirmación de "listo" entre manos. Devuelve `null` si no
+ * hay nada que resolver (le toca a un humano, o la fase no aplica).
  *
- * Devuelve también el log de jugadas/pases que hicieron los bots (no las
- * confirmaciones de "listo", esas no son movimientos de partida) para que
- * el caller los persista en `partida_movimientos` igual que los humanos —
- * si no, el replay tendría huecos en los turnos que jugó un bot.
+ * `movimiento` es `null` para las confirmaciones de "listo" — esas no son
+ * movimientos de partida y no van al log de replay.
+ */
+function resolverUnPasoBot(
+  partida: PartidaState,
+): { partida: PartidaState; movimiento: MovimientoBot | null } | null {
+  if (partida.fase === 'jugando') {
+    const seat = partida.turno;
+    const asiento = partida.asientos[seat];
+    if (!asiento || !esBot(asiento.usuario_id)) return null;
+
+    const numeroMano = partida.numeroMano;
+    const pieza = elegirJugadaBot(partida, seat);
+    const resultado = pieza
+      ? aplicarJugada(partida, asiento.usuario_id, pieza)
+      : aplicarPase(partida, asiento.usuario_id);
+    if (!resultado.ok) return null; // no debería ocurrir; corta por seguridad
+
+    return {
+      partida: resultado.partida,
+      movimiento: {
+        numeroMano, seat,
+        tipo:  pieza ? 'jugar' : 'pasar',
+        pieza: pieza ?? null,
+        lado:  pieza ? resultado.partida.ultimaJugada?.lado ?? null : null,
+      },
+    };
+  }
+
+  if (partida.fase === 'entre_manos') {
+    const pendiente = partida.asientos.findIndex(
+      (a, i) => esBot(a.usuario_id) && !partida.listos[i],
+    );
+    if (pendiente === -1) return null; // sin bots pendientes: espera a los humanos
+    const resultado = marcarListo(partida, partida.asientos[pendiente].usuario_id);
+    if (!resultado.ok) return null;
+    return { partida: resultado.partida, movimiento: null };
+  }
+
+  return null; // fin_partida u otra fase: nada que resolver
+}
+
+/**
+ * Resuelve todos los turnos de bots consecutivos a partir del estado
+ * actual, todos de una (sin delay). Se usa solo como red de seguridad
+ * (GET /juego, ver juegos.ts) — el camino normal de juego usa
+ * `resolverTurnosBotConDelay` para que se pueda seguir la partida.
  *
  * Si no hubo nada que resolver, `partida` es la MISMA referencia recibida
  * (permite a los callers detectar "no hubo cambios" con un simple !==).
@@ -75,39 +117,37 @@ export function resolverTurnosBot(
   // bot seguidas (28 fichas por jugador como mucho); evita un loop
   // infinito si algún día hay un bug en la lógica de arriba.
   for (let iter = 0; iter < 200; iter++) {
-    if (actual.fase === 'jugando') {
-      const seat = actual.turno;
-      const asiento = actual.asientos[seat];
-      if (!asiento || !esBot(asiento.usuario_id)) break;
-
-      const numeroMano = actual.numeroMano;
-      const pieza = elegirJugadaBot(actual, seat);
-      const resultado = pieza
-        ? aplicarJugada(actual, asiento.usuario_id, pieza)
-        : aplicarPase(actual, asiento.usuario_id);
-      if (!resultado.ok) break; // no debería ocurrir; corta por seguridad
-      movimientos.push({
-        numeroMano, seat,
-        tipo:  pieza ? 'jugar' : 'pasar',
-        pieza: pieza ?? null,
-        lado:  pieza ? resultado.partida.ultimaJugada?.lado ?? null : null,
-      });
-      actual = resultado.partida;
-      continue;
-    }
-
-    if (actual.fase === 'entre_manos') {
-      const pendiente = actual.asientos.findIndex(
-        (a, i) => esBot(a.usuario_id) && !actual.listos[i],
-      );
-      if (pendiente === -1) break; // sin bots pendientes: espera a los humanos
-      const resultado = marcarListo(actual, actual.asientos[pendiente].usuario_id);
-      if (!resultado.ok) break;
-      actual = resultado.partida;
-      continue;
-    }
-
-    break; // fin_partida u otra fase: nada que resolver
+    const paso = resolverUnPasoBot(actual);
+    if (!paso) break;
+    actual = paso.partida;
+    if (paso.movimiento) movimientos.push(paso.movimiento);
   }
   return { partida: actual, movimientos };
+}
+
+/** Tiempo entre cada jugada de bot cuando hay varios seguidos — sin esto,
+ *  con 2-3 bots en fila resolvía todo de una vez y no se distinguía quién
+ *  jugó cada cosa. */
+export const BOT_MOVE_DELAY_MS = 1_500;
+
+/**
+ * Igual que resolverTurnosBot, pero de a un paso por vez con un delay real
+ * entre cada uno. `onPaso` se llama después de cada paso (antes del
+ * delay) para que el caller persista ese estado intermedio — así el
+ * polling del cliente lo va mostrando progresivamente en vez de saltar
+ * directo al estado final.
+ */
+export async function resolverTurnosBotConDelay(
+  partida: PartidaState,
+  onPaso: (partida: PartidaState, movimiento: MovimientoBot | null) => Promise<void>,
+): Promise<PartidaState> {
+  let actual = partida;
+  for (let iter = 0; iter < 200; iter++) {
+    const paso = resolverUnPasoBot(actual);
+    if (!paso) break;
+    actual = paso.partida;
+    await onPaso(actual, paso.movimiento);
+    await new Promise(resolve => setTimeout(resolve, BOT_MOVE_DELAY_MS));
+  }
+  return actual;
 }

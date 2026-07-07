@@ -2,11 +2,11 @@ import { FastifyInstance } from 'fastify';
 import { pool } from '../db/pool';
 import { codigoDisponibleEn } from './salas';
 import { crearPartida } from '../game/logic';
-import type { Asiento } from '../game/logic';
+import type { Asiento, PartidaState } from '../game/logic';
 import { ELO_INICIAL } from '../game/elo';
 import { tryMatch2p, tryMatch4p, rangoPermitido, rellenoConBots } from '../game/matchmaking';
 import type { Ticket } from '../game/matchmaking';
-import { resolverTurnosBot } from '../game/bots';
+import { resolverBotsEnSegundoPlano } from './juegos';
 
 const ErrorSchema = {
   type: 'object',
@@ -68,12 +68,16 @@ async function cargarTickets(client: import('pg').PoolClient, modo: 2 | 4, tipo:
 }
 
 // ── Crea sala + partida ya en juego para un grupo de asientos ───────
+// Si el reparto forzó a un bot a abrir con el doble más alto (o hay varios
+// bots seguidos antes del primer turno humano), esos pasos NO se resuelven
+// acá — se resuelven después del COMMIT (ver intentarEmparejar), de a uno
+// con delay, igual que cualquier otro turno de bot en juegos.ts.
 async function crearSala(
   client: import('pg').PoolClient,
   modo: 2 | 4,
   tipo: Tipo,
   asientos: Asiento[],
-): Promise<string> {
+): Promise<{ salaId: string; juegoId: string; partidaInicial: PartidaState }> {
   const codigo = await codigoDisponibleEn('salas', '2M-');
   const { rows: salaRows } = await client.query(
     `INSERT INTO salas (codigo, creador_id, tipo, modo, max_jugadores, estado, started_at, config)
@@ -91,28 +95,13 @@ async function crearSala(
     );
   }
 
-  // resolverTurnosBot es un no-op si no hay bots sentados; si el reparto
-  // forzó a un bot a abrir con el doble más alto, ya queda resuelto acá.
-  const { partida, movimientos } = resolverTurnosBot(crearPartida(asientos, PUNTOS_MM));
-  await client.query('INSERT INTO juegos (sala_id, partida) VALUES ($1, $2)', [salaId, JSON.stringify(partida)]);
+  const partidaInicial = crearPartida(asientos, PUNTOS_MM);
+  const { rows: juegoRows } = await client.query(
+    `INSERT INTO juegos (sala_id, partida) VALUES ($1, $2) RETURNING id`,
+    [salaId, JSON.stringify(partidaInicial)],
+  );
 
-  // Movimientos del bot forzado a abrir (si los hubo) — mismo log que
-  // alimenta el replay (docs/CASOS_DE_USO_SOCIAL.md §5.1/§5.3), en la
-  // misma transacción que la creación de la sala.
-  for (const m of movimientos) {
-    const { rows } = await client.query(
-      `SELECT COALESCE(MAX(orden), -1) + 1 AS next
-       FROM partida_movimientos WHERE sala_id = $1 AND numero_mano = $2`,
-      [salaId, m.numeroMano],
-    );
-    await client.query(
-      `INSERT INTO partida_movimientos (sala_id, numero_mano, orden, seat, tipo, pieza_a, pieza_b, lado)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [salaId, m.numeroMano, rows[0].next, m.seat, m.tipo, m.pieza?.a ?? null, m.pieza?.b ?? null, m.lado],
-    );
-  }
-
-  return salaId;
+  return { salaId, juegoId: juegoRows[0].id, partidaInicial };
 }
 
 /** Asientos 1&3 = equipo del primer grupo; 2&4 = equipo del segundo (4P). */
@@ -181,7 +170,7 @@ async function intentarEmparejar(modo: 2 | 4, tipo: Tipo): Promise<{ matched: bo
       [idsAEliminar],
     );
 
-    const salaId = await crearSala(client, modo, tipo, asientos);
+    const { salaId, juegoId, partidaInicial } = await crearSala(client, modo, tipo, asientos);
 
     await client.query('DELETE FROM ranked_cola WHERE id = ANY($1)', [idsAEliminar]);
 
@@ -193,6 +182,9 @@ async function intentarEmparejar(modo: 2 | 4, tipo: Tipo): Promise<{ matched: bo
     }
 
     await client.query('COMMIT');
+    // Recién después del commit: si no, el UPDATE de este resolver corre
+    // contra una fila de `juegos` que otra conexión todavía no puede ver.
+    resolverBotsEnSegundoPlano(juegoId, salaId, partidaInicial);
     return { matched: true, salaId };
   } catch (e) {
     await client.query('ROLLBACK');

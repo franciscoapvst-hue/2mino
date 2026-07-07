@@ -5,7 +5,7 @@ import {
 } from '../game/logic';
 import type { PartidaState, Pieza } from '../game/logic';
 import { aplicarEloRanked } from './ranked';
-import { resolverTurnosBot } from '../game/bots';
+import { resolverTurnosBotConDelay } from '../game/bots';
 import type { MovimientoBot } from '../game/bots';
 
 const ErrorSchema = {
@@ -120,6 +120,29 @@ async function guardarMovimientos(salaId: string, movimientos: (MovimientoInput 
   for (const m of movimientos) await guardarMovimiento(salaId, m);
 }
 
+// Un juego a la vez resolviendo bots en segundo plano — sin este guard, una
+// jugada del humano y el polling de GET /juego (que también dispara esto
+// como red de seguridad) podrían arrancar dos cadenas de resolución en
+// paralelo para el mismo juego, cada una escribiendo su propia versión del
+// estado y pisándose entre sí.
+const resolucionesEnCurso = new Set<string>();
+
+// Dispara la resolución de los bots en segundo plano (no bloquea la
+// respuesta al humano que acaba de jugar) y persiste cada paso intermedio
+// con su delay — así el polling del cliente (cada 2s) los va mostrando de
+// a uno en vez de saltar directo al estado final. No-op si no hay nada
+// pendiente, o si ya hay una resolución en curso para este juego.
+export function resolverBotsEnSegundoPlano(juegoId: string, salaId: string, partida: PartidaState) {
+  if (resolucionesEnCurso.has(juegoId)) return;
+  resolucionesEnCurso.add(juegoId);
+  resolverTurnosBotConDelay(partida, async (p, m) => {
+    await guardarPartida(juegoId, salaId, p);
+    if (m) await guardarMovimiento(salaId, m);
+  })
+    .catch(e => console.error('Error resolviendo turnos de bot:', e))
+    .finally(() => resolucionesEnCurso.delete(juegoId));
+}
+
 export async function juegosRoutes(app: FastifyInstance) {
 
   // ── POST /salas/:id/juego/iniciar ────────────────
@@ -214,16 +237,14 @@ export async function juegosRoutes(app: FastifyInstance) {
     const juego = await getJuegoActivo(req.params.id);
     if (!juego) return reply.code(404).send({ error: 'No hay partida para esta sala' });
     const partida = parsePartida(juego);
-    // Red de seguridad: si por lo que sea el turno quedó en un bot sin
-    // resolver (p. ej. un guardado previo a este cambio), lo resuelve acá
-    // también. resolverTurnosBot devuelve la MISMA referencia si no hay
-    // nada que hacer, así que esto no persiste en el caso normal.
-    const { partida: partidaFinal, movimientos } = resolverTurnosBot(partida);
-    if (partidaFinal !== partida) {
-      await guardarPartida(juego.id, juego.sala_id, partidaFinal);
-      await guardarMovimientos(juego.sala_id, movimientos);
-    }
-    return reply.send(vistaPublica(partidaFinal, req.query.usuario_id));
+    // Red de seguridad: por si el turno quedó en un bot sin resolver (ej.
+    // el servidor se reinició a mitad de una tanda). Usa el mismo resolutor
+    // con delay y con guard de concurrencia que jugar/pasar/listo — si no,
+    // el polling del cliente (cada 2s) pisaría el delay resolviendo todo
+    // de una en cuanto la ventana de 1.5s todavía estuviera abierta. Si no
+    // hay nada pendiente (el caso normal) es un no-op inmediato.
+    resolverBotsEnSegundoPlano(juego.id, juego.sala_id, partida);
+    return reply.send(vistaPublica(partida, req.query.usuario_id));
   });
 
   // ── POST /salas/:id/juego/jugar ───────────────────
@@ -273,10 +294,10 @@ export async function juegosRoutes(app: FastifyInstance) {
       numeroMano: numeroManoAntes, seat, tipo: 'jugar', pieza,
       lado: resultado.partida.ultimaJugada?.lado ?? null,
     }];
-    const { partida: partidaFinal, movimientos: movimientosBot } = resolverTurnosBot(resultado.partida);
-    await guardarPartida(juego.id, juego.sala_id, partidaFinal);
-    await guardarMovimientos(juego.sala_id, [...movimientos, ...movimientosBot]);
-    return reply.send(vistaPublica(partidaFinal, usuario_id));
+    await guardarPartida(juego.id, juego.sala_id, resultado.partida);
+    await guardarMovimientos(juego.sala_id, movimientos);
+    resolverBotsEnSegundoPlano(juego.id, juego.sala_id, resultado.partida);
+    return reply.send(vistaPublica(resultado.partida, usuario_id));
   });
 
   // ── POST /salas/:id/juego/pasar ───────────────────
@@ -316,10 +337,10 @@ export async function juegosRoutes(app: FastifyInstance) {
     const movimientos: MovimientoInput[] = seat === -1 ? [] : [{
       numeroMano: numeroManoAntes, seat, tipo: 'pasar', pieza: null, lado: null,
     }];
-    const { partida: partidaFinal, movimientos: movimientosBot } = resolverTurnosBot(resultado.partida);
-    await guardarPartida(juego.id, juego.sala_id, partidaFinal);
-    await guardarMovimientos(juego.sala_id, [...movimientos, ...movimientosBot]);
-    return reply.send(vistaPublica(partidaFinal, req.body.usuario_id));
+    await guardarPartida(juego.id, juego.sala_id, resultado.partida);
+    await guardarMovimientos(juego.sala_id, movimientos);
+    resolverBotsEnSegundoPlano(juego.id, juego.sala_id, resultado.partida);
+    return reply.send(vistaPublica(resultado.partida, req.body.usuario_id));
   });
 
   // ── POST /salas/:id/juego/listo ───────────────────
@@ -354,10 +375,9 @@ export async function juegosRoutes(app: FastifyInstance) {
 
     if (!resultado.ok) return reply.code(400).send({ error: resultado.error });
 
-    const { partida: partidaFinal, movimientos } = resolverTurnosBot(resultado.partida);
-    await guardarPartida(juego.id, juego.sala_id, partidaFinal);
-    await guardarMovimientos(juego.sala_id, movimientos);
-    return reply.send(vistaPublica(partidaFinal, req.body.usuario_id));
+    await guardarPartida(juego.id, juego.sala_id, resultado.partida);
+    resolverBotsEnSegundoPlano(juego.id, juego.sala_id, resultado.partida);
+    return reply.send(vistaPublica(resultado.partida, req.body.usuario_id));
   });
 
   // ── POST /salas/:id/juego/abandonar ───────────────
