@@ -2017,3 +2017,30 @@ button:active { transform: scale(0.97); }
   border-color: rgba(168, 85, 247, 0.35);
   color: var(--text);
 }
+
+/* ── Espacio publicitario (AdSense) ──────────────────
+   Gris neutro a propósito, sin depender de la paleta ámbar/teal de cada
+   página — que se lea como "espacio de un tercero", distinto de la UI
+   propia de la app. */
+.ad-slot {
+  margin: 20px auto;
+  padding: 10px;
+  width: 100%;
+  max-width: 100%;
+  min-height: 90px;
+  max-height: 300px;
+  border-radius: 10px;
+  border: 1px dashed rgba(128, 128, 128, 0.35);
+  background: rgba(128, 128, 128, 0.05);
+  text-align: center;
+  overflow: hidden;
+}
+.ad-slot-label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(128, 128, 128, 0.75);
+  margin-bottom: 6px;
+}

@@ -7,6 +7,7 @@ import { avatarUrl } from '../avatars';
 import { rangoDeElo, progresoRango } from '../ranks';
 import AvatarPicker from './AvatarPicker';
 import InboxPopover from './social/InboxPopover';
+import AdSlot from './AdSlot';
 
 type Props = {
   user:          AuthUser;
@@ -255,6 +256,8 @@ export default function Dashboard({
             <span key={m} className="dash-chip">{m}</span>
           ))}
         </div>
+
+        <AdSlot slot={import.meta.env.VITE_ADSENSE_SLOT_DASHBOARD} />
       </main>
 
       {avatarAbierto && (
