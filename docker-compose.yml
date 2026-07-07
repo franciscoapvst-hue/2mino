@@ -55,6 +55,21 @@ services:
       postgres:
         condition: service_healthy
 
+  # ── Microservicio social (amigos, chat, notificaciones) ──
+  ms-social:
+    build: ./ms-social
+    restart: unless-stopped
+    environment:
+      PORT:            6200
+      DB_URL:          postgres://2mino:${POSTGRES_PASSWORD}@postgres:5432/2mino
+      JWT_SECRET:      ${JWT_SECRET}
+      MS_USUARIOS_URL: http://ms-usuarios:4000
+      MS_SALAS_URL:    http://ms-salas:6001
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Sin puerto externo: nginx proxea /ws/ directo acá (ver nginx.conf)
+
   # ── API de integración (pública) ─────────────────
   api-integracion:
     build: ./api-integracion
@@ -64,6 +79,7 @@ services:
       MS_USUARIOS_URL:          http://ms-usuarios:4000
       MS_FRONTEND_LANDING_URL:  http://ms-frontend-landing:5000
       MS_SALAS_URL:             http://ms-salas:6001
+      MS_SOCIAL_URL:            http://ms-social:6200
       JWT_SECRET:       ${JWT_SECRET}
       CORS_ORIGIN:      ${CORS_ORIGIN:-*}
     depends_on:

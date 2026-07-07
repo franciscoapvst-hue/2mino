@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api, type Sala, type AuthUser, type Party, type ColaEstado, type TipoJuego } from '../api';
-import { BackIcon } from './icons';
+import { BackIcon, CasualIcon, RankedIcon } from './icons';
+import { Bone } from './DominoStage';
 import { rangoDeElo } from '../ranks';
 
 type Props = {
   user: AuthUser;
   tipo: TipoJuego;               // 'casual' | 'ranked'
+  dark: boolean;
   onBack: () => void;
   onGameStart: (sala: Sala) => void;
   /** Código de party a unirse automáticamente (viene de un link de invitación). */
@@ -15,42 +17,60 @@ type Props = {
 type Pantalla = 'menu' | 'cola' | 'party';
 
 // ── Menú principal ─────────────────────────────────
-function Menu({ onSolo2, onSolo4, onCrearParty }: {
-  onSolo2: () => void; onSolo4: () => void; onCrearParty: () => void;
+function Menu({ tipo, onSolo2, onSolo4, onCrearParty }: {
+  tipo: TipoJuego; onSolo2: () => void; onSolo4: () => void; onCrearParty: () => void;
 }) {
   return (
-    <div className="ranked-menu">
-      <button className="ranked-mode-card" onClick={onSolo2}>
-        <h3>1v1 aleatorio</h3>
-        <p>Búsqueda individual contra cualquier jugador de tu nivel.</p>
+    <div className="mm-menu">
+      <button className="mm-mode-card" onClick={onSolo2}>
+        <span className="mm-mode-icon">{tipo === 'ranked' ? <RankedIcon /> : <CasualIcon />}</span>
+        <span className="mm-mode-body">
+          <h3>1v1 aleatorio</h3>
+          <p>Búsqueda individual contra cualquier jugador de tu nivel.</p>
+        </span>
+        <span className="mm-mode-cta">Buscar →</span>
       </button>
-      <button className="ranked-mode-card" onClick={onSolo4}>
-        <h3>2v2 aleatorio</h3>
-        <p>Búsqueda individual; el equipo se arma con quien empareje.</p>
+      <button className="mm-mode-card" onClick={onSolo4}>
+        <span className="mm-mode-icon">{tipo === 'ranked' ? <RankedIcon /> : <CasualIcon />}</span>
+        <span className="mm-mode-body">
+          <h3>2v2 aleatorio</h3>
+          <p>Búsqueda individual; el equipo se arma con quien empareje.</p>
+        </span>
+        <span className="mm-mode-cta">Buscar →</span>
       </button>
-      <button className="ranked-mode-card ranked-mode-team" onClick={onCrearParty}>
-        <h3>2v2 en equipo</h3>
-        <p>Invita a tu compañero con un link y buscan partida juntos.</p>
+      <button className="mm-mode-card mm-mode-team" onClick={onCrearParty}>
+        <span className="mm-mode-icon"><Bone a={6} b={6} className="mm-mode-tile" /></span>
+        <span className="mm-mode-body">
+          <h3>2v2 en equipo</h3>
+          <p>Invita a tu compañero con un link y buscan partida juntos.</p>
+        </span>
+        <span className="mm-mode-cta">Crear equipo →</span>
       </button>
     </div>
   );
 }
 
 // ── Pantalla de cola (solo o party) ────────────────
-function ColaView({ estado, onCancelar, cancelando }: {
+function ColaView({ estado, tipo, onCancelar, cancelando }: {
   estado: Extract<ColaEstado, { en_cola: true }>;
+  tipo: TipoJuego;
   onCancelar: () => void;
   cancelando: boolean;
 }) {
   const segundos = Math.floor(estado.espera_ms / 1000);
   return (
-    <div className="ranked-cola">
+    <div className="mm-panel mm-cola">
+      <div className="mm-cola-tiles" aria-hidden="true">
+        <Bone a={6} b={3} className="mm-cola-tile mm-cola-tile-a" />
+        <Bone a={5} b={5} className="mm-cola-tile mm-cola-tile-b" />
+      </div>
       <div className="boot-spinner" />
       <h3>Buscando partida{estado.es_party ? ' — en equipo' : ''}…</h3>
-      <p className="ranked-cola-meta">
-        {estado.modo === 2 ? '1 vs 1' : '2 vs 2'} · {segundos}s · rango ±{estado.rango_actual} ELO
+      <p className="mm-cola-meta">
+        {estado.modo === 2 ? '1 vs 1' : '2 vs 2'} · {segundos}s
+        {tipo === 'ranked' && <> · rango ±{estado.rango_actual} ELO</>}
       </p>
-      <button className="btn-salir" onClick={onCancelar} disabled={cancelando}>
+      <button className="mm-ghost-btn" onClick={onCancelar} disabled={cancelando}>
         {cancelando ? 'Cancelando…' : 'Cancelar búsqueda'}
       </button>
     </div>
@@ -73,20 +93,20 @@ function PartyView({ party, userId, onBuscar, buscando, onSalir, onCopyLink }: {
   }
 
   return (
-    <div className="party-lobby">
-      <p className="party-code-label">Código de equipo</p>
-      <div className="party-code-row">
-        <span className="party-code">{party.codigo}</span>
-        <button className="btn-copy" onClick={copiar}>{copiado ? 'Copiado' : 'Copiar link'}</button>
+    <div className="mm-panel mm-party">
+      <span className="mm-party-label">Código de equipo</span>
+      <div className="mm-party-code-row">
+        <span className="mm-party-code">{party.codigo}</span>
+        <button className="mm-copy-btn" onClick={copiar}>{copiado ? 'Copiado' : 'Copiar link'}</button>
       </div>
 
-      <div className="party-slots">
+      <div className="mm-party-slots">
         {[0, 1].map(i => {
           const m = party.miembros[i];
           return (
-            <div key={i} className={`party-slot${m ? ' party-slot-filled' : ''}`}>
+            <div key={i} className={`mm-party-slot${m ? ' is-filled' : ''}`}>
               {m
-                ? <><span className="slot-avatar">{m.username[0].toUpperCase()}</span>@{m.username}</>
+                ? <><span className="mm-party-avatar">{m.username[0].toUpperCase()}</span>@{m.username}</>
                 : 'Esperando compañero…'}
             </div>
           );
@@ -94,18 +114,18 @@ function PartyView({ party, userId, onBuscar, buscando, onSalir, onCopyLink }: {
       </div>
 
       {soyCreador ? (
-        <button className="btn-primary" onClick={onBuscar} disabled={!completa || buscando}>
+        <button className="mm-primary-btn" onClick={onBuscar} disabled={!completa || buscando}>
           {buscando ? 'Iniciando…' : completa ? 'Buscar partida (2v2)' : 'Esperando al equipo…'}
         </button>
       ) : (
-        <p className="ranked-cola-meta">Solo el creador del equipo puede iniciar la búsqueda.</p>
+        <p className="mm-cola-meta">Solo el creador del equipo puede iniciar la búsqueda.</p>
       )}
-      <button className="btn-salir" onClick={onSalir}>Salir del equipo</button>
+      <button className="mm-ghost-btn" onClick={onSalir}>Salir del equipo</button>
     </div>
   );
 }
 
-export default function MatchmakingView({ user, tipo, onBack, onGameStart, autoJoinCodigo }: Props) {
+export default function MatchmakingView({ user, tipo, dark, onBack, onGameStart, autoJoinCodigo }: Props) {
   const [pantalla, setPantalla]   = useState<Pantalla>('menu');
   const [party, setParty]         = useState<Party | null>(null);
   const [cola, setCola]           = useState<ColaEstado | null>(null);
@@ -234,25 +254,39 @@ export default function MatchmakingView({ user, tipo, onBack, onGameStart, autoJ
   }
 
   const titulo = tipo === 'ranked' ? 'Partida Ranked' : 'Partida Casual';
+  const subtitulo = pantalla === 'menu'
+    ? 'Elige cómo quieres buscar partida'
+    : pantalla === 'party'
+    ? 'Invita a tu compañero'
+    : 'Buscando rival…';
+  const rango = elo !== null ? rangoDeElo(elo) : null;
 
   return (
-    <div className="salas-page">
-      <nav className="salas-nav">
-        <button className="btn-back" onClick={salirMatchmaking}><BackIcon /> Lobby</button>
-        <h2>{titulo}</h2>
-        {elo !== null && (
-          <span className="lobby-elo" title={`${rangoDeElo(elo).nombre} · ELO ranked`}>
-            {rangoDeElo(elo).url && <img className="lobby-rank-badge" src={rangoDeElo(elo).url!} alt="" />}
-            {elo}
-          </span>
+    <div className={`dash mm-shell${dark ? '' : ' is-light'}`}>
+      <nav className="social-nav">
+        <button className="dash-icon-btn" onClick={salirMatchmaking} aria-label="Volver al lobby">
+          <BackIcon />
+        </button>
+        <div className="social-nav-title">
+          <h1>{titulo}</h1>
+          <p>{subtitulo}</p>
+        </div>
+        {rango && (
+          <div className="social-nav-right">
+            <span className="mm-elo-chip" title={`${rango.nombre} · ELO ranked`}>
+              {rango.url && <img src={rango.url} alt="" />}
+              {elo}
+            </span>
+          </div>
         )}
       </nav>
 
-      <div className="salas-content ranked-content">
-        {error && <div className="game-error-banner">⚠ {error}</div>}
+      <div className="social-body mm-body">
+        {error && <div className="social-error">⚠ {error}</div>}
 
         {pantalla === 'menu' && (
           <Menu
+            tipo={tipo}
             onSolo2={() => buscarSolo(2)}
             onSolo4={() => buscarSolo(4)}
             onCrearParty={crearParty}
@@ -271,7 +305,7 @@ export default function MatchmakingView({ user, tipo, onBack, onGameStart, autoJ
         )}
 
         {pantalla === 'cola' && cola?.en_cola && (
-          <ColaView estado={cola} onCancelar={cancelarCola} cancelando={busy} />
+          <ColaView estado={cola} tipo={tipo} onCancelar={cancelarCola} cancelando={busy} />
         )}
       </div>
     </div>

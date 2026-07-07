@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { api, type AuthUser, type UserConfig } from '../api';
-import { SunIcon, MoonIcon, CasualIcon, RankedIcon, SalasIcon } from './icons';
+import { SunIcon, MoonIcon, CasualIcon, RankedIcon, SalasIcon, BellIcon, PeopleIcon, TrophyIcon, HistoryIcon } from './icons';
 import { Bone } from './DominoStage';
 import { avatarUrl } from '../avatars';
 import { rangoDeElo, progresoRango } from '../ranks';
 import AvatarPicker from './AvatarPicker';
+import InboxPopover from './social/InboxPopover';
 
 type Props = {
   user:          AuthUser;
@@ -18,6 +19,12 @@ type Props = {
   onGoToCasual:  () => void;
   onPieceDemo:   () => void;
   onAvatarChange: (avatar: string) => void;
+  onGoToAmigos:      () => void;
+  onGoToLeaderboard: () => void;
+  onGoToHistorial:   () => void;
+  onUnirseSala:      (codigo: string) => void;
+  /** Sube cada vez que llega `notificacion_nueva` por el WS de sociales. */
+  notifVersion?: number;
 };
 
 // ── Tarjeta de modo secundario (casual / salas) ────
@@ -38,15 +45,33 @@ function PlayCard({ icon, title, desc, action, accent, onClick }: {
 }
 
 // ── Dashboard / Lobby ─────────────────────────────
-export default function Dashboard({ user, config, dark, onToggleTheme, onLogout, onGoToSalas, onGoToRanked, onGoToCasual, onPieceDemo, onAvatarChange }: Props) {
+export default function Dashboard({
+  user, config, dark, onToggleTheme, onLogout, onGoToSalas, onGoToRanked, onGoToCasual, onPieceDemo, onAvatarChange,
+  onGoToAmigos, onGoToLeaderboard, onGoToHistorial, onUnirseSala, notifVersion,
+}: Props) {
   const [elo, setElo] = useState<number | null>(null);
   const [avatarAbierto, setAvatarAbierto] = useState(false);
+  const [inboxAbierto, setInboxAbierto] = useState(false);
+  const [noLeidas, setNoLeidas] = useState(0);
   const foto = avatarUrl(user.avatar);
 
   useEffect(() => {
     api.ranked.me()
       .then(r => setElo(r.elo))
       .catch(() => setElo(null)); // sin ranked aún: no romper el lobby
+  }, []);
+
+  useEffect(() => {
+    api.social.noLeidasCount().then(r => setNoLeidas(r.count)).catch(() => {});
+  }, [inboxAbierto, notifVersion]); // notifVersion: refetch inmediato al llegar notificacion_nueva por WS
+
+  // Poll de 30s como red de seguridad si el WS se cayó — el WS es la vía
+  // rápida (ver useSocialSocket), esto no debería disparar en el camino feliz.
+  useEffect(() => {
+    const id = setInterval(() => {
+      api.social.noLeidasCount().then(r => setNoLeidas(r.count)).catch(() => {});
+    }, 30_000);
+    return () => clearInterval(id);
   }, []);
 
   const rango = elo !== null ? rangoDeElo(elo) : null;
@@ -75,6 +100,20 @@ export default function Dashboard({ user, config, dark, onToggleTheme, onLogout,
             <Bone a={3} b={5} className="dash-pieces-tile" />
           </button>
 
+          <button className="dash-icon-btn" onClick={onGoToAmigos} aria-label="Amigos" title="Amigos">
+            <PeopleIcon />
+          </button>
+
+          <button
+            className="dash-icon-btn dash-bell-btn"
+            onClick={() => setInboxAbierto(o => !o)}
+            aria-label="Bandeja de entrada"
+            title="Bandeja de entrada"
+          >
+            <BellIcon />
+            {noLeidas > 0 && <span className="dash-bell-badge">{noLeidas > 9 ? '9+' : noLeidas}</span>}
+          </button>
+
           <button
             className="dash-user"
             onClick={() => setAvatarAbierto(true)}
@@ -91,6 +130,10 @@ export default function Dashboard({ user, config, dark, onToggleTheme, onLogout,
 
           <button className="dash-logout" onClick={onLogout}>Salir</button>
         </div>
+
+        {inboxAbierto && (
+          <InboxPopover onClose={() => setInboxAbierto(false)} onUnirseSala={onUnirseSala} />
+        )}
       </nav>
 
       {/* ── Body ─────────────────────────────────── */}
@@ -181,6 +224,27 @@ export default function Dashboard({ user, config, dark, onToggleTheme, onLogout,
             action="Ver salas"
             accent="neutral"
             onClick={onGoToSalas}
+          />
+        </div>
+
+        {/* Comunidad: leaderboard + historial */}
+        <h2 className="dash-section-title">Comunidad</h2>
+        <div className="dash-row">
+          <PlayCard
+            icon={<TrophyIcon />}
+            title="Leaderboard"
+            desc="Top 100 jugadores por ELO. Mira su historial, capicúas y tranques."
+            action="Ver leaderboard"
+            accent="teal"
+            onClick={onGoToLeaderboard}
+          />
+          <PlayCard
+            icon={<HistoryIcon />}
+            title="Historial de partidas"
+            desc="Repasa tus últimas partidas y reproduce cómo fue cada mano."
+            action="Ver historial"
+            accent="neutral"
+            onClick={onGoToHistorial}
           />
         </div>
 

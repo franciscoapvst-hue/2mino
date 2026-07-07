@@ -119,6 +119,71 @@ export async function salasGatewayRoutes(app: FastifyInstance) {
     return reply.code(status).send(data);
   });
 
+  // ── GET /salas/mis-partidas ───────────────────────
+  app.get<{ Querystring: { cursor?: string; limit?: number } }>('/salas/mis-partidas', {
+    schema: {
+      tags:     ['salas'],
+      summary:  'Historial de partidas propio (paginado)',
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          cursor: { type: 'string', format: 'date-time' },
+          limit:  { type: 'integer', minimum: 1, maximum: 50 },
+        },
+      },
+      response: { 200: { type: 'array', items: SalaResumenSchema }, 401: { ...ErrorSchema } },
+    },
+  }, async (req, reply) => {
+    const payload = verifyToken(req.headers.authorization);
+    if (!payload) return reply.code(401).send({ error: 'Token requerido' });
+
+    const qs = new URLSearchParams({
+      usuario_id: payload.sub,
+      ...(req.query.cursor ? { cursor: req.query.cursor } : {}),
+      ...(req.query.limit ? { limit: String(req.query.limit) } : {}),
+    }).toString();
+    const { status, data } = await callSalas(`/salas/mis-partidas?${qs}`, 'GET');
+    return reply.code(status).send(data);
+  });
+
+  // ── GET /salas/:id/replay ─────────────────────────
+  app.get<{ Params: { id: string } }>('/salas/:id/replay', {
+    schema: {
+      tags:     ['salas'],
+      summary:  'Movimientos + resultado para reconstruir la partida (replay)',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', properties: { id: { type: 'string', format: 'uuid' } } },
+      response: { 200: { ...SalaResumenSchema }, 401: { ...ErrorSchema }, 404: { ...ErrorSchema } },
+    },
+  }, async (req, reply) => {
+    if (!verifyToken(req.headers.authorization)) return reply.code(401).send({ error: 'Token requerido' });
+    const { status, data } = await callSalas(`/salas/${req.params.id}/replay`, 'GET');
+    return reply.code(status).send(data);
+  });
+
+  // ── POST /salas/:id/revancha ──────────────────────
+  app.post<{ Params: { id: string } }>('/salas/:id/revancha', {
+    schema: {
+      tags:     ['salas'],
+      summary:  'Crear una revancha (misma gente, sala nueva)',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', properties: { id: { type: 'string', format: 'uuid' } } },
+      response: {
+        201: { ...SalaResumenSchema }, 400: { ...ErrorSchema },
+        401: { ...ErrorSchema }, 404: { ...ErrorSchema },
+      },
+    },
+  }, async (req, reply) => {
+    const payload = verifyToken(req.headers.authorization);
+    if (!payload) return reply.code(401).send({ error: 'Token requerido' });
+
+    const { status, data } = await callSalas(`/salas/${req.params.id}/revancha`, 'POST', {
+      solicitante_id: payload.sub,
+    });
+    return reply.code(status).send(data);
+  });
+
   // ── POST /salas/:id/unirse ───────────────────────
   app.post<{ Params: { id: string } }>('/salas/:id/unirse', {
     schema: {

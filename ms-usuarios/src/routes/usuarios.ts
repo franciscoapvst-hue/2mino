@@ -203,6 +203,88 @@ export async function usuariosRoutes(app: FastifyInstance) {
     },
   );
 
+  // ── GET /usuarios/por-username/:username ────────
+  // Resuelve username → id. Lo usa el gateway (routes/social.ts) para
+  // "agregar amigo por nombre de usuario" — ms-social no guarda username
+  // como clave, solo UUID, así que el gateway resuelve acá antes de llamar
+  // a POST /solicitudes.
+  app.get<{ Params: { username: string } }>(
+    '/usuarios/por-username/:username',
+    {
+      schema: {
+        tags:    ['usuarios'],
+        summary: 'Buscar usuario por username (resuelve a UUID)',
+        params: {
+          type: 'object',
+          properties: { username: { type: 'string' } },
+        },
+        response: {
+          200: { description: 'Usuario encontrado',    ...UserSchema },
+          404: { description: 'Usuario no encontrado', ...ErrorSchema },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { rows } = await pool.query(
+        `SELECT u.id, u.username, u.email, u.segmento_id, u.avatar, u.created_at, u.updated_at,
+                s.nombre as segmento, s.config as segmento_config
+         FROM usuarios u
+         LEFT JOIN segmentos s ON s.id = u.segmento_id
+         WHERE u.username = $1`,
+        [req.params.username],
+      );
+      if (!rows.length) return reply.code(404).send({ error: 'Usuario no encontrado' });
+      return reply.send(rows[0]);
+    },
+  );
+
+  // ── GET /usuarios/buscar ─────────────────────────
+  // Búsqueda por prefijo de username, para autocompletar mientras se
+  // escribe (ej. buscador de "agregar amigo" en FriendsView). Distinto
+  // de por-username/:username (que exige match exacto para resolver a
+  // UUID); acá puede haber 0, 1 o varios resultados.
+  app.get<{ Querystring: { q: string; excluir?: string; limit?: number } }>(
+    '/usuarios/buscar',
+    {
+      schema: {
+        tags:    ['usuarios'],
+        summary: 'Buscar usuarios por prefijo de username (autocompletar)',
+        querystring: {
+          type: 'object',
+          required: ['q'],
+          properties: {
+            q:       { type: 'string', minLength: 1, maxLength: 20 },
+            excluir: { type: 'string', format: 'uuid' },
+            limit:   { type: 'integer', minimum: 1, maximum: 20, default: 8 },
+          },
+        },
+        response: {
+          200: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id:       { type: 'string', format: 'uuid' },
+                username: { type: 'string' },
+                avatar:   { type: 'string', nullable: true },
+              },
+            },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { q, excluir, limit = 8 } = req.query;
+      const { rows } = await pool.query(
+        `SELECT id, username, avatar FROM usuarios
+         WHERE username ILIKE $1 || '%' AND ($2::uuid IS NULL OR id != $2)
+         ORDER BY username ASC LIMIT $3`,
+        [q, excluir ?? null, limit],
+      );
+      return reply.send(rows);
+    },
+  );
+
   // ── PATCH /usuarios/:id/avatar ──────────────────
   app.patch<{ Params: { id: string }; Body: { avatar: string } }>(
     '/usuarios/:id/avatar',

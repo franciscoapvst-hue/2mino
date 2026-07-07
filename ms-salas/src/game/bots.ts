@@ -26,6 +26,17 @@ export function esBot(usuarioId: string): boolean {
   return (BOT_IDS as readonly string[]).includes(usuarioId);
 }
 
+// Un movimiento de bot, en la misma forma que necesita partida_movimientos
+// (docs/CASOS_DE_USO_SOCIAL.md §5.1) — el caller (juegos.ts) los persiste
+// igual que los movimientos humanos, para que el replay quede completo.
+export type MovimientoBot = {
+  numeroMano: number;
+  seat:       number;
+  tipo:       'jugar' | 'pasar';
+  pieza:      Pieza | null;
+  lado:       'izq' | 'der' | null;
+};
+
 /** Primera ficha jugable de la mano, en orden (izquierda a derecha). */
 function elegirJugadaBot(partida: PartidaState, seat: number): Pieza | null {
   const mano = partida.manos[seat] ?? [];
@@ -45,12 +56,21 @@ function elegirJugadaBot(partida: PartidaState, seat: number): Pieza | null {
  * Resuelve todos los turnos de bots consecutivos a partir del estado
  * actual: juega/pasa mientras le toque a un bot, y confirma "listo"
  * entre manos por cada bot pendiente. Se detiene en cuanto le toca a
- * un humano o la partida no tiene más que resolver. Sin cambios,
- * devuelve la MISMA referencia (permite a los callers detectar "no hubo
- * movimiento de bots" con un simple !==).
+ * un humano o la partida no tiene más que resolver.
+ *
+ * Devuelve también el log de jugadas/pases que hicieron los bots (no las
+ * confirmaciones de "listo", esas no son movimientos de partida) para que
+ * el caller los persista en `partida_movimientos` igual que los humanos —
+ * si no, el replay tendría huecos en los turnos que jugó un bot.
+ *
+ * Si no hubo nada que resolver, `partida` es la MISMA referencia recibida
+ * (permite a los callers detectar "no hubo cambios" con un simple !==).
  */
-export function resolverTurnosBot(partida: PartidaState): PartidaState {
+export function resolverTurnosBot(
+  partida: PartidaState,
+): { partida: PartidaState; movimientos: MovimientoBot[] } {
   let actual = partida;
+  const movimientos: MovimientoBot[] = [];
   // Tope defensivo: una partida real nunca encadena tantas jugadas de
   // bot seguidas (28 fichas por jugador como mucho); evita un loop
   // infinito si algún día hay un bug en la lógica de arriba.
@@ -60,11 +80,18 @@ export function resolverTurnosBot(partida: PartidaState): PartidaState {
       const asiento = actual.asientos[seat];
       if (!asiento || !esBot(asiento.usuario_id)) break;
 
+      const numeroMano = actual.numeroMano;
       const pieza = elegirJugadaBot(actual, seat);
       const resultado = pieza
         ? aplicarJugada(actual, asiento.usuario_id, pieza)
         : aplicarPase(actual, asiento.usuario_id);
       if (!resultado.ok) break; // no debería ocurrir; corta por seguridad
+      movimientos.push({
+        numeroMano, seat,
+        tipo:  pieza ? 'jugar' : 'pasar',
+        pieza: pieza ?? null,
+        lado:  pieza ? resultado.partida.ultimaJugada?.lado ?? null : null,
+      });
       actual = resultado.partida;
       continue;
     }
@@ -82,5 +109,5 @@ export function resolverTurnosBot(partida: PartidaState): PartidaState {
 
     break; // fin_partida u otra fase: nada que resolver
   }
-  return actual;
+  return { partida: actual, movimientos };
 }

@@ -147,4 +147,56 @@ export async function rankedRoutes(app: FastifyInstance) {
       historial,
     });
   });
+
+  // ── GET /ranked/leaderboard/:usuario_id/perfil ────
+  // Perfil extendido (docs/CASOS_DE_USO_SOCIAL.md §4.2): capicúas/trancas
+  // de partida_resultados (TODAS las partidas, no solo ranked) + ELO
+  // actual + progresión reciente para el modal del leaderboard.
+  app.get<{ Params: { usuario_id: string } }>('/ranked/leaderboard/:usuario_id/perfil', {
+    schema: {
+      tags:    ['ranked'],
+      summary: 'Perfil extendido de un jugador (capicúas, trancas, progresión de ELO)',
+      params: {
+        type: 'object',
+        properties: { usuario_id: { type: 'string', format: 'uuid' } },
+      },
+      response: { 200: { ...RatingSchema } },
+    },
+  }, async (req, reply) => {
+    const { usuario_id } = req.params;
+
+    const [{ rows: rating }, { rows: agregado }, { rows: progresion }] = await Promise.all([
+      pool.query(
+        'SELECT usuario_id, username, elo, partidas, ganadas FROM ranked_ratings WHERE usuario_id = $1',
+        [usuario_id],
+      ),
+      pool.query(
+        `SELECT
+           COUNT(*) FILTER (WHERE capicua)        AS total_capicuas,
+           COUNT(*) FILTER (WHERE tranques_ganados > 0)  AS total_tranques_ganados,
+           COUNT(*) FILTER (WHERE tranques_perdidos > 0) AS total_tranques_perdidos,
+           COUNT(*)                                AS total_partidas_jugadas
+         FROM partida_resultados WHERE usuario_id = $1`,
+        [usuario_id],
+      ),
+      pool.query(
+        `SELECT created_at AS fecha, elo_despues AS elo
+         FROM ranked_historial WHERE usuario_id = $1
+         ORDER BY created_at ASC LIMIT 50`,
+        [usuario_id],
+      ),
+    ]);
+
+    return reply.send({
+      usuario_id,
+      username:          rating[0]?.username ?? null,
+      elo:               rating[0]?.elo      ?? ELO_INICIAL,
+      partidas:          rating[0]?.partidas ?? 0,
+      ganadas:           rating[0]?.ganadas  ?? 0,
+      capicuas:          Number(agregado[0]?.total_capicuas ?? 0),
+      tranques_ganados:  Number(agregado[0]?.total_tranques_ganados ?? 0),
+      tranques_perdidos: Number(agregado[0]?.total_tranques_perdidos ?? 0),
+      progresion_elo:    progresion,
+    });
+  });
 }

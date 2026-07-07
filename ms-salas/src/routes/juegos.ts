@@ -1,11 +1,12 @@
 import { FastifyInstance } from 'fastify';
 import { pool } from '../db/pool';
 import {
-  crearPartida, aplicarJugada, aplicarPase, marcarListo, aplicarAbandono, vistaPublica,
+  crearPartida, aplicarJugada, aplicarPase, marcarListo, aplicarAbandono, vistaPublica, equipoDe,
 } from '../game/logic';
 import type { PartidaState, Pieza } from '../game/logic';
 import { aplicarEloRanked } from './ranked';
 import { resolverTurnosBot } from '../game/bots';
+import type { MovimientoBot } from '../game/bots';
 
 const ErrorSchema = {
   type: 'object',
@@ -50,7 +51,73 @@ async function guardarPartida(juegoId: string, salaId: string, partida: PartidaS
     } catch (e) {
       console.error('Error aplicando ELO ranked:', e);
     }
+    // Historial (docs/CASOS_DE_USO_SOCIAL.md §5.4) — idempotente igual que
+    // el ELO (ON CONFLICT DO NOTHING + UNIQUE(sala_id, usuario_id)).
+    try {
+      await guardarResultados(salaId, partida);
+    } catch (e) {
+      console.error('Error guardando partida_resultados:', e);
+    }
   }
+}
+
+// ── Historial: resultado agregado por jugador (docs §5.1/§5.4) ──────
+async function guardarResultados(salaId: string, partida: PartidaState) {
+  if (partida.equipoGanadorPartida === null) return; // abandono ya cerró distinto; no debería pasar acá
+  const { rows: salaRows } = await pool.query('SELECT tipo FROM salas WHERE id = $1', [salaId]);
+  const tipoSala = salaRows[0]?.tipo === 'ranked' ? 'ranked' : 'casual';
+
+  for (let seat = 0; seat < partida.asientos.length; seat++) {
+    const a = partida.asientos[seat];
+    const equipo = equipoDe(seat);
+    const rival = equipo === 0 ? 1 : 0;
+    await pool.query(
+      `INSERT INTO partida_resultados
+        (sala_id, usuario_id, equipo, gano, tipo_sala, capicua,
+         tranques_ganados, tranques_perdidos, puntos_favor, puntos_contra)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+       ON CONFLICT (sala_id, usuario_id) DO NOTHING`,
+      [
+        salaId, a.usuario_id, equipo, equipo === partida.equipoGanadorPartida, tipoSala,
+        partida.capicuasPorEquipo[equipo] > 0,
+        partida.trancasPorEquipo[equipo],
+        partida.trancasPorEquipo[rival],
+        partida.marcador[equipo],
+        partida.marcador[rival],
+      ],
+    );
+  }
+}
+
+// ── Log de movimientos para el replay (docs §5.1/§5.3) ──────────────
+type MovimientoInput = {
+  numeroMano: number;
+  seat:       number;
+  tipo:       'jugar' | 'pasar';
+  pieza:      Pieza | null;
+  lado:       'izq' | 'der' | null;
+};
+
+async function guardarMovimiento(salaId: string, m: MovimientoInput) {
+  // Volumen bajo (una partida a 100 puntos son pocas decenas de jugadas);
+  // no hace falta llevar un contador en PartidaState, una query de más
+  // por jugada es despreciable frente al UPDATE que ya se hace a `juegos`.
+  const { rows } = await pool.query(
+    `SELECT COALESCE(MAX(orden), -1) + 1 AS next
+     FROM partida_movimientos WHERE sala_id = $1 AND numero_mano = $2`,
+    [salaId, m.numeroMano],
+  );
+  await pool.query(
+    `INSERT INTO partida_movimientos (sala_id, numero_mano, orden, seat, tipo, pieza_a, pieza_b, lado)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+    [salaId, m.numeroMano, rows[0].next, m.seat, m.tipo, m.pieza?.a ?? null, m.pieza?.b ?? null, m.lado],
+  );
+}
+
+async function guardarMovimientos(salaId: string, movimientos: (MovimientoInput | MovimientoBot)[]) {
+  // Secuencial (no Promise.all): el `orden` de cada uno depende de haber
+  // visto ya los INSERTs anteriores de esta misma tanda.
+  for (const m of movimientos) await guardarMovimiento(salaId, m);
 }
 
 export async function juegosRoutes(app: FastifyInstance) {
@@ -151,9 +218,10 @@ export async function juegosRoutes(app: FastifyInstance) {
     // resolver (p. ej. un guardado previo a este cambio), lo resuelve acá
     // también. resolverTurnosBot devuelve la MISMA referencia si no hay
     // nada que hacer, así que esto no persiste en el caso normal.
-    const partidaFinal = resolverTurnosBot(partida);
+    const { partida: partidaFinal, movimientos } = resolverTurnosBot(partida);
     if (partidaFinal !== partida) {
       await guardarPartida(juego.id, juego.sala_id, partidaFinal);
+      await guardarMovimientos(juego.sala_id, movimientos);
     }
     return reply.send(vistaPublica(partidaFinal, req.query.usuario_id));
   });
@@ -195,12 +263,19 @@ export async function juegosRoutes(app: FastifyInstance) {
 
     const partida = parsePartida(juego);
     const { usuario_id, pieza, lado } = req.body;
+    const seat = partida.asientos.findIndex(a => a.usuario_id === usuario_id);
+    const numeroManoAntes = partida.numeroMano;
     const resultado = aplicarJugada(partida, usuario_id, pieza, lado);
 
     if (!resultado.ok) return reply.code(400).send({ error: resultado.error });
 
-    const partidaFinal = resolverTurnosBot(resultado.partida);
+    const movimientos: MovimientoInput[] = seat === -1 ? [] : [{
+      numeroMano: numeroManoAntes, seat, tipo: 'jugar', pieza,
+      lado: resultado.partida.ultimaJugada?.lado ?? null,
+    }];
+    const { partida: partidaFinal, movimientos: movimientosBot } = resolverTurnosBot(resultado.partida);
     await guardarPartida(juego.id, juego.sala_id, partidaFinal);
+    await guardarMovimientos(juego.sala_id, [...movimientos, ...movimientosBot]);
     return reply.send(vistaPublica(partidaFinal, usuario_id));
   });
 
@@ -232,12 +307,18 @@ export async function juegosRoutes(app: FastifyInstance) {
     if (!juego) return reply.code(404).send({ error: 'No hay partida para esta sala' });
 
     const partida = parsePartida(juego);
+    const seat = partida.asientos.findIndex(a => a.usuario_id === req.body.usuario_id);
+    const numeroManoAntes = partida.numeroMano;
     const resultado = aplicarPase(partida, req.body.usuario_id);
 
     if (!resultado.ok) return reply.code(400).send({ error: resultado.error });
 
-    const partidaFinal = resolverTurnosBot(resultado.partida);
+    const movimientos: MovimientoInput[] = seat === -1 ? [] : [{
+      numeroMano: numeroManoAntes, seat, tipo: 'pasar', pieza: null, lado: null,
+    }];
+    const { partida: partidaFinal, movimientos: movimientosBot } = resolverTurnosBot(resultado.partida);
     await guardarPartida(juego.id, juego.sala_id, partidaFinal);
+    await guardarMovimientos(juego.sala_id, [...movimientos, ...movimientosBot]);
     return reply.send(vistaPublica(partidaFinal, req.body.usuario_id));
   });
 
@@ -273,8 +354,9 @@ export async function juegosRoutes(app: FastifyInstance) {
 
     if (!resultado.ok) return reply.code(400).send({ error: resultado.error });
 
-    const partidaFinal = resolverTurnosBot(resultado.partida);
+    const { partida: partidaFinal, movimientos } = resolverTurnosBot(resultado.partida);
     await guardarPartida(juego.id, juego.sala_id, partidaFinal);
+    await guardarMovimientos(juego.sala_id, movimientos);
     return reply.send(vistaPublica(partidaFinal, req.body.usuario_id));
   });
 

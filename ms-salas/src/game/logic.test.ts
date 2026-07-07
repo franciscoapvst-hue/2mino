@@ -26,6 +26,8 @@ function partida(over: Partial<PartidaState> = {}): PartidaState {
     fase: 'jugando',
     listos: new Array(n).fill(false),
     equipoGanadorPartida: null,
+    capicuasPorEquipo: [0, 0],
+    trancasPorEquipo:  [0, 0],
     manos: Array.from({ length: n }, () => []),
     tablero: [],
     turno: 0,
@@ -161,6 +163,22 @@ describe('dominó (mano vacía)', () => {
     const s = ok(aplicarJugada(p, 'u0', pz(2, 4)));
     expect(s.resultadoMano).toMatchObject({ tipo: 'capicua', puntos: 30 });
     expect(s.marcador).toEqual([30, 0]);
+    expect(s.capicuasPorEquipo).toEqual([1, 0]);
+    expect(s.trancasPorEquipo).toEqual([0, 0]);
+  });
+
+  it('una victoria "normal" (sin capicúa) no incrementa capicuasPorEquipo', () => {
+    const p = partida({
+      maxJugadores: 4,
+      asientos: asientos(4),
+      manos: [[pz(3, 4)], [pz(2, 3)], [pz(6, 6)], [pz(1, 2)]],
+      tablero: [abrirTablero(pz(2, 3))],
+      turno: 0,
+      listos: [false, false, false, false],
+    });
+    const s = ok(aplicarJugada(p, 'u0', pz(3, 4), 'der'));
+    expect(s.resultadoMano).toMatchObject({ tipo: 'normal' });
+    expect(s.capicuasPorEquipo).toEqual([0, 0]);
   });
 
   it('al alcanzar el objetivo la partida termina', () => {
@@ -273,6 +291,7 @@ describe('aplicarPase', () => {
     expect(s.resultadoMano).toMatchObject({ tipo: 'tranca', equipoGanador: 0, puntos: 23 });
     expect(s.marcador).toEqual([23, 0]);
     expect(s.fase).toBe('entre_manos');
+    expect(s.trancasPorEquipo).toEqual([1, 0]);
     // trancó seat 1 (equipo 1) y PERDIÓ → sale el siguiente (seat 2)
     expect(s.salida).toBe(2);
   });
@@ -300,6 +319,7 @@ describe('aplicarPase', () => {
     const s = ok(aplicarPase(p, 'u1'));
     expect(s.resultadoMano).toMatchObject({ tipo: 'tranca', equipoGanador: null, puntos: 0 });
     expect(s.marcador).toEqual([0, 0]);
+    expect(s.trancasPorEquipo).toEqual([0, 0]); // empate: no suma a nadie
   });
 });
 

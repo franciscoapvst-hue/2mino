@@ -1,0 +1,319 @@
+/* ═══════════════════════════════════════════════════════
+   Salas abiertas — misma identidad (fieltro + ámbar/teal).
+   Se monta como <div className="dash sv-shell ...">, reusa
+   las variables --d-* de dashboard.css y el header/estados
+   compartidos de social.css (.social-nav, .social-empty, etc).
+   ═══════════════════════════════════════════════════════ */
+
+.sv-body { max-width: 920px; }
+
+/* ── Toolbar ─────────────────────────────────────── */
+.sv-toolbar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.sv-create-toggle {
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: none;
+  background: var(--amber);
+  color: var(--amber-ink, #201400);
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: background .15s ease;
+  white-space: nowrap;
+}
+.sv-create-toggle:hover { background: var(--amber-hi); }
+.sv-create-toggle.active { background: var(--d-surface); color: var(--d-ink); border: 1px solid var(--d-border); }
+
+.sv-search-form {
+  flex: 1;
+  min-width: 220px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--d-border);
+  background: var(--d-surface);
+}
+.sv-search-icon { color: var(--d-muted); display: flex; flex-shrink: 0; }
+.sv-search-form input {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--d-ink);
+  font-size: 0.88rem;
+  min-width: 0;
+}
+.sv-search-form input::placeholder { color: var(--d-muted); }
+.sv-search-form input:focus { outline: none; }
+.sv-search-form button {
+  padding: 6px 13px;
+  border-radius: 8px;
+  border: none;
+  background: var(--teal);
+  color: #06231d;
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sv-search-form button:disabled { opacity: 0.5; cursor: default; }
+
+/* ── Formulario de crear sala ────────────────────── */
+.sv-create-form {
+  padding: 20px;
+  margin-bottom: 20px;
+  border-radius: 16px;
+  border: 1px solid var(--d-border);
+  background: var(--d-surface);
+}
+.sv-create-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
+}
+.sv-field, .sv-option-group { display: flex; flex-direction: column; gap: 7px; }
+.sv-field-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--d-muted);
+}
+.sv-field input {
+  padding: 10px 13px;
+  border-radius: 9px;
+  border: 1px solid var(--d-border);
+  background: var(--d-bg);
+  color: var(--d-ink);
+  font-size: 0.88rem;
+}
+.sv-field input::placeholder { color: var(--d-muted); }
+.sv-field input:focus { outline: none; border-color: var(--amber); }
+
+.sv-toggle-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.sv-toggle-btn {
+  padding: 7px 13px;
+  border-radius: 8px;
+  border: 1px solid var(--d-border);
+  background: var(--d-bg);
+  color: var(--d-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color .15s ease, color .15s ease;
+}
+.sv-toggle-btn:hover:not(:disabled):not(.active) { border-color: var(--teal); color: var(--d-ink); }
+.sv-toggle-btn.active { background: var(--amber); border-color: var(--amber); color: var(--amber-ink, #201400); }
+.sv-toggle-btn:disabled { opacity: 0.5; cursor: default; }
+
+.sv-create-submit {
+  padding: 11px 20px;
+  border: none;
+  border-radius: 10px;
+  background: var(--amber);
+  color: var(--amber-ink, #201400);
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.sv-create-submit:hover:not(:disabled) { background: var(--amber-hi); }
+.sv-create-submit:disabled { opacity: 0.5; cursor: default; }
+
+.sv-empty-tile { width: 48px; margin: 0 auto 10px; }
+
+/* ── Grid de salas ───────────────────────────────── */
+.sv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.sv-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid var(--d-border);
+  background: var(--d-surface);
+  transition: border-color .15s ease, transform .15s ease;
+}
+.sv-card:hover { transform: translateY(-2px); border-color: var(--teal); }
+.sv-card-ranked { border-color: color-mix(in srgb, var(--amber) 30%, var(--d-border)); }
+.sv-card-ranked:hover { border-color: var(--amber); }
+.sv-card-full { opacity: 0.6; }
+
+.sv-card-top { display: flex; align-items: center; justify-content: space-between; }
+.sv-codigo {
+  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--d-muted);
+}
+.sv-ranked-chip {
+  padding: 2px 9px;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--amber) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amber) 32%, transparent);
+  color: var(--amber);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sv-nombre { font-weight: 700; color: var(--d-ink); font-size: 0.98rem; }
+.sv-modo { font-size: 0.8rem; color: var(--d-muted); margin-bottom: 6px; }
+
+.sv-card-foot {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.sv-players-row { display: flex; align-items: center; gap: 8px; }
+.sv-dots { display: flex; gap: 4px; }
+.sv-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--d-border);
+}
+.sv-dot.is-filled { background: var(--teal); }
+.sv-players-text { font-size: 0.78rem; color: var(--d-muted); }
+
+.sv-join-btn {
+  padding: 7px 16px;
+  border-radius: 8px;
+  border: none;
+  background: var(--teal);
+  color: #06231d;
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.sv-join-btn:hover:not(:disabled) { opacity: 0.88; }
+.sv-join-btn:disabled { opacity: 0.45; cursor: default; background: var(--d-border); color: var(--d-muted); }
+
+/* ── Sala de espera ──────────────────────────────── */
+.sv-waiting { display: flex; flex-direction: column; gap: 22px; }
+
+.sv-waiting-head { display: flex; flex-direction: column; gap: 8px; }
+.sv-waiting-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--d-muted);
+}
+.sv-waiting-code-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.sv-waiting-code {
+  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--amber);
+}
+.sv-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border-radius: 8px;
+  border: 1px solid var(--d-border);
+  background: var(--d-surface);
+  color: var(--d-ink);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sv-copy-btn:hover { border-color: var(--teal); color: var(--teal); }
+.sv-waiting-meta { display: flex; gap: 8px; font-size: 0.86rem; color: var(--d-muted); flex-wrap: wrap; }
+.sv-waiting-meta-dot { opacity: 0.5; }
+
+.sv-teams-hint {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--d-surface);
+  border: 1px solid var(--d-border);
+  font-size: 0.82rem;
+  color: var(--d-muted);
+}
+
+.sv-slot-grid { display: grid; gap: 12px; }
+.sv-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 92px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px dashed var(--d-border);
+  background: var(--d-surface);
+  text-align: center;
+}
+.sv-slot-empty { cursor: pointer; color: var(--d-muted); transition: border-color .15s ease, color .15s ease; }
+.sv-slot-empty:hover { border-color: var(--amber); color: var(--amber); }
+.sv-slot-pos { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; }
+.sv-slot-cta { font-size: 0.8rem; font-weight: 600; }
+.sv-slot-filled { border-style: solid; border-color: var(--d-border); }
+.sv-slot-me { border-color: var(--teal); box-shadow: inset 0 0 0 1px var(--teal); }
+.sv-slot-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  color: var(--amber-ink, #201400);
+  background: linear-gradient(135deg, var(--amber-hi), var(--amber));
+}
+.sv-slot-username { font-weight: 700; color: var(--d-ink); font-size: 0.88rem; }
+.sv-slot-host {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+
+.sv-waiting-actions { display: flex; flex-direction: column; gap: 10px; }
+.sv-start-btn {
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  background: var(--amber);
+  color: var(--amber-ink, #201400);
+  font-weight: 700;
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+.sv-start-btn:hover:not(:disabled) { background: var(--amber-hi); }
+.sv-start-btn:disabled { opacity: 0.5; cursor: default; }
+.sv-leave-btn {
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--d-border);
+  background: transparent;
+  color: var(--d-muted);
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sv-leave-btn:hover:not(:disabled) { border-color: #e06060; color: #e06060; }
+
+@media (max-width: 600px) {
+  .sv-slot-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}

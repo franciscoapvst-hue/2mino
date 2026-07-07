@@ -39,6 +39,17 @@ export async function rankedGatewayRoutes(app: FastifyInstance) {
     return reply.code(status).send(data);
   });
 
+  app.get<{ Params: { usuario_id: string } }>('/ranked/leaderboard/:usuario_id/perfil', {
+    schema: {
+      tags: ['ranked'], summary: 'Perfil extendido de un jugador (capicúas, trancas, progresión de ELO)',
+      params: { type: 'object', properties: { usuario_id: { type: 'string', format: 'uuid' } } },
+      response: { 200: AnySchema },
+    },
+  }, async (req, reply) => {
+    const { status, data } = await callSalas(`/ranked/leaderboard/${req.params.usuario_id}/perfil`, 'GET');
+    return reply.code(status).send(data);
+  });
+
   // ── Party ──────────────────────────────────────────
 
   app.post<{ Body: { tipo?: 'casual' | 'ranked' } }>('/ranked/party', {

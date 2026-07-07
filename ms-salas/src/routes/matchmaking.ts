@@ -93,8 +93,24 @@ async function crearSala(
 
   // resolverTurnosBot es un no-op si no hay bots sentados; si el reparto
   // forzó a un bot a abrir con el doble más alto, ya queda resuelto acá.
-  const partida = resolverTurnosBot(crearPartida(asientos, PUNTOS_MM));
+  const { partida, movimientos } = resolverTurnosBot(crearPartida(asientos, PUNTOS_MM));
   await client.query('INSERT INTO juegos (sala_id, partida) VALUES ($1, $2)', [salaId, JSON.stringify(partida)]);
+
+  // Movimientos del bot forzado a abrir (si los hubo) — mismo log que
+  // alimenta el replay (docs/CASOS_DE_USO_SOCIAL.md §5.1/§5.3), en la
+  // misma transacción que la creación de la sala.
+  for (const m of movimientos) {
+    const { rows } = await client.query(
+      `SELECT COALESCE(MAX(orden), -1) + 1 AS next
+       FROM partida_movimientos WHERE sala_id = $1 AND numero_mano = $2`,
+      [salaId, m.numeroMano],
+    );
+    await client.query(
+      `INSERT INTO partida_movimientos (sala_id, numero_mano, orden, seat, tipo, pieza_a, pieza_b, lado)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [salaId, m.numeroMano, rows[0].next, m.seat, m.tipo, m.pieza?.a ?? null, m.pieza?.b ?? null, m.lado],
+    );
+  }
 
   return salaId;
 }

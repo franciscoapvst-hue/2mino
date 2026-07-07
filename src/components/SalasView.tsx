@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, FormEvent } from 'react';
 import { api, type Sala, type SalaJugador, type AuthUser } from '../api';
-import { BackIcon, RefreshIcon, CopyIcon } from './icons';
+import { BackIcon, RefreshIcon, CopyIcon, SearchIcon } from './icons';
+import { Bone } from './DominoStage';
 
 type Props = {
   user:         AuthUser;
+  dark:         boolean;
   onBack:       () => void;
   onGameStart:  (sala: Sala) => void;
 };
@@ -15,9 +17,9 @@ const MODO_LABEL: Record<string, string> = {
 
 function PlayerDots({ current, max }: { current: number; max: number }) {
   return (
-    <div className="player-dots">
+    <div className="sv-dots">
       {Array.from({ length: max }, (_, i) => (
-        <span key={i} className={i < current ? 'dot-on' : 'dot-off'}>●</span>
+        <span key={i} className={`sv-dot${i < current ? ' is-filled' : ''}`} />
       ))}
     </div>
   );
@@ -35,28 +37,29 @@ function SalaCard({
   const btnLabel = yaEstoy ? 'Volver' : llena ? 'Llena' : 'Unirse';
 
   return (
-    <div className={`sala-card${llena && !yaEstoy ? ' sala-card-full' : ''}`}>
-      <div className="sala-card-top">
-        <span className="sala-codigo">{sala.codigo}</span>
-        {sala.tipo === 'ranked' && <span className="sala-ranked-badge">RANKED</span>}
+    <div className={`sv-card${llena && !yaEstoy ? ' sv-card-full' : ''}${sala.tipo === 'ranked' ? ' sv-card-ranked' : ''}`}>
+      <div className="sv-card-top">
+        <span className="sv-codigo">{sala.codigo}</span>
+        {sala.tipo === 'ranked' && <span className="sv-ranked-chip">Ranked</span>}
       </div>
 
-      <div className="sala-card-body">
-        <p className="sala-nombre">{sala.nombre ?? 'Sin nombre'}</p>
-        <p className="sala-modo">{MODO_LABEL[sala.modo] ?? sala.modo}</p>
-        <div className="sala-players-row">
+      <p className="sv-nombre">{sala.nombre ?? 'Sin nombre'}</p>
+      <p className="sv-modo">{MODO_LABEL[sala.modo] ?? sala.modo}</p>
+
+      <div className="sv-card-foot">
+        <div className="sv-players-row">
           <PlayerDots current={count} max={sala.max_jugadores} />
-          <span className="sala-players-text">{count}/{sala.max_jugadores}</span>
+          <span className="sv-players-text">{count}/{sala.max_jugadores}</span>
         </div>
-      </div>
 
-      <button
-        className="sala-join-btn"
-        disabled={(llena && !yaEstoy) || joining}
-        onClick={() => onJoin(sala.id)}
-      >
-        {joining ? '…' : btnLabel}
-      </button>
+        <button
+          className="sv-join-btn"
+          disabled={(llena && !yaEstoy) || joining}
+          onClick={() => onJoin(sala.id)}
+        >
+          {joining ? '…' : btnLabel}
+        </button>
+      </div>
     </div>
   );
 }
@@ -86,31 +89,29 @@ function WaitingRoom({
   const soyCreador = sala.creador_id === userId;
 
   return (
-    <div className="waiting-room">
-      <div className="waiting-header">
-        <div className="waiting-code-wrap">
-          <span className="waiting-code-label">Código de sala</span>
-          <div className="waiting-code-row">
-            <span className="waiting-code">{sala.codigo}</span>
-            <button className="btn-copy" onClick={copyCodigo} title="Copiar código">
-              <CopyIcon />
-              {copied ? 'Copiado' : 'Copiar'}
-            </button>
-          </div>
+    <div className="sv-waiting">
+      <div className="sv-waiting-head">
+        <span className="sv-waiting-label">Código de sala</span>
+        <div className="sv-waiting-code-row">
+          <span className="sv-waiting-code">{sala.codigo}</span>
+          <button className="sv-copy-btn" onClick={copyCodigo} title="Copiar código">
+            <CopyIcon />
+            {copied ? 'Copiado' : 'Copiar'}
+          </button>
         </div>
-        <div className="waiting-meta">
+        <div className="sv-waiting-meta">
           <span>{MODO_LABEL[sala.modo]}</span>
-          <span className="waiting-meta-sep">·</span>
+          <span className="sv-waiting-meta-dot">·</span>
           <span>{sala.max_jugadores} jugadores</span>
+          {sala.nombre && <><span className="sv-waiting-meta-dot">·</span><span>{sala.nombre}</span></>}
         </div>
-        {sala.nombre && <p className="waiting-nombre">{sala.nombre}</p>}
       </div>
 
       {sala.max_jugadores === 4 && (
-        <p className="teams-hint">Parejas: asientos 1 y 3 vs 2 y 4 — toca un asiento libre para moverte</p>
+        <p className="sv-teams-hint">Parejas: asientos 1 y 3 vs 2 y 4 — toca un asiento libre para moverte</p>
       )}
 
-      <div className="slot-grid" style={{ gridTemplateColumns: `repeat(${sala.max_jugadores}, 1fr)` }}>
+      <div className="sv-slot-grid" style={{ gridTemplateColumns: `repeat(${sala.max_jugadores}, 1fr)` }}>
         {slots.map(({ posicion, jugador }) => (
           <SlotCard
             key={posicion}
@@ -124,17 +125,17 @@ function WaitingRoom({
         ))}
       </div>
 
-      <div className="waiting-actions">
+      <div className="sv-waiting-actions">
         {soyCreador && (
           <button
-            className="btn-primary waiting-start-btn"
+            className="sv-start-btn"
             onClick={onIniciar}
             disabled={iniciando || sala.estado !== 'esperando'}
           >
             {iniciando ? 'Iniciando…' : sala.estado === 'en_juego' ? 'Partida en curso' : 'Iniciar partida'}
           </button>
         )}
-        <button className="btn-salir" onClick={onSalir} disabled={saliendo}>
+        <button className="sv-leave-btn" onClick={onSalir} disabled={saliendo}>
           {saliendo ? 'Saliendo…' : 'Salir de la sala'}
         </button>
       </div>
@@ -149,19 +150,19 @@ function SlotCard({ posicion, jugador, esMio, esCreador, equipo, onSentarme }: {
 }) {
   if (!jugador) {
     return (
-      <button type="button" className="slot slot-empty slot-clickable" onClick={onSentarme}>
-        <span className="slot-pos">{posicion}{equipo ? ` · ${equipo}` : ''}</span>
-        <span className="slot-waiting">Sentarme aquí</span>
+      <button type="button" className="sv-slot sv-slot-empty" onClick={onSentarme}>
+        <span className="sv-slot-pos">{posicion}{equipo ? ` · ${equipo}` : ''}</span>
+        <span className="sv-slot-cta">Sentarme aquí</span>
       </button>
     );
   }
 
   return (
-    <div className={`slot slot-filled${esMio ? ' slot-me' : ''}`}>
-      <span className="slot-avatar">{jugador.username[0].toUpperCase()}</span>
-      <span className="slot-username">@{jugador.username}</span>
-      {equipo && <span className="slot-pos">{posicion} · Equipo {equipo}</span>}
-      {esCreador && <span className="slot-host-badge">creador</span>}
+    <div className={`sv-slot sv-slot-filled${esMio ? ' sv-slot-me' : ''}`}>
+      <span className="sv-slot-avatar">{jugador.username[0].toUpperCase()}</span>
+      <span className="sv-slot-username">@{jugador.username}</span>
+      {equipo && <span className="sv-slot-pos">{posicion} · Equipo {equipo}</span>}
+      {esCreador && <span className="sv-slot-host">creador</span>}
     </div>
   );
 }
@@ -185,72 +186,70 @@ function CreateForm({ onCrear, creating }: { onCrear: (b: CreateBody) => void; c
   }
 
   return (
-    <form className="create-form" onSubmit={submit}>
-      <div className="create-form-grid">
-        <div className="field">
-          <span className="field-label">Nombre (opcional)</span>
+    <form className="sv-create-form" onSubmit={submit}>
+      <div className="sv-create-grid">
+        <div className="sv-field">
+          <span className="sv-field-label">Nombre (opcional)</span>
           <input
             type="text" value={nombre} maxLength={60} placeholder="Ej: Partida de amigos"
             onChange={e => setNombre(e.target.value)} disabled={creating}
           />
         </div>
 
-        <div className="create-options">
-          <div className="option-group">
-            <span className="field-label">Modo</span>
-            <div className="toggle-row">
-              {(['clasico','rapido','torneo'] as const).map(m => (
-                <button key={m} type="button"
-                  className={`toggle-btn${modo === m ? ' active' : ''}`}
-                  onClick={() => setModo(m)} disabled={creating}>
-                  {MODO_LABEL[m]}
-                </button>
-              ))}
-            </div>
+        <div className="sv-option-group">
+          <span className="sv-field-label">Modo</span>
+          <div className="sv-toggle-row">
+            {(['clasico','rapido','torneo'] as const).map(m => (
+              <button key={m} type="button"
+                className={`sv-toggle-btn${modo === m ? ' active' : ''}`}
+                onClick={() => setModo(m)} disabled={creating}>
+                {MODO_LABEL[m]}
+              </button>
+            ))}
           </div>
+        </div>
 
-          <div className="option-group">
-            <span className="field-label">Jugadores</span>
-            <div className="toggle-row">
-              {([2, 4] as const).map(n => (
-                <button key={n} type="button"
-                  className={`toggle-btn${max === n ? ' active' : ''}`}
-                  onClick={() => setMax(n)} disabled={creating}>
-                  {n}
-                </button>
-              ))}
-            </div>
+        <div className="sv-option-group">
+          <span className="sv-field-label">Jugadores</span>
+          <div className="sv-toggle-row">
+            {([2, 4] as const).map(n => (
+              <button key={n} type="button"
+                className={`sv-toggle-btn${max === n ? ' active' : ''}`}
+                onClick={() => setMax(n)} disabled={creating}>
+                {n}
+              </button>
+            ))}
           </div>
+        </div>
 
-          <div className="option-group">
-            <span className="field-label">Tipo</span>
-            <div className="toggle-row">
-              {(['casual', 'ranked'] as const).map(t => (
-                <button key={t} type="button"
-                  className={`toggle-btn${tipo === t ? ' active' : ''}`}
-                  onClick={() => setTipo(t)} disabled={creating}>
-                  {t === 'casual' ? 'Casual' : 'Ranked'}
-                </button>
-              ))}
-            </div>
+        <div className="sv-option-group">
+          <span className="sv-field-label">Tipo</span>
+          <div className="sv-toggle-row">
+            {(['casual', 'ranked'] as const).map(t => (
+              <button key={t} type="button"
+                className={`sv-toggle-btn${tipo === t ? ' active' : ''}`}
+                onClick={() => setTipo(t)} disabled={creating}>
+                {t === 'casual' ? 'Casual' : 'Ranked'}
+              </button>
+            ))}
           </div>
+        </div>
 
-          <div className="option-group">
-            <span className="field-label">Partida a</span>
-            <div className="toggle-row">
-              {([100, 150, 200] as const).map(n => (
-                <button key={n} type="button"
-                  className={`toggle-btn${puntos === n ? ' active' : ''}`}
-                  onClick={() => setPuntos(n)} disabled={creating}>
-                  {n}
-                </button>
-              ))}
-            </div>
+        <div className="sv-option-group">
+          <span className="sv-field-label">Partida a</span>
+          <div className="sv-toggle-row">
+            {([100, 150, 200] as const).map(n => (
+              <button key={n} type="button"
+                className={`sv-toggle-btn${puntos === n ? ' active' : ''}`}
+                onClick={() => setPuntos(n)} disabled={creating}>
+                {n}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      <button type="submit" className="btn-primary create-submit-btn" disabled={creating}>
+      <button type="submit" className="sv-create-submit" disabled={creating}>
         {creating ? 'Creando…' : 'Crear sala'}
       </button>
     </form>
@@ -258,7 +257,7 @@ function CreateForm({ onCrear, creating }: { onCrear: (b: CreateBody) => void; c
 }
 
 // ── Main view ─────────────────────────────────────
-export default function SalasView({ user, onBack, onGameStart }: Props) {
+export default function SalasView({ user, dark, onBack, onGameStart }: Props) {
   const [salas,       setSalas]       = useState<Sala[]>([]);
   const [loading,     setLoading]     = useState(true);
   const [refreshing,  setRefreshing]  = useState(false);
@@ -401,13 +400,17 @@ export default function SalasView({ user, onBack, onGameStart }: Props) {
   // ── Si estoy en una sala, mostrar sala de espera ──
   if (sala) {
     return (
-      <div className="salas-page">
-        <nav className="salas-nav">
-          <button className="btn-back" onClick={() => setSala(null)}>
-            <BackIcon /> Lista de salas
+      <div className={`dash sv-shell${dark ? "" : " is-light"}`}>
+        <nav className="social-nav">
+          <button className="dash-icon-btn" onClick={() => setSala(null)} aria-label="Volver a la lista">
+            <BackIcon />
           </button>
+          <div className="social-nav-title">
+            <h1>Sala de espera</h1>
+            <p>Esperando a que se complete el equipo</p>
+          </div>
         </nav>
-        <div className="salas-content">
+        <div className="social-body sv-body">
           <WaitingRoom
             sala={sala}
             userId={user.id}
@@ -424,71 +427,74 @@ export default function SalasView({ user, onBack, onGameStart }: Props) {
 
   // ── Lista de salas ────────────────────────────────
   return (
-    <div className="salas-page">
-      <nav className="salas-nav">
-        <button className="btn-back" onClick={onBack}>
-          <BackIcon /> Lobby
+    <div className={`dash sv-shell${dark ? "" : " is-light"}`}>
+      <nav className="social-nav">
+        <button className="dash-icon-btn" onClick={onBack} aria-label="Volver al lobby">
+          <BackIcon />
         </button>
-        <h2 className="salas-nav-title">Salas Abiertas</h2>
-        <button
-          className="btn-icon-round"
-          onClick={() => loadSalas(true)}
-          disabled={refreshing}
-          title="Actualizar"
-        >
-          <RefreshIcon spinning={refreshing} />
-        </button>
+        <div className="social-nav-title">
+          <h1>Salas abiertas</h1>
+          <p>{loading ? 'Cargando…' : `${salas.length} sala${salas.length === 1 ? '' : 's'} disponible${salas.length === 1 ? '' : 's'}`}</p>
+        </div>
+        <div className="social-nav-right">
+          <button
+            className="dash-icon-btn"
+            onClick={() => loadSalas(true)}
+            disabled={refreshing}
+            aria-label="Actualizar"
+            title="Actualizar"
+          >
+            <RefreshIcon spinning={refreshing} />
+          </button>
+        </div>
       </nav>
 
-      <div className="salas-content">
+      <div className="social-body sv-body">
         {/* Toolbar */}
-        <div className="salas-toolbar">
+        <div className="sv-toolbar">
           <button
-            className={`btn-create-sala${showCreate ? ' active' : ''}`}
+            className={`sv-create-toggle${showCreate ? ' active' : ''}`}
             onClick={() => setShowCreate(s => !s)}
           >
             {showCreate ? '✕ Cancelar' : '+ Crear sala'}
           </button>
 
-          <form className="search-code-form" onSubmit={handleSearchCode}>
+          <form className="sv-search-form" onSubmit={handleSearchCode}>
+            <span className="sv-search-icon"><SearchIcon /></span>
             <input
               type="text"
-              className="search-code-input"
               placeholder="Código de sala (2M-XXXX)"
               value={searchCode}
               onChange={e => { setSearchCode(e.target.value.toUpperCase()); setSearchErr(null); }}
               maxLength={8}
               disabled={searching}
             />
-            <button type="submit" className="search-code-btn" disabled={searching || !searchCode.trim()}>
+            <button type="submit" disabled={searching || !searchCode.trim()}>
               {searching ? '…' : 'Buscar'}
             </button>
           </form>
         </div>
 
-        {searchErr && <div className="api-error" style={{ marginBottom: 12 }}>⚠ {searchErr}</div>}
+        {searchErr && <div className="social-error">⚠ {searchErr}</div>}
 
         {/* Create form */}
         {showCreate && (
           <CreateForm onCrear={handleCrear} creating={creating} />
         )}
 
-        {error && <div className="api-error" style={{ marginBottom: 12 }}>⚠ {error}</div>}
+        {error && <div className="social-error">⚠ {error}</div>}
 
         {/* Lista */}
         {loading ? (
-          <div className="salas-loading">
-            <div className="boot-spinner" />
-            <p>Cargando salas…</p>
-          </div>
+          <div className="social-loading"><div className="boot-spinner" /><p>Cargando salas…</p></div>
         ) : salas.length === 0 ? (
-          <div className="salas-empty">
-            <p className="salas-empty-icon">🁣</p>
-            <p className="salas-empty-msg">No hay salas abiertas en este momento</p>
-            <p className="salas-empty-sub">¡Crea una y espera a que se unan!</p>
+          <div className="social-empty">
+            <Bone a={4} b={1} className="sv-empty-tile" />
+            <p className="social-empty-msg">No hay salas abiertas en este momento</p>
+            <p className="social-empty-sub">¡Crea una y espera a que se unan!</p>
           </div>
         ) : (
-          <div className="salas-grid">
+          <div className="sv-grid">
             {salas.map(s => (
               <SalaCard
                 key={s.id}

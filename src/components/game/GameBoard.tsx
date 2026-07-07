@@ -4,34 +4,21 @@ import SnakeBoard from './SnakeBoard';
 import { puedeJugar, getExtremos } from '../../game/local-rules';
 import { api } from '../../api';
 import type { PartidaPublica, Pieza, Sala, AuthUser } from '../../api';
-import { BackIcon } from '../icons';
+import { BackIcon, PersonAddIcon } from '../icons';
+import { useMeasuredWidth } from '../../hooks/useMeasuredWidth';
+import ChatPanel from '../social/ChatPanel';
 
-type Props = { sala: Sala; user: AuthUser; onExit: () => void };
+type Props = {
+  sala: Sala;
+  user: AuthUser;
+  onExit: () => void;
+  /** Acciones sociales post-partida (§6/§7 de docs/CASOS_DE_USO_SOCIAL.md) — opcionales, stubs. */
+  onRevancha?: () => void;
+  onInvitarCompanero?: (usuarioId: string) => void;
+  onAgregarAmigo?: (usuarioId: string, username: string) => void;
+};
 
-/**
- * Mide el ancho de un contenedor con ResizeObserver.
- * Usa callback ref: funciona aunque el nodo se monte tarde
- * (p. ej. tras el guard de carga) o se desmonte.
- */
-function useMeasuredWidth(): [number, (el: HTMLElement | null) => void] {
-  const [width, setWidth] = useState(0);
-  const roRef = useRef<ResizeObserver | null>(null);
-
-  const refCb = useCallback((el: HTMLElement | null) => {
-    roRef.current?.disconnect();
-    roRef.current = null;
-    if (!el) return;
-    const ro = new ResizeObserver(entries =>
-      setWidth(entries[0].contentRect.width));
-    ro.observe(el);
-    setWidth(el.getBoundingClientRect().width);
-    roRef.current = ro;
-  }, []);
-
-  return [width, refCb];
-}
-
-export default function GameBoard({ sala, user, onExit }: Props) {
+export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCompanero, onAgregarAmigo }: Props) {
   const [partida,       setPartida]       = useState<PartidaPublica | null>(null);
   const [cargando,      setCargando]      = useState(true);
   const [error,         setError]         = useState<string | null>(null);
@@ -407,7 +394,13 @@ export default function GameBoard({ sala, user, onExit }: Props) {
 
       {/* ── Fin de partida ───────────────────────── */}
       {partida.fase === 'fin_partida' && (
-        <FinPartidaOverlay partida={partida} onExit={onExit} />
+        <FinPartidaOverlay
+          partida={partida}
+          onExit={onExit}
+          onRevancha={onRevancha}
+          onInvitarCompanero={onInvitarCompanero}
+          onAgregarAmigo={onAgregarAmigo}
+        />
       )}
 
       {/* ── Confirmar abandono (ranked) ──────────── */}
@@ -427,6 +420,8 @@ export default function GameBoard({ sala, user, onExit }: Props) {
           </div>
         </div>
       )}
+
+      <ChatPanel salaId={sala.id} miUsuarioId={user.id} miUsername={user.username} />
     </div>
   );
 }
@@ -539,9 +534,12 @@ function ManoOverlay({ partida, nombreAsiento, onListo, confirmando }: {
   );
 }
 
-function FinPartidaOverlay({ partida, onExit }: {
+function FinPartidaOverlay({ partida, onExit, onRevancha, onInvitarCompanero, onAgregarAmigo }: {
   partida: PartidaPublica;
   onExit: () => void;
+  onRevancha?: () => void;
+  onInvitarCompanero?: (usuarioId: string) => void;
+  onAgregarAmigo?: (usuarioId: string, username: string) => void;
 }) {
   const miEq = partida.miEquipo ?? 0;
   const gane = partida.equipoGanadorPartida === miEq;
@@ -557,13 +555,81 @@ function FinPartidaOverlay({ partida, onExit }: {
                 : gane ? '¡Alcanzaron el objetivo!'
                 : 'El rival alcanzó el objetivo';
 
+  // Rivales (equipo contrario) y compañero (mismo equipo, si 2v2), para las
+  // acciones sociales de abajo. Ver docs/CASOS_DE_USO_SOCIAL.md §6/§7.
+  const companero = partida.maxJugadores === 4
+    ? partida.asientos.find((_, seat) => seat !== partida.miSeat && seat % 2 === miEq)
+    : undefined;
+  const rivales = partida.asientos.filter((_, seat) => seat % 2 !== miEq);
+
   return (
     <div className="game-result-overlay">
       <div className="game-result-card">
         <h2>{titulo}</h2>
         <MarcadorResumen partida={partida} />
         <p className="result-detail">{detalle}</p>
+
+        {!abandono && (
+          <PostGameActions
+            rivales={rivales}
+            companero={companero}
+            onRevancha={onRevancha}
+            onInvitarCompanero={onInvitarCompanero}
+            onAgregarAmigo={onAgregarAmigo}
+          />
+        )}
+
         <button className="btn-primary" onClick={onExit}>Volver a la sala</button>
+      </div>
+    </div>
+  );
+}
+
+// ── Acciones sociales post-partida (revancha, agregar amigo, compañero) ──
+function PostGameActions({ rivales, companero, onRevancha, onInvitarCompanero, onAgregarAmigo }: {
+  rivales: { usuario_id: string; username: string }[];
+  companero?: { usuario_id: string; username: string };
+  onRevancha?: () => void;
+  onInvitarCompanero?: (usuarioId: string) => void;
+  onAgregarAmigo?: (usuarioId: string, username: string) => void;
+}) {
+  const [agregados, setAgregados] = useState<Set<string>>(new Set());
+
+  function handleAgregar(usuarioId: string, username: string) {
+    onAgregarAmigo?.(usuarioId, username);
+    setAgregados(prev => new Set(prev).add(usuarioId));
+  }
+
+  if (!onRevancha && !onInvitarCompanero && !onAgregarAmigo) return null;
+
+  return (
+    <div className="post-game-actions">
+      {rivales.length > 0 && onAgregarAmigo && (
+        <div className="post-game-friends">
+          {rivales.map(r => (
+            <button
+              key={r.usuario_id}
+              className="post-game-btn post-game-btn-ghost"
+              disabled={agregados.has(r.usuario_id)}
+              onClick={() => handleAgregar(r.usuario_id, r.username)}
+            >
+              <PersonAddIcon /> {agregados.has(r.usuario_id) ? `Solicitud enviada a @${r.username}` : `Agregar a @${r.username}`}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="post-game-row">
+        {onRevancha && (
+          <button className="post-game-btn post-game-btn-teal" onClick={onRevancha}>
+            Jugar de nuevo
+          </button>
+        )}
+        {companero && onInvitarCompanero && (
+          <button className="post-game-btn post-game-btn-amber" onClick={() => onInvitarCompanero(companero.usuario_id)}>
+            Invitar a @{companero.username} de nuevo
+          </button>
+        )}
       </div>
     </div>
   );
