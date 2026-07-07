@@ -347,4 +347,79 @@ export async function usuariosRoutes(app: FastifyInstance) {
       return reply.send({ message: 'Contraseña actualizada correctamente' });
     },
   );
+
+  // ── POST /usuarios/oauth-google ─────────────────
+  // El gateway ya verificó el ID token de Google antes de llamar acá — este
+  // endpoint solo hace find-or-create por email. Si es un usuario nuevo, se
+  // genera un username único a partir del sugerido y una contraseña aleatoria
+  // (password_hash es NOT NULL pero esta cuenta nunca la usa para loguearse;
+  // sigue sirviendo el flujo de "olvidé mi contraseña" si alguna vez la quiere).
+  app.post<{ Body: { email: string; nombreSugerido: string } }>(
+    '/usuarios/oauth-google',
+    {
+      schema: {
+        tags:        ['usuarios'],
+        summary:     'Find-or-create para login con Google',
+        description: 'Busca un usuario por email; si no existe, lo crea con un username derivado del nombre de Google.',
+        body: {
+          type: 'object',
+          required: ['email', 'nombreSugerido'],
+          properties: {
+            email:          { type: 'string', format: 'email' },
+            nombreSugerido: { type: 'string' },
+          },
+        },
+        response: {
+          200: { description: 'Usuario existente', ...UserSchema },
+          201: { description: 'Usuario creado',     ...UserSchema },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { email, nombreSugerido } = req.body;
+
+      const { rows: existentes } = await pool.query(
+        `SELECT u.*, s.nombre as segmento, s.config as segmento_config
+         FROM usuarios u
+         LEFT JOIN segmentos s ON s.id = u.segmento_id
+         WHERE u.email = $1`,
+        [email],
+      );
+      if (existentes.length) {
+        const { password_hash, ...safeUser } = existentes[0];
+        return reply.send(safeUser);
+      }
+
+      const { rows: segRows } = await pool.query(
+        `SELECT id FROM segmentos WHERE nombre = 'tester' AND activo = true`,
+      );
+      const segmentoId = segRows[0].id;
+
+      const base = nombreSugerido
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')  // saca acentos
+        .replace(/[^a-zA-Z0-9]/g, '')
+        .slice(0, 16) || 'jugador';
+      const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), ROUNDS);
+
+      // Prueba el nombre base y, si está tomado, le agrega un sufijo numérico
+      // hasta encontrar uno libre (usuarios concurrentes podrían chocar igual,
+      // por eso el catch de 23505 más abajo como red de seguridad final).
+      for (let intento = 0; intento < 20; intento++) {
+        const username = intento === 0 ? base : `${base}${Math.floor(Math.random() * 10000)}`.slice(0, 20);
+        try {
+          const { rows } = await pool.query(
+            `INSERT INTO usuarios (username, email, password_hash, segmento_id)
+             VALUES ($1, $2, $3, $4)
+             RETURNING id, username, email, segmento_id, avatar, created_at`,
+            [username, email, passwordHash, segmentoId],
+          );
+          return reply.code(201).send({ ...rows[0], segmento: 'tester' });
+        } catch (err: any) {
+          if (err.code === '23505' && err.detail?.includes('username')) continue;
+          throw err;
+        }
+      }
+      return reply.code(500).send({ error: 'No se pudo generar un username único' });
+    },
+  );
 }

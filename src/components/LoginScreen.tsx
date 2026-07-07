@@ -1,8 +1,25 @@
-import { useState, FormEvent } from 'react';
+import { useEffect, useRef, useState, FormEvent } from 'react';
 import type { View } from '../App';
 import { api, tokenStore, type AuthUser, type UserConfig } from '../api';
-import { GoogleIcon, SunIcon, MoonIcon } from './icons';
+import { SunIcon, MoonIcon } from './icons';
 import { Bone, DominoStage } from './DominoStage';
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+// Tipado mínimo de Google Identity Services (google.accounts.id) — la
+// librería se carga como script global en index.html, no vía npm.
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: { client_id: string; callback: (r: { credential: string }) => void }) => void;
+          renderButton: (parent: HTMLElement, options: Record<string, unknown>) => void;
+        };
+      };
+    };
+  }
+}
 
 type Props = {
   onSwitch: (v: View) => void;
@@ -53,6 +70,52 @@ export default function LoginScreen({ onSwitch, onSuccess, dark, onToggleTheme }
       setLoading(false);
     }
   }
+
+  async function handleGoogleCredential(credential: string) {
+    setApiError(null);
+    setLoading(true);
+    try {
+      const authRes = await api.loginGoogle(credential);
+      tokenStore.set(authRes.token, true);
+      const config = await api.getPreferencias();
+      onSuccess(authRes.user, config);
+    } catch (err: unknown) {
+      setApiError(err instanceof Error ? err.message : 'Error al iniciar sesión con Google');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const googleBtnRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const clientId = GOOGLE_CLIENT_ID;
+    if (!clientId) return;
+
+    let cancelado = false;
+    // El script de Google se carga async/defer en index.html — puede no
+    // estar listo todavía cuando este componente monta.
+    function intentar() {
+      if (cancelado) return;
+      if (!window.google || !googleBtnRef.current) {
+        setTimeout(intentar, 100);
+        return;
+      }
+      window.google!.accounts.id.initialize({
+        client_id: clientId!,
+        callback: (r) => handleGoogleCredential(r.credential),
+      });
+      window.google.accounts.id.renderButton(googleBtnRef.current, {
+        type: 'standard',
+        theme: dark ? 'filled_black' : 'outline',
+        size: 'large',
+        shape: 'pill',
+        text: 'continue_with',
+        width: 340,
+      });
+    }
+    intentar();
+    return () => { cancelado = true; };
+  }, [dark]);
 
   return (
     <div className={`login-screen${dark ? '' : ' is-light'}`}>
@@ -138,9 +201,13 @@ export default function LoginScreen({ onSwitch, onSuccess, dark, onToggleTheme }
 
           <div className="lg-divider"><span>o</span></div>
 
-          <button type="button" className="lg-google" disabled title="Próximamente">
-            <GoogleIcon /> Continuar con Google
-          </button>
+          {GOOGLE_CLIENT_ID ? (
+            <div className="lg-google-btn" ref={googleBtnRef} />
+          ) : (
+            <button type="button" className="lg-google" disabled title="Próximamente">
+              Continuar con Google
+            </button>
+          )}
 
           <p className="lg-foot">
             ¿No tienes cuenta?{' '}

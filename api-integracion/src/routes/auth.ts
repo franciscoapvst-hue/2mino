@@ -1,6 +1,10 @@
 import { FastifyInstance } from 'fastify';
+import { OAuth2Client } from 'google-auth-library';
 import { callMs } from '../http';
 import { signToken, verifyToken } from '../jwt';
+
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
 
 // ── Schemas reutilizables ─────────────────────────
 const UserSchema = {
@@ -159,6 +163,60 @@ export async function authRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const { status, data } = await callMs('/usuarios/reset-password', 'POST', req.body);
       return reply.code(status).send(data);
+    },
+  );
+
+  // ── POST /auth/google ───────────────────────────
+  app.post<{ Body: { credential: string } }>(
+    '/auth/google',
+    {
+      schema: {
+        tags:        ['auth'],
+        summary:     'Iniciar sesión con Google',
+        description: 'Verifica el ID token de Google Identity Services y devuelve un JWT propio (crea la cuenta si es la primera vez).',
+        body: {
+          type: 'object',
+          required: ['credential'],
+          properties: {
+            credential: { type: 'string', description: 'ID token devuelto por Google Identity Services' },
+          },
+        },
+        response: {
+          200: { description: 'Login exitoso',   ...TokenUserSchema },
+          201: { description: 'Cuenta creada y login exitoso', ...TokenUserSchema },
+          401: { description: 'Token de Google inválido', ...ErrorSchema },
+          503: { description: 'Login con Google no configurado', ...ErrorSchema },
+        },
+      },
+    },
+    async (req, reply) => {
+      if (!googleClient || !GOOGLE_CLIENT_ID) {
+        return reply.code(503).send({ error: 'Login con Google no está configurado' });
+      }
+
+      let payload;
+      try {
+        const ticket = await googleClient.verifyIdToken({
+          idToken: req.body.credential,
+          audience: GOOGLE_CLIENT_ID,
+        });
+        payload = ticket.getPayload();
+      } catch {
+        return reply.code(401).send({ error: 'Token de Google inválido' });
+      }
+      if (!payload?.email || !payload.email_verified) {
+        return reply.code(401).send({ error: 'Token de Google inválido' });
+      }
+
+      const { status, data } = await callMs('/usuarios/oauth-google', 'POST', {
+        email: payload.email,
+        nombreSugerido: payload.name ?? payload.email.split('@')[0],
+      });
+      if (status !== 200 && status !== 201) return reply.code(status).send(data);
+
+      const user = data as { id: string; username: string };
+      const token = signToken(user);
+      return reply.code(status).send({ token, user });
     },
   );
 

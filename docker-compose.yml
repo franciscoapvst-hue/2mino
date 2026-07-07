@@ -66,13 +66,17 @@ services:
       MS_SALAS_URL:             http://ms-salas:6001
       JWT_SECRET:       ${JWT_SECRET}
       CORS_ORIGIN:      ${CORS_ORIGIN:-*}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     depends_on:
       - ms-usuarios
     # Sin puerto externo: el frontend lo alcanza vía la red Docker (proxy /api de nginx)
 
   # ── Frontend (build estático servido por nginx) ──
   frontend:
-    build: .
+    build:
+      context: .
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     restart: unless-stopped
     depends_on:
       - api-integracion
