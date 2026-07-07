@@ -188,7 +188,10 @@ export default function SnakeBoard({
           onDragOver={onDragOverIzq}
           onDrop={e => { e.preventDefault(); onPlayIzq(); }}
           onDragLeave={onDragLeave}
-        >◀</div>
+          aria-label="Jugar por la izquierda"
+        >
+          <span className="ghost-slot" aria-hidden="true" />
+        </div>
       )}
 
       {showZones && canDer && (
@@ -199,7 +202,10 @@ export default function SnakeBoard({
           onDragOver={onDragOverDer}
           onDrop={e => { e.preventDefault(); onPlayDer(); }}
           onDragLeave={onDragLeave}
-        >▶</div>
+          aria-label="Jugar por la derecha"
+        >
+          <span className="ghost-slot" aria-hidden="true" />
+        </div>
       )}
     </div>
   );
