@@ -231,11 +231,14 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
   const puedoPasar = esMiTurno && ext !== null &&
     !partida.miMano.some(p => { const o = puedeJugar(p, ext); return o.izq || o.der; });
 
-  // Zonas de juego: visibles cuando arrastro O tengo ficha seleccionada
-  const selOps = selectedPiece && ext ? puedeJugar(selectedPiece, ext) : null;
-  const showZones = esMiTurno && (arrastrando !== null || selectedPiece !== null);
-  const canIzq = showZones && (arrastrando !== null ? true : (selOps?.izq ?? false));
-  const canDer = showZones && (arrastrando !== null ? true : (selOps?.der ?? false));
+  // Zonas de juego: la ficha activa (arrastrando o tocada) se previsualiza
+  // en las puntas donde REALMENTE se puede jugar — si vale en ambas,
+  // aparece en ambas; si solo en una, solo ahí (nunca "las dos porque sí").
+  const piezaActiva = arrastrando ?? selectedPiece;
+  const opsActiva = piezaActiva && ext ? puedeJugar(piezaActiva, ext) : null;
+  const showZones = esMiTurno && piezaActiva !== null && ext !== null;
+  const canIzq = showZones && (opsActiva?.izq ?? false);
+  const canDer = showZones && (opsActiva?.der ?? false);
 
   // Escala de piezas en la mano: ajusta para que quepan todas en el ancho disponible
   const HAND_VW = 54, HAND_VH = 100, HAND_GAP = 6;
@@ -330,7 +333,7 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
               tablero={partida.tablero}
               containerWidth={boardWidth}
               nuevaFichaIdx={nuevaFichaIdx}
-              showZones={showZones}
+              piezaFantasma={piezaActiva}
               canIzq={canIzq}
               canDer={canDer}
               sobreIzq={sobreZona === 'izq'}

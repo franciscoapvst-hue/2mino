@@ -10,7 +10,7 @@
  * - El cuadrado lo da CSS (aspect-ratio: 1 en board-center); el centrado
  *   vertical lo hace flexbox (align-items: center en board-center).
  */
-import type { Val, FichaTablero } from '../../api';
+import type { Val, Pieza, FichaTablero } from '../../api';
 import DominoPiece from './DominoPiece';
 
 const HW0 = 100, HH0 = 54;
@@ -126,14 +126,17 @@ function computeLayout(
   const contentMinX = Math.min(...pieces.map(p => p.x));
   const contentMaxX = Math.max(...pieces.map(p => p.x + p.w));
 
-  return { pieces, boardW, boardH, VW, HH, contentMinX, contentMaxX };
+  return { pieces, boardW, boardH, VW, VH, HW, HH, contentMinX, contentMaxX };
 }
 
 export type SnakeBoardProps = {
   tablero:        FichaTablero[];
   containerWidth: number;
   nuevaFichaIdx:  number | null;
-  showZones:      boolean;
+  /** Ficha activa (arrastrando o tocada) — se previsualiza en las puntas
+   *  donde de verdad se puede jugar (canIzq/canDer ya vienen evaluados
+   *  contra las reglas reales, no "siempre ambos lados" al arrastrar). */
+  piezaFantasma:  Pieza | null;
   canIzq:         boolean;
   canDer:         boolean;
   sobreIzq:       boolean;
@@ -145,25 +148,47 @@ export type SnakeBoardProps = {
   onDragLeave:    () => void;
 };
 
+/** Orienta la ficha fantasma para el lado dado: la cara que coincide con
+ *  el extremo del tablero queda pegada a él (como quedaría si se juega),
+ *  la otra cara (el nuevo extremo que se abriría) queda hacia afuera. Los
+ *  dobles siempre van atravesados (igual que en el tablero real). */
+function orientarFantasma(pieza: Pieza, valorExtremo: Val, lado: 'izq' | 'der') {
+  if (pieza.a === pieza.b) return { a: pieza.a, b: pieza.b, orient: 'v' as const };
+  const otro = pieza.a === valorExtremo ? pieza.b : pieza.a;
+  return lado === 'izq'
+    ? { a: otro, b: valorExtremo, orient: 'h' as const }
+    : { a: valorExtremo, b: otro, orient: 'h' as const };
+}
+
 export default function SnakeBoard({
-  tablero, containerWidth, nuevaFichaIdx,
-  showZones, canIzq, canDer, sobreIzq, sobreDer,
+  tablero, containerWidth, nuevaFichaIdx, piezaFantasma,
+  canIzq, canDer, sobreIzq, sobreDer,
   onPlayIzq, onPlayDer,
   onDragOverIzq, onDragOverDer, onDragLeave,
 }: SnakeBoardProps) {
   if (!tablero.length || containerWidth <= 0) return null;
 
-  const { pieces, boardW, boardH, VW, HH, contentMinX, contentMaxX } =
+  const { pieces, boardW, boardH, VW, HW, VH, HH, contentMinX, contentMaxX } =
     computeLayout(tablero, containerWidth, nuevaFichaIdx);
 
-  const ZW = Math.max(38, Math.min(VW, 52));
-  const ZH = Math.max(HH, 44);
-  const ZY = Math.max(0, (boardH - ZH) / 2);
+  const izqVal = tablero[0].izqVal;
+  const derVal = tablero[tablero.length - 1].derVal;
+  const fantasmaIzq = piezaFantasma && canIzq ? orientarFantasma(piezaFantasma, izqVal, 'izq') : null;
+  const fantasmaDer = piezaFantasma && canDer ? orientarFantasma(piezaFantasma, derVal, 'der') : null;
+
+  // Tamaño real de la ficha fantasma según su orientación (doble = vertical
+  // atravesado, normal = horizontal), igual que cualquier ficha del tablero.
+  const ZWi = fantasmaIzq?.orient === 'v' ? VW : HW;
+  const ZHi = fantasmaIzq?.orient === 'v' ? VH : HH;
+  const ZWd = fantasmaDer?.orient === 'v' ? VW : HW;
+  const ZHd = fantasmaDer?.orient === 'v' ? VH : HH;
+  const ZYi = Math.max(0, (boardH - ZHi) / 2);
+  const ZYd = Math.max(0, (boardH - ZHd) / 2);
 
   // Junto al contenido, pero nunca fuera del tablero (board-center
   // recorta con overflow:hidden): si no hay hueco, se superponen al borde.
-  const izqX = Math.max(0, Math.min(contentMinX - ZW - 4, boardW - ZW));
-  const derX = Math.min(contentMaxX + 4, boardW - ZW);
+  const izqX = Math.max(0, Math.min(contentMinX - ZWi - 4, boardW - ZWi));
+  const derX = Math.min(contentMaxX + 4, boardW - ZWd);
 
   return (
     <div
@@ -180,31 +205,31 @@ export default function SnakeBoard({
         />
       ))}
 
-      {showZones && canIzq && (
+      {fantasmaIzq && (
         <div
           className={`snake-drop-zone${sobreIzq ? ' dz-sobre' : ''}`}
-          style={{ position: 'absolute', left: izqX, top: ZY, width: ZW, height: ZH }}
+          style={{ position: 'absolute', left: izqX, top: ZYi, width: ZWi, height: ZHi }}
           onClick={onPlayIzq}
           onDragOver={onDragOverIzq}
           onDrop={e => { e.preventDefault(); onPlayIzq(); }}
           onDragLeave={onDragLeave}
           aria-label="Jugar por la izquierda"
         >
-          <span className="ghost-slot" aria-hidden="true" />
+          <DominoPiece a={fantasmaIzq.a} b={fantasmaIzq.b} orient={fantasmaIzq.orient} ghost style={{ width: '100%', height: '100%' }} />
         </div>
       )}
 
-      {showZones && canDer && (
+      {fantasmaDer && (
         <div
           className={`snake-drop-zone${sobreDer ? ' dz-sobre' : ''}`}
-          style={{ position: 'absolute', left: derX, top: ZY, width: ZW, height: ZH }}
+          style={{ position: 'absolute', left: derX, top: ZYd, width: ZWd, height: ZHd }}
           onClick={onPlayDer}
           onDragOver={onDragOverDer}
           onDrop={e => { e.preventDefault(); onPlayDer(); }}
           onDragLeave={onDragLeave}
           aria-label="Jugar por la derecha"
         >
-          <span className="ghost-slot" aria-hidden="true" />
+          <DominoPiece a={fantasmaDer.a} b={fantasmaDer.b} orient={fantasmaDer.orient} ghost style={{ width: '100%', height: '100%' }} />
         </div>
       )}
     </div>

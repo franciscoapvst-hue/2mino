@@ -54,6 +54,10 @@ export type DominoPieceProps = {
   disabled?:   boolean;
   placing?:    boolean;
   draggable?:  boolean;
+  /** Preview semitransparente de dónde quedaría la ficha si se juega ahí
+   *  (zonas de drop del tablero) — no es clickeable/arrastrable en sí, el
+   *  contenedor que la envuelve maneja click/drop. */
+  ghost?:      boolean;
   onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
   onDragEnd?:  () => void;
   onClick?:    () => void;
@@ -70,6 +74,7 @@ export default function DominoPiece({
   disabled  = false,
   placing   = false,
   draggable = false,
+  ghost     = false,
   onDragStart,
   onDragEnd,
   onClick,
@@ -86,17 +91,22 @@ export default function DominoPiece({
   const bx = isV ? PAD : PAD + F + DIV;
   const by = isV ? PAD + F + DIV : PAD;
 
-  // Borde: sutil en normal, verde en jugable, violeta en seleccionado
-  const stroke  = selected ? '#7c3aed'
+  // Borde: sutil en normal, verde en jugable, violeta en seleccionado,
+  // ámbar punteado en preview (ghost, en las zonas de drop del tablero)
+  const stroke  = ghost    ? 'var(--amber, #ef9f2e)'
+                : selected ? '#7c3aed'
                 : playable ? '#16a34a'
                 : disabled ? '#d1d5db'
                 :            '#6b7280'; // gris medio — tile blanco ya destaca solo
-  const strokeW = selected ? 2.5 : 1.5;
+  const strokeW = ghost ? 2 : selected ? 2.5 : 1.5;
 
-  // Fondo SIEMPRE blanco para la cara (como un dominó real)
+  // Fondo SIEMPRE blanco sólido (como un dominó real) — el ghost se atenúa
+  // entero vía opacity del wrapper (.dp-ghost), no mezclando alpha acá:
+  // si no, blanco-semitransparente sobre el fondo oscuro de la mesa se ve
+  // gris sucio en vez de "la ficha real, más tenue".
   const fillFace = faceDown  ? '#1e1b4b'  // dorso oscuro
                  : disabled  ? '#f3f4f6'  // blanco apagado
-                 :             '#ffffff';  // blanco puro
+                 :             '#ffffff';  // blanco puro (ghost incluido)
 
   const [dX1, dY1, dX2, dY2] = isV
     ? [PAD, PAD + F, PAD + F, PAD + F]
@@ -109,6 +119,7 @@ export default function DominoPiece({
     playable  && 'dp-playable',
     disabled  && 'dp-disabled',
     placing   && 'dp-placing',
+    ghost     && 'dp-ghost',
     clickable && 'dp-clickable',
     draggable && 'dp-draggable',
     className,
@@ -137,7 +148,8 @@ export default function DominoPiece({
         fill={fillFace}
         stroke={stroke}
         strokeWidth={strokeW}
-        filter={!faceDown ? `url(#sh-${uid})` : undefined}
+        strokeDasharray={ghost ? '5 4' : undefined}
+        filter={!faceDown && !ghost ? `url(#sh-${uid})` : undefined}
       />
 
       {faceDown ? (

@@ -100,7 +100,7 @@ export default function ReplayViewer({ dark, salaId, onBack }: Props) {
                   tablero={tablero}
                   containerWidth={boardWidth}
                   nuevaFichaIdx={null}
-                  showZones={false}
+                  piezaFantasma={null}
                   canIzq={false}
                   canDer={false}
                   sobreIzq={false}

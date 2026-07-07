@@ -136,34 +136,30 @@
 }
 
 /* Zonas de drop DENTRO del tablero (a cada punta de la serpiente) — antes
-   mostraban ◀ ▶, ahora una silueta de ficha (el hueco donde va la
-   próxima). El div .snake-drop-zone es solo el área clickeable/soltable
-   (sin estilo propio, más grande que la silueta para que sea fácil de
-   acertar); .ghost-slot es la silueta que se ve. */
+   mostraban ◀ ▶, ahora la ficha real semitransparente (preview de dónde
+   quedaría si se juega ahí). El div .snake-drop-zone es solo el área
+   clickeable/soltable (sin estilo propio); el DominoPiece con ghost=true
+   que tiene adentro es lo que se ve. */
 .snake-drop-zone {
   border: none !important;
   background: transparent !important;
   color: transparent !important;
 }
-.ghost-slot {
-  width: 80%;
-  height: 80%;
-  border-radius: 7px;
-  border: 2px dashed color-mix(in srgb, var(--amber) 55%, transparent);
-  background: color-mix(in srgb, var(--amber) 8%, transparent);
+.dp.dp-ghost {
+  opacity: 0.5;
+  pointer-events: none;
   animation: ghostPulse 1.6s ease-in-out infinite;
-  transition: border-color .15s ease, background .15s ease, transform .15s ease, box-shadow .15s ease;
+  transition: opacity .15s ease, transform .15s ease;
 }
-.snake-drop-zone.dz-sobre .ghost-slot {
+.snake-drop-zone.dz-sobre .dp.dp-ghost {
+  opacity: 0.9;
   animation: none;
-  border-color: var(--teal);
-  background: color-mix(in srgb, var(--teal) 18%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--teal) 20%, transparent);
-  transform: scale(1.1);
+  transform: scale(1.06);
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--teal) 70%, transparent));
 }
 @keyframes ghostPulse {
-  0%, 100% { opacity: 0.7; }
-  50%      { opacity: 1; }
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 0.65; }
 }
 
 /* ── Mano del jugador ────────────────────────────── */
