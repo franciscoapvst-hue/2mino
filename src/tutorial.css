@@ -1,0 +1,201 @@
+/* ═══════════════════════════════════════════════════════
+   Tutorial interactivo — reusa game.css (fieltro/ámbar/teal)
+   sobre la estructura real de GameBoard. Solo agrega el
+   resaltado ("coachmark") y el panel guía docked abajo.
+   ═══════════════════════════════════════════════════════ */
+
+/* El GameBoard real deja que .game-table (CSS grid, fila "center" a 1fr)
+   ocupe todo el alto disponible — tiene sentido ahí porque el tablero
+   real necesita espacio dinámico (ResizeObserver). Acá la mesa es falsa
+   y fija: ese mismo alto solo empuja mi mano justo detrás del panel guía
+   fijo de abajo. Se compacta el alto de la mesa falsa para que la mano
+   quede siempre visible por encima del panel, sin importar el viewport. */
+.tut-shell { padding-bottom: 240px; }
+.tut-shell .my-hand-zone { padding: 12px 16px 16px; gap: 8px; margin-bottom: 16px; }
+.tut-shell .game-table {
+  flex: none !important;
+  grid-template-rows: auto auto !important;
+  align-content: start !important;
+  align-items: start !important;
+  gap: 8px !important;
+  padding: 14px 20px !important;
+}
+/* .board-center real usa aspect-ratio:1/1 con una fórmula en dvh pensada
+   para el tablero de verdad (ver styles.css ~L1870) — acá el contenido es
+   mínimo (texto o una ficha), así que se anula esa fórmula por completo. */
+.tut-shell .board-center {
+  aspect-ratio: auto !important;
+  max-width: 100% !important;
+  min-height: 70px !important;
+  height: auto !important;
+}
+
+/* Botón de saltar, siempre visible en el nav */
+.tut-skip {
+  margin-left: auto;
+  padding: 7px 13px;
+  border-radius: 9px;
+  border: 1px solid var(--g-border);
+  background: transparent;
+  color: var(--g-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tut-skip:hover { border-color: #e06060; color: #e06060; }
+
+/* ── Resaltado del elemento activo ──────────────────── */
+@keyframes tutPulse {
+  0%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 55%, transparent), 0 0 24px 4px color-mix(in srgb, var(--amber) 30%, transparent); }
+  50%      { box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 80%, transparent), 0 0 32px 8px color-mix(in srgb, var(--amber) 45%, transparent); }
+}
+.tut-focus {
+  position: relative;
+  z-index: 32;
+  border-radius: 14px;
+  animation: tutPulse 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tut-focus { animation: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 70%, transparent); }
+}
+
+/* dp.tut-focus específicamente no aplica (foco va en contenedores), pero
+   .my-hand.tut-focus y .btn-pasar.tut-focus sí necesitan el radio ajustado */
+.btn-back.tut-focus,
+.chat-fab.tut-focus { border-radius: 50%; }
+.btn-pasar.tut-focus { border-radius: 10px; }
+
+/* ── Panel guía (coachmark), docked abajo ────────────── */
+.tut-coach {
+  position: fixed;
+  left: 50%;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 35;
+  width: min(440px, calc(100vw - 32px));
+  padding: 14px 20px 16px;
+  border-radius: 18px;
+  background: var(--g-surface, #111815);
+  border: 1px solid color-mix(in srgb, var(--amber) 30%, var(--g-border, transparent));
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.55);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tut-coach { animation: tutCoachIn .25s cubic-bezier(.2,.7,.2,1) both; }
+}
+@keyframes tutCoachIn {
+  from { opacity: 0; transform: translate(-50%, 10px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.tut-coach-dots { display: flex; gap: 5px; margin-bottom: 12px; }
+.tut-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--g-border, rgba(255,255,255,.12));
+}
+.tut-dot.is-done   { background: var(--teal, #34d3b4); }
+.tut-dot.is-active { background: var(--amber, #ef9f2e); width: 18px; border-radius: 4px; }
+
+.tut-coach h2 {
+  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--g-ink, #f2ede3);
+  margin-bottom: 6px;
+}
+.tut-coach p {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--g-muted, #b6beb4);
+  margin-bottom: 16px;
+}
+
+.tut-coach-actions { display: flex; align-items: center; gap: 10px; }
+.tut-coach-back {
+  padding: 10px 14px;
+  border-radius: 9px;
+  border: 1px solid var(--g-border);
+  background: transparent;
+  color: var(--g-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tut-coach-back:hover { border-color: var(--teal); color: var(--teal); }
+
+.tut-coach-next {
+  margin-left: auto;
+  padding: 10px 18px;
+  border-radius: 9px;
+  border: none;
+  background: var(--amber, #ef9f2e);
+  color: #201400;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.tut-coach-next:hover { background: var(--amber-hi, #f7ad3f); }
+.tut-coach-finish { background: var(--teal, #34d3b4); color: #06231d; }
+.tut-coach-finish:hover { opacity: 0.9; background: var(--teal, #34d3b4); }
+.tut-coach-ghost {
+  background: transparent;
+  border: 1px solid var(--g-border);
+  color: var(--g-muted);
+  font-weight: 600;
+}
+.tut-coach-ghost:hover { border-color: var(--amber); color: var(--amber); }
+
+@media (max-width: 480px) {
+  .tut-coach { bottom: 8px; padding: 16px 16px 18px; }
+  .tut-shell { padding-bottom: 220px; }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Onboarding — pregunta de nivel antes del tutorial
+   ═══════════════════════════════════════════════════════ */
+.onb-body {
+  max-width: 560px;
+  padding-top: 64px;
+  text-align: center;
+}
+.onb-mark { display: flex; justify-content: center; margin-bottom: 20px; }
+.onb-mark-tile { width: 40px; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.3)); }
+
+.onb-shell h1 {
+  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--d-ink);
+  text-wrap: balance;
+}
+.onb-sub {
+  margin: 10px 0 32px;
+  font-size: 0.95rem;
+  color: var(--d-muted);
+}
+
+.onb-options { display: flex; flex-direction: column; gap: 12px; text-align: left; }
+.onb-option {
+  padding: 18px 20px;
+  border-radius: 14px;
+  border: 1px solid var(--d-border);
+  background: var(--d-surface);
+  color: var(--d-ink);
+  cursor: pointer;
+  transition: border-color .15s ease, transform .15s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.onb-option:hover:not(:disabled) { border-color: var(--amber); transform: translateY(-2px); }
+.onb-option:disabled { opacity: 0.6; cursor: default; }
+.onb-option-title {
+  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+.onb-option-loading { margin-left: 8px; color: var(--amber); }
+.onb-option-desc { font-size: 0.86rem; color: var(--d-muted); }
