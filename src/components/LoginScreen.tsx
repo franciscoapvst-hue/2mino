@@ -13,7 +13,11 @@ declare global {
     google?: {
       accounts: {
         id: {
-          initialize: (config: { client_id: string; callback: (r: { credential: string }) => void }) => void;
+          initialize: (config: {
+            client_id: string;
+            callback: (r: { credential: string }) => void;
+            use_fedcm_for_button?: boolean;
+          }) => void;
           renderButton: (parent: HTMLElement, options: Record<string, unknown>) => void;
         };
       };
@@ -104,6 +108,10 @@ export default function LoginScreen({ onSwitch, onSuccess, dark, onToggleTheme }
       window.google!.accounts.id.initialize({
         client_id: clientId!,
         callback: (r) => handleGoogleCredential(r.credential),
+        // Sin esto, si el navegador ya tiene sesión de Google activa, Chrome
+        // dibuja su propia "ficha de cuenta" nativa (FedCM) con fondo blanco
+        // fijo, ignorando el theme oscuro/claro que le pasamos más abajo.
+        use_fedcm_for_button: false,
       });
       // Limpia antes de renderizar: si el efecto corre de nuevo (toggle de
       // tema, o el doble-mount de StrictMode en dev), Google agrega un
