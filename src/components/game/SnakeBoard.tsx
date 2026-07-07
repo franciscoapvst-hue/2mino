@@ -177,7 +177,16 @@ export default function SnakeBoard({
 
   // Tablero hipotético (real + fantasma) por cada lado — el fantasma es
   // siempre pieces[0] (se antepone) o el último (se agrega al final), y
-  // así cae exactamente donde caería la ficha real, giros incluidos.
+  // así hereda el giro/wrap de la serpiente en vez de una posición
+  // calculada aparte.
+  //
+  // OJO: el tablero real y el hipotético NO comparten sistema de
+  // coordenadas cuando la fila entra centrada (needsWrap = false) — el
+  // centrado depende del ancho TOTAL de las fichas de esa llamada
+  // puntual, y el hipotético tiene una ficha más (distinto ancho total,
+  // distinto centrado). Para que el fantasma caiga pegado a la fila real
+  // (sin superponerse), se compara una ficha de referencia presente en
+  // ambos cálculos y se corrige la diferencia horizontal.
   const layoutIzq = piezaFantasma && canIzq
     ? computeLayout([fichaFantasma(piezaFantasma, izqVal, 'izq'), ...tablero], containerWidth, null)
     : null;
@@ -185,8 +194,22 @@ export default function SnakeBoard({
     ? computeLayout([...tablero, fichaFantasma(piezaFantasma, derVal, 'der')], containerWidth, null)
     : null;
 
-  const fantasmaIzq = layoutIzq?.pieces[0] ?? null;
-  const fantasmaDer = layoutDer ? layoutDer.pieces[layoutDer.pieces.length - 1] : null;
+  // pieces[1] del hipotético-izq es la misma ficha que real.pieces[0]
+  // (la primera real, corrida un lugar por el fantasma antepuesto).
+  const fantasmaIzq = layoutIzq && (() => {
+    const shiftX = real.pieces[0].x - layoutIzq.pieces[1].x;
+    const g = layoutIzq.pieces[0];
+    return { ...g, x: g.x + shiftX };
+  })();
+  // pieces[length-2] del hipotético-der es la última ficha real (el
+  // fantasma quedó agregado después, en pieces[length-1]).
+  const fantasmaDer = layoutDer && (() => {
+    const ultimoReal = real.pieces[real.pieces.length - 1];
+    const equivalente = layoutDer.pieces[layoutDer.pieces.length - 2];
+    const shiftX = ultimoReal.x - equivalente.x;
+    const g = layoutDer.pieces[layoutDer.pieces.length - 1];
+    return { ...g, x: g.x + shiftX };
+  })();
 
   // Por si el fantasma inicia una fila nueva que el tablero real todavía
   // no tiene: no lo recortamos, agrandamos el contenedor para mostrarlo.
