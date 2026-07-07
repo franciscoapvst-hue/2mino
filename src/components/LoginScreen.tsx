@@ -1,24 +1,31 @@
 import { useEffect, useRef, useState, FormEvent } from 'react';
 import type { View } from '../App';
 import { api, tokenStore, type AuthUser, type UserConfig } from '../api';
-import { SunIcon, MoonIcon } from './icons';
+import { GoogleIcon, SunIcon, MoonIcon } from './icons';
 import { Bone, DominoStage } from './DominoStage';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-// Tipado mínimo de Google Identity Services (google.accounts.id) — la
+// Tipado mínimo de Google Identity Services (google.accounts.oauth2) — la
 // librería se carga como script global en index.html, no vía npm.
+//
+// Se usa el "code client" (Authorization Code, popup propio) en vez del
+// botón prearmado (google.accounts.id.renderButton): ese widget fuerza su
+// propio diseño (incluida una placa blanca fija detrás del logo) porque es
+// el componente de marca registrada de Google. Con el code client, el botón
+// es 100% nuestro — solo dispara el popup de Google al clickear — y el
+// backend intercambia el código por un id_token verificable igual que antes.
 declare global {
   interface Window {
     google?: {
       accounts: {
-        id: {
-          initialize: (config: {
+        oauth2: {
+          initCodeClient: (config: {
             client_id: string;
-            callback: (r: { credential: string }) => void;
-            use_fedcm_for_button?: boolean;
-          }) => void;
-          renderButton: (parent: HTMLElement, options: Record<string, unknown>) => void;
+            scope: string;
+            ux_mode: 'popup';
+            callback: (r: { code: string } | { error: string }) => void;
+          }) => { requestCode: () => void };
         };
       };
     };
@@ -75,11 +82,11 @@ export default function LoginScreen({ onSwitch, onSuccess, dark, onToggleTheme }
     }
   }
 
-  async function handleGoogleCredential(credential: string) {
+  async function handleGoogleCode(code: string) {
     setApiError(null);
     setLoading(true);
     try {
-      const authRes = await api.loginGoogle(credential);
+      const authRes = await api.loginGoogle(code);
       tokenStore.set(authRes.token, true);
       const config = await api.getPreferencias();
       onSuccess(authRes.user, config);
@@ -90,45 +97,29 @@ export default function LoginScreen({ onSwitch, onSuccess, dark, onToggleTheme }
     }
   }
 
-  const googleBtnRef = useRef<HTMLDivElement>(null);
+  // El code client se crea una sola vez (no hace falta re-crearlo por
+  // cambios de tema, a diferencia del widget prearmado de antes).
+  const codeClientRef = useRef<{ requestCode: () => void } | null>(null);
   useEffect(() => {
-    const clientId = GOOGLE_CLIENT_ID;
-    if (!clientId) return;
-
+    if (!GOOGLE_CLIENT_ID) return;
     let cancelado = false;
-    // El script de Google se carga async/defer en index.html — puede no
-    // estar listo todavía cuando este componente monta.
     function intentar() {
       if (cancelado) return;
-      const el = googleBtnRef.current;
-      if (!window.google || !el) {
-        setTimeout(intentar, 100);
-        return;
-      }
-      window.google!.accounts.id.initialize({
-        client_id: clientId!,
-        callback: (r) => handleGoogleCredential(r.credential),
-        // Sin esto, si el navegador ya tiene sesión de Google activa, Chrome
-        // dibuja su propia "ficha de cuenta" nativa (FedCM) con fondo blanco
-        // fijo, ignorando el theme oscuro/claro que le pasamos más abajo.
-        use_fedcm_for_button: false,
-      });
-      // Limpia antes de renderizar: si el efecto corre de nuevo (toggle de
-      // tema, o el doble-mount de StrictMode en dev), Google agrega un
-      // iframe nuevo sin sacar el anterior y quedan dos botones apilados.
-      el.innerHTML = '';
-      window.google!.accounts.id.renderButton(el, {
-        type: 'standard',
-        theme: dark ? 'filled_black' : 'outline',
-        size: 'large',
-        shape: 'rectangular',
-        text: 'continue_with',
-        width: el.clientWidth || 340,
+      if (!window.google) { setTimeout(intentar, 100); return; }
+      codeClientRef.current = window.google.accounts.oauth2.initCodeClient({
+        client_id: GOOGLE_CLIENT_ID!,
+        scope: 'openid email profile',
+        ux_mode: 'popup',
+        callback: (r) => { if ('code' in r) handleGoogleCode(r.code); },
       });
     }
     intentar();
     return () => { cancelado = true; };
-  }, [dark]);
+  }, []);
+
+  function handleGoogleClick() {
+    codeClientRef.current?.requestCode();
+  }
 
   return (
     <div className={`login-screen${dark ? '' : ' is-light'}`}>
@@ -214,13 +205,15 @@ export default function LoginScreen({ onSwitch, onSuccess, dark, onToggleTheme }
 
           <div className="lg-divider"><span>o</span></div>
 
-          {GOOGLE_CLIENT_ID ? (
-            <div className="lg-google-btn" ref={googleBtnRef} />
-          ) : (
-            <button type="button" className="lg-google" disabled title="Próximamente">
-              Continuar con Google
-            </button>
-          )}
+          <button
+            type="button"
+            className="lg-google"
+            onClick={handleGoogleClick}
+            disabled={loading || !GOOGLE_CLIENT_ID}
+            title={GOOGLE_CLIENT_ID ? undefined : 'Próximamente'}
+          >
+            <GoogleIcon /> Continuar con Google
+          </button>
 
           <p className="lg-foot">
             ¿No tienes cuenta?{' '}

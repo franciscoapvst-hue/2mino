@@ -232,8 +232,8 @@ export const api = {
   login: (body: { email: string; password: string }) =>
     req<AuthResponse>('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
 
-  loginGoogle: (credential: string) =>
-    req<AuthResponse>('/auth/google', { method: 'POST', body: JSON.stringify({ credential }) }),
+  loginGoogle: (code: string) =>
+    req<AuthResponse>('/auth/google', { method: 'POST', body: JSON.stringify({ code }) }),
 
   forgotPassword: (email: string) =>
     req<{ message: string; _dev_token?: string }>('/auth/forgot-password', {

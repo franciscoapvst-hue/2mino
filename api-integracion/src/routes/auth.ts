@@ -3,8 +3,13 @@ import { OAuth2Client } from 'google-auth-library';
 import { callMs } from '../http';
 import { signToken, verifyToken } from '../jwt';
 
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
+const GOOGLE_CLIENT_ID     = process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+// 'postmessage' es el redirect_uri especial que espera Google para el flujo
+// de popup de un code client de JS (no hay redirect real de por medio).
+const googleClient = (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET)
+  ? new OAuth2Client(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, 'postmessage')
+  : null;
 
 // ── Schemas reutilizables ─────────────────────────
 const UserSchema = {
@@ -167,24 +172,24 @@ export async function authRoutes(app: FastifyInstance) {
   );
 
   // ── POST /auth/google ───────────────────────────
-  app.post<{ Body: { credential: string } }>(
+  app.post<{ Body: { code: string } }>(
     '/auth/google',
     {
       schema: {
         tags:        ['auth'],
         summary:     'Iniciar sesión con Google',
-        description: 'Verifica el ID token de Google Identity Services y devuelve un JWT propio (crea la cuenta si es la primera vez).',
+        description: 'Cambia el authorization code (popup propio, no el widget de Google) por tokens, verifica el ID token y devuelve un JWT propio (crea la cuenta si es la primera vez).',
         body: {
           type: 'object',
-          required: ['credential'],
+          required: ['code'],
           properties: {
-            credential: { type: 'string', description: 'ID token devuelto por Google Identity Services' },
+            code: { type: 'string', description: 'Authorization code devuelto por google.accounts.oauth2 (ux_mode: popup)' },
           },
         },
         response: {
           200: { description: 'Login exitoso',   ...TokenUserSchema },
           201: { description: 'Cuenta creada y login exitoso', ...TokenUserSchema },
-          401: { description: 'Token de Google inválido', ...ErrorSchema },
+          401: { description: 'Código o token de Google inválido', ...ErrorSchema },
           503: { description: 'Login con Google no configurado', ...ErrorSchema },
         },
       },
@@ -194,12 +199,18 @@ export async function authRoutes(app: FastifyInstance) {
         return reply.code(503).send({ error: 'Login con Google no está configurado' });
       }
 
+      let idToken: string | null | undefined;
+      try {
+        const { tokens } = await googleClient.getToken(req.body.code);
+        idToken = tokens.id_token;
+      } catch {
+        return reply.code(401).send({ error: 'Código de Google inválido' });
+      }
+      if (!idToken) return reply.code(401).send({ error: 'Código de Google inválido' });
+
       let payload;
       try {
-        const ticket = await googleClient.verifyIdToken({
-          idToken: req.body.credential,
-          audience: GOOGLE_CLIENT_ID,
-        });
+        const ticket = await googleClient.verifyIdToken({ idToken, audience: GOOGLE_CLIENT_ID });
         payload = ticket.getPayload();
       } catch {
         return reply.code(401).send({ error: 'Token de Google inválido' });
