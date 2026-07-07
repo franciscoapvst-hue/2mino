@@ -7,6 +7,7 @@ import type { PartidaPublica, Pieza, Sala, AuthUser } from '../../api';
 import { BackIcon, PersonAddIcon } from '../icons';
 import { useMeasuredWidth } from '../../hooks/useMeasuredWidth';
 import ChatPanel from '../social/ChatPanel';
+import AdSlot from '../AdSlot';
 
 type Props = {
   sala: Sala;
@@ -532,6 +533,8 @@ function ManoOverlay({ partida, nombreAsiento, onListo, confirmando }: {
             ? `Esperando… (${nListos}/${partida.maxJugadores})`
             : 'Listo para la siguiente mano'}
         </button>
+
+        <AdSlot slot={import.meta.env.VITE_ADSENSE_SLOT_MANO} />
       </div>
     </div>
   );

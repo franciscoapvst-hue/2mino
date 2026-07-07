@@ -93,7 +93,11 @@ services:
     build:
       context: .
       args:
-        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+        VITE_GOOGLE_CLIENT_ID:          ${GOOGLE_CLIENT_ID:-}
+        VITE_ADSENSE_CLIENT_ID:         ${ADSENSE_CLIENT_ID:-}
+        VITE_ADSENSE_SLOT_DASHBOARD:    ${ADSENSE_SLOT_DASHBOARD:-}
+        VITE_ADSENSE_SLOT_MATCHMAKING:  ${ADSENSE_SLOT_MATCHMAKING:-}
+        VITE_ADSENSE_SLOT_MANO:         ${ADSENSE_SLOT_MANO:-}
     restart: unless-stopped
     depends_on:
       - api-integracion
