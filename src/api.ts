@@ -1,3 +1,5 @@
+import type { ReplayData } from './game/replay-engine';
+
 const BASE = '/api';
 
 // ── Tipos públicos ────────────────────────────────
@@ -123,6 +125,68 @@ export type AuthResponse = {
   user: AuthUser;
 };
 
+// ── Social: amigos, bandeja, leaderboard extendido, historial, chat ──
+// ms-social todavía no existe (ver docs/CASOS_DE_USO_SOCIAL.md). Estos
+// tipos son el contrato propuesto ahí; `api.social`/`api.historial` abajo
+// devuelven datos mock con esta misma forma hasta que el backend real
+// esté listo — solo hay que reemplazar el cuerpo de esas funciones.
+export type Amigo = {
+  usuario_id: string;
+  username:   string;
+  avatar:     string | null;
+  elo:        number;
+  conectado:  boolean;
+};
+
+export type TipoNotificacion = 'solicitud_amistad' | 'amistad_aceptada' | 'invitacion_partida';
+
+export type Notificacion = {
+  id:            string;
+  tipo:          TipoNotificacion;
+  de_usuario_id: string;
+  de_username:   string;
+  de_avatar:     string | null;
+  payload:       { sala_codigo?: string; party_codigo?: string };
+  leida:         boolean;
+  created_at:    string;
+};
+
+export type EstadoRelacion = 'amigo' | 'pendiente' | 'ninguno';
+
+export type PerfilJugador = {
+  usuario_id: string;
+  username:   string;
+  elo:        number;
+  partidas:   number;
+  ganadas:    number;
+  capicuas:          number;
+  tranques_ganados:  number;
+  tranques_perdidos: number;
+  progresion_elo: { fecha: string; elo: number }[];
+};
+
+export type PartidaHistorial = {
+  sala_id:         string;
+  fecha:           string;
+  tipo_sala:       'casual' | 'ranked';
+  modo:            2 | 4;
+  rival_principal: string;
+  gano:            boolean;
+  puntos_favor:    number;
+  puntos_contra:   number;
+  capicua:         boolean;
+  tranque:         boolean;
+  delta_elo:       number | null;
+};
+
+export type ChatMensaje = {
+  id:         string;
+  usuario_id: string;
+  username:   string;
+  mensaje:    string;
+  created_at: string;
+};
+
 // ── Token management ──────────────────────────────
 const TOKEN_KEY = '2mino-token';
 
@@ -240,5 +304,82 @@ export const api = {
       req<ColaEstado>('/ranked/cola/entrar', { method: 'POST', body: JSON.stringify({ modo, tipo }) }),
     estadoCola: () => req<ColaEstado>('/ranked/cola/estado'),
     salirCola: () => req<{ ok: true }>('/ranked/cola/salir', { method: 'POST', body: '{}' }),
+  },
+
+  // ── Social (ms-social) ────────────────────────────
+  // Cada función es 1:1 con un endpoint de docs/CASOS_DE_USO_SOCIAL.md.
+  social: {
+    amigos: () => req<Amigo[]>('/amigos'),
+
+    eliminarAmigo: (usuarioId: string) =>
+      req<{ ok: true }>(`/amigos/${usuarioId}`, { method: 'DELETE' }),
+
+    // Acepta un usuario_id (UUID, ej. desde el fin de partida) o un
+    // username crudo (desde el buscador de FriendsView) — se distingue
+    // por forma, el gateway resuelve el username si hace falta.
+    enviarSolicitud: (idOUsername: string) => {
+      const esUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOUsername);
+      return req<{ ok: true }>('/solicitudes', {
+        method: 'POST',
+        body: JSON.stringify(esUuid ? { a_usuario_id: idOUsername } : { a_username: idOUsername }),
+      });
+    },
+
+    aceptarSolicitud: (id: string) =>
+      req<{ ok: true }>(`/solicitudes/${id}/aceptar`, { method: 'POST', body: '{}' }),
+
+    rechazarSolicitud: (id: string) =>
+      req<{ ok: true }>(`/solicitudes/${id}/rechazar`, { method: 'POST', body: '{}' }),
+
+    estadoRelacion: (usuarioIds: string[]) =>
+      req<Record<string, EstadoRelacion>>('/social/estado-relacion', {
+        method: 'POST', body: JSON.stringify({ usuario_ids: usuarioIds }),
+      }),
+
+    notificaciones: () => req<Notificacion[]>('/notificaciones'),
+
+    marcarLeida: (id: string) =>
+      req<{ ok: true }>(`/notificaciones/${id}/leer`, { method: 'POST', body: '{}' }),
+
+    noLeidasCount: () => req<{ count: number }>('/notificaciones/no-leidas/count'),
+
+    invitarPartida: (aUsuarioId: string, salaCodigo: string) =>
+      req<{ ok: true }>('/social/invitar-partida', {
+        method: 'POST', body: JSON.stringify({ a_usuario_id: aUsuarioId, sala_codigo: salaCodigo }),
+      }),
+
+    // El endpoint real crea la sala y devuelve también a quién invitar
+    // (el resto de los jugadores viejos); acá solo se necesita el código
+    // para mantener la firma que ya usan los componentes.
+    revancha: async (salaId: string): Promise<{ ok: true; sala_codigo: string }> => {
+      const r = await req<{ sala: Sala; invitar: { usuario_id: string; username: string }[] }>(
+        `/salas/${salaId}/revancha`, { method: 'POST', body: '{}' },
+      );
+      return { ok: true, sala_codigo: r.sala.codigo };
+    },
+
+    // Reusa el mecanismo de party ranked que ya existe (§7.2 del doc): crea
+    // una party y manda la invitación por el mismo canal de notificaciones.
+    invitarCompanero: async (aUsuarioId: string): Promise<{ ok: true; party_codigo: string }> => {
+      const party = await api.ranked.crearParty('ranked');
+      await req('/social/invitar-partida', {
+        method: 'POST', body: JSON.stringify({ a_usuario_id: aUsuarioId, party_codigo: party.codigo }),
+      });
+      return { ok: true, party_codigo: party.codigo };
+    },
+
+    perfilJugador: (entry: LeaderboardEntry) =>
+      req<PerfilJugador>(`/ranked/leaderboard/${entry.usuario_id}/perfil`),
+
+    // miUsername ya no hace falta (era para la semilla del mock) — se
+    // mantiene en la firma para no tocar ChatPanel.tsx.
+    chatHistorial: (salaId: string, _miUsername: string) =>
+      req<ChatMensaje[]>(`/social/chat/${salaId}`),
+  },
+
+  // ── Historial de partidas propio + replay (ms-salas) ─────────────
+  historial: {
+    misPartidas: () => req<PartidaHistorial[]>('/salas/mis-partidas'),
+    replay: (salaId: string) => req<ReplayData>(`/salas/${salaId}/replay`),
   },
 };

@@ -203,6 +203,41 @@ export async function usuariosRoutes(app: FastifyInstance) {
     },
   );
 
+  // ── GET /usuarios/por-username/:username ────────
+  // Resuelve username → id. Lo usa el gateway (routes/social.ts) para
+  // "agregar amigo por nombre de usuario" — ms-social no guarda username
+  // como clave, solo UUID, así que el gateway resuelve acá antes de llamar
+  // a POST /solicitudes.
+  app.get<{ Params: { username: string } }>(
+    '/usuarios/por-username/:username',
+    {
+      schema: {
+        tags:    ['usuarios'],
+        summary: 'Buscar usuario por username (resuelve a UUID)',
+        params: {
+          type: 'object',
+          properties: { username: { type: 'string' } },
+        },
+        response: {
+          200: { description: 'Usuario encontrado',    ...UserSchema },
+          404: { description: 'Usuario no encontrado', ...ErrorSchema },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { rows } = await pool.query(
+        `SELECT u.id, u.username, u.email, u.segmento_id, u.avatar, u.created_at, u.updated_at,
+                s.nombre as segmento, s.config as segmento_config
+         FROM usuarios u
+         LEFT JOIN segmentos s ON s.id = u.segmento_id
+         WHERE u.username = $1`,
+        [req.params.username],
+      );
+      if (!rows.length) return reply.code(404).send({ error: 'Usuario no encontrado' });
+      return reply.send(rows[0]);
+    },
+  );
+
   // ── PATCH /usuarios/:id/avatar ──────────────────
   app.patch<{ Params: { id: string }; Body: { avatar: string } }>(
     '/usuarios/:id/avatar',

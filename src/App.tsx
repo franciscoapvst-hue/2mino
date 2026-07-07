@@ -10,11 +10,17 @@ import SalasView from './components/SalasView';
 import MatchmakingView from './components/MatchmakingView';
 import PieceDemo from './components/game/PieceDemo';
 import GameBoard from './components/game/GameBoard';
+import FriendsView from './components/social/FriendsView';
+import LeaderboardView from './components/social/LeaderboardView';
+import MatchHistoryView from './components/social/MatchHistoryView';
+import ReplayViewer from './components/social/ReplayViewer';
 import { api, tokenStore, type AuthUser, type UserConfig, type Sala } from './api';
 import { DominoTile, SunIcon, MoonIcon } from './components/icons';
+import { useSocialSocket } from './hooks/useSocialSocket';
 
 export type View = 'login' | 'register' | 'forgot';
-type AppView = View | 'dashboard' | 'salas' | 'ranked' | 'casual' | 'piece-demo' | 'game';
+type AppView = View | 'dashboard' | 'salas' | 'ranked' | 'casual' | 'piece-demo' | 'game'
+  | 'amigos' | 'leaderboard' | 'historial' | 'replay';
 
 type Session = { user: AuthUser; config: UserConfig };
 
@@ -35,6 +41,8 @@ export default function App() {
   const [gameSala, setGameSala]   = useState<Sala | null>(null);
   // A dónde volver al salir de una partida terminada.
   const [gameOrigin, setGameOrigin] = useState<'salas' | 'dashboard'>('salas');
+  // Sala seleccionada para ver su repetición (MatchHistoryView → ReplayViewer).
+  const [replaySalaId, setReplaySalaId] = useState<string | null>(null);
   // Invitación a party vía link (/party/ABCD). El inicializador de useState
   // corre síncrono en el primer render, ANTES que cualquier efecto —
   // evita que el .then() del restore de sesión capture un valor null por
@@ -43,6 +51,11 @@ export default function App() {
   const [dark,    setDark]    = useState<boolean>(
     () => localStorage.getItem('2mino-theme') !== 'light'
   );
+  // WS de presencia/notificaciones (docs/CASOS_DE_USO_SOCIAL.md §2.3):
+  // un solo socket para toda la sesión, su estado baja como props a quien
+  // lo necesite (Dashboard para el badge de la campana, FriendsView para
+  // los puntitos de "en línea").
+  const { enVivo, notifVersion } = useSocialSocket(session ? tokenStore.get() : null);
 
   useEffect(() => {
     document.documentElement.classList.toggle('light', !dark);
@@ -75,6 +88,42 @@ export default function App() {
     tokenStore.clear();
     setSession(null);
     setView('login');
+  }
+
+  // Unirse a una sala desde una invitación de la bandeja de entrada
+  // (InboxPopover). Usa los endpoints reales de salas — ya existen,
+  // a diferencia del resto de "social" que todavía es mock.
+  async function handleUnirseSala(codigo: string) {
+    if (!session) return;
+    try {
+      const detalle = await api.salas.porCodigo(codigo);
+      const yaEstoy = detalle.jugadores?.some(j => j.usuario_id === session.user.id);
+      const final = yaEstoy ? detalle : await api.salas.unirse(detalle.id);
+      setGameSala(final);
+      setGameOrigin('dashboard');
+      setView(final.estado === 'en_juego' ? 'game' : 'salas');
+    } catch {
+      // TODO: mostrar aviso de error (código no encontrado / sala llena)
+      setView('salas');
+    }
+  }
+
+  // Acciones sociales post-partida (§6/§7 del doc de casos de uso).
+  async function handleRevancha() {
+    if (!gameSala) return;
+    try {
+      const { sala_codigo } = await api.social.revancha(gameSala.id);
+      const nuevaSala = await api.salas.porCodigo(sala_codigo);
+      setGameSala(nuevaSala);
+      setGameOrigin('dashboard');
+      setView(nuevaSala.estado === 'en_juego' ? 'game' : 'salas');
+    } catch { /* noop, botón best-effort */ }
+  }
+  function handleInvitarCompanero(usuarioId: string) {
+    api.social.invitarCompanero(usuarioId).catch(() => {});
+  }
+  function handleAgregarAmigo(usuarioId: string) {
+    api.social.enviarSolicitud(usuarioId).catch(() => {});
   }
 
   if (booting) {
@@ -128,8 +177,33 @@ export default function App() {
         sala={gameSala}
         user={session.user}
         onExit={() => { setGameSala(null); setView(gameOrigin); }}
+        onRevancha={handleRevancha}
+        onInvitarCompanero={handleInvitarCompanero}
+        onAgregarAmigo={handleAgregarAmigo}
       />
     );
+  }
+
+  if (view === 'amigos' && session) {
+    return <FriendsView dark={dark} onBack={() => setView('dashboard')} conectadosEnVivo={enVivo} />;
+  }
+
+  if (view === 'leaderboard' && session) {
+    return <LeaderboardView dark={dark} onBack={() => setView('dashboard')} miUsuarioId={session.user.id} />;
+  }
+
+  if (view === 'historial' && session) {
+    return (
+      <MatchHistoryView
+        dark={dark}
+        onBack={() => setView('dashboard')}
+        onVerReplay={(salaId) => { setReplaySalaId(salaId); setView('replay'); }}
+      />
+    );
+  }
+
+  if (view === 'replay' && session && replaySalaId) {
+    return <ReplayViewer dark={dark} salaId={replaySalaId} onBack={() => setView('historial')} />;
   }
 
   if (view === 'salas' && session) {
@@ -169,6 +243,11 @@ export default function App() {
         onAvatarChange={(avatar) =>
           setSession(s => s && { ...s, user: { ...s.user, avatar } })
         }
+        onGoToAmigos={() => setView('amigos')}
+        onGoToLeaderboard={() => setView('leaderboard')}
+        onGoToHistorial={() => setView('historial')}
+        onUnirseSala={handleUnirseSala}
+        notifVersion={notifVersion}
       />
     );
   }

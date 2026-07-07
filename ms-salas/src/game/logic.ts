@@ -100,6 +100,10 @@ export type PartidaState = {
   fase:           Fase;
   listos:         boolean[];     // confirmaciones en 'entre_manos'
   equipoGanadorPartida: 0 | 1 | null;
+  // Acumulado durante TODA la partida (no se resetea entre manos, solo en
+  // crearPartida) — alimenta partida_resultados para historial/leaderboard.
+  capicuasPorEquipo: [number, number];
+  trancasPorEquipo:  [number, number];
   // — mano en curso —
   manos:          Pieza[][];     // manos[seat]
   tablero:        FichaTablero[];
@@ -154,6 +158,8 @@ export function crearPartida(jugadores: Asiento[], puntosObjetivo = 100): Partid
     fase: 'jugando',
     listos: new Array(maxJugadores).fill(false),
     equipoGanadorPartida: null,
+    capicuasPorEquipo: [0, 0],
+    trancasPorEquipo:  [0, 0],
     manos,
     tablero: [],
     turno: apertura?.seat ?? 0,
@@ -197,6 +203,15 @@ function cerrarMano(
     : equipoDe(resultado.ganadorSeat);
   if (equipo !== null) marcador[equipo] += resultado.puntos;
 
+  // Contadores acumulados de toda la partida (partida_resultados en el
+  // historial/leaderboard). Un "normal" no suma a ninguno de los dos.
+  const capicuasPorEquipo: [number, number] = [...partida.capicuasPorEquipo];
+  const trancasPorEquipo:  [number, number] = [...partida.trancasPorEquipo];
+  if (resultado.tipo === 'capicua') capicuasPorEquipo[equipoDe(resultado.ganadorSeat)]++;
+  if (resultado.tipo === 'tranca' && resultado.equipoGanador !== null) {
+    trancasPorEquipo[resultado.equipoGanador]++;
+  }
+
   const ganadorPartida = marcador[0] >= partida.puntosObjetivo ? 0
                        : marcador[1] >= partida.puntosObjetivo ? 1
                        : null;
@@ -204,6 +219,8 @@ function cerrarMano(
   return {
     ...partida,
     marcador,
+    capicuasPorEquipo,
+    trancasPorEquipo,
     resultadoMano: resultado,
     salida: proximaSalida,
     fase: ganadorPartida !== null ? 'fin_partida' : 'entre_manos',

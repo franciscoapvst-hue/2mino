@@ -4,6 +4,9 @@ const MS_USUARIOS_BASE = () =>
 const MS_SALAS_BASE = () =>
   (process.env.MS_SALAS_URL ?? 'http://localhost:6001').trim();
 
+const MS_SOCIAL_BASE = () =>
+  (process.env.MS_SOCIAL_URL ?? 'http://localhost:6200').trim();
+
 export async function callSalas(
   path: string,
   method: string,
@@ -19,6 +22,15 @@ export async function callMs(
   body?: unknown,
 ): Promise<{ status: number; data: unknown }> {
   return callService(MS_USUARIOS_BASE(), path, method, body);
+}
+
+/** Llama a ms-social (amigos, notificaciones, chat) */
+export async function callSocial(
+  path: string,
+  method: string,
+  body?: unknown,
+): Promise<{ status: number; data: unknown }> {
+  return callService(MS_SOCIAL_BASE(), path, method, body);
 }
 
 /** Llamada HTTP genérica a cualquier microservicio interno */

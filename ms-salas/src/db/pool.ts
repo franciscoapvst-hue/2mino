@@ -133,6 +133,44 @@ const SCHEMA = `
   CREATE UNIQUE INDEX IF NOT EXISTS idx_ranked_cola_party
     ON ranked_cola(party_id) WHERE party_id IS NOT NULL;
   CREATE INDEX IF NOT EXISTS idx_ranked_cola_modo ON ranked_cola(modo, created_at);
+
+  -- ── Historial + replay (docs/CASOS_DE_USO_SOCIAL.md §5) ───────────
+  -- Log de movimientos, append-only. Una fila por jugada/pase. Permite
+  -- reconstruir la partida completa para el replay.
+  CREATE TABLE IF NOT EXISTS partida_movimientos (
+    id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    sala_id       UUID        NOT NULL REFERENCES salas(id) ON DELETE CASCADE,
+    numero_mano   INT         NOT NULL,
+    orden         INT         NOT NULL,
+    seat          INT         NOT NULL,
+    tipo          VARCHAR(20) NOT NULL CHECK (tipo IN ('jugar','pasar')),
+    pieza_a       INT,
+    pieza_b       INT,
+    lado          VARCHAR(6)  CHECK (lado IN ('izq','der') OR lado IS NULL),
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (sala_id, numero_mano, orden)
+  );
+  CREATE INDEX IF NOT EXISTS idx_partida_mov_sala ON partida_movimientos(sala_id, numero_mano, orden);
+
+  -- Resultado agregado por jugador por partida (historial propio,
+  -- leaderboard de capicúas/tranques, estadísticas de perfil). Se
+  -- inserta una vez, al llegar la partida a fase 'fin_partida'.
+  CREATE TABLE IF NOT EXISTS partida_resultados (
+    id                 UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    sala_id            UUID        NOT NULL REFERENCES salas(id) ON DELETE CASCADE,
+    usuario_id         UUID        NOT NULL,
+    equipo             INT         NOT NULL CHECK (equipo IN (0, 1)),
+    gano               BOOLEAN     NOT NULL,
+    tipo_sala          VARCHAR(20) NOT NULL CHECK (tipo_sala IN ('casual','ranked')),
+    capicua            BOOLEAN     NOT NULL DEFAULT false,
+    tranques_ganados   INT         NOT NULL DEFAULT 0,
+    tranques_perdidos  INT         NOT NULL DEFAULT 0,
+    puntos_favor       INT         NOT NULL,
+    puntos_contra      INT         NOT NULL,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (sala_id, usuario_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_partida_result_usuario ON partida_resultados(usuario_id, created_at DESC);
 `;
 
 // Cambios sobre tablas que pueden ya existir de un arranque previo

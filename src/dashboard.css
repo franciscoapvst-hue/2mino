@@ -402,6 +402,15 @@
   .dash-featured-tile-b { display: none; }
 }
 
+/* En móvil angosto, la fila de íconos del nav (tema, fichas, amigos,
+   bandeja, avatar, salir) ya no cabe entera — se retira "Ver fichas"
+   (el menos crítico) para no empujar "Salir" fuera de la pantalla. */
+@media (max-width: 480px) {
+  .dash-pieces { display: none; }
+  .dash-nav { gap: 6px; }
+  .dash-icon-btn { width: 34px; height: 34px; }
+}
+
 /* ═══════════════════════════════════════════════════════
    Fichas & reglas (PieceDemo) — misma identidad
    Usa el tema global (html.light) porque no recibe prop dark.
