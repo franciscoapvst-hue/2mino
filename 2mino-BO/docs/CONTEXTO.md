@@ -41,8 +41,17 @@ son bugs del juego en sí, sin relación con el Back Office.
   (proxy directo a `ms-frontend-landing`).
 - `src/views/UsuariosView.tsx` — `GET /admin/usuarios?q=`, `PATCH
   /admin/usuarios/:id/segmento`, `PATCH /admin/usuarios/:id/estado`
-  (ban/reactivar). Sin columna ELO — no existe en `ms-usuarios` (vive en
-  `ranked_historial` de `ms-salas`, fuera de alcance de esta versión).
+  (ban/reactivar). Sin columna ELO en la tabla — click en el username
+  abre `UsuarioDetalleModal` (`GET /admin/usuarios/:id`), que sí trae
+  perfil + segmento + ELO/partidas/ganadas en una sola llamada. Esto
+  cruza tablas de `ms-usuarios` (usuarios/segmentos) con
+  `ranked_ratings` de `ms-salas` (misma base física) vía la función
+  PL/pgSQL `usuario_completo()` en `ms-usuarios/src/db/pool.ts` — se
+  usó una función y no una VIEW a propósito: PL/pgSQL no valida que las
+  tablas referenciadas existan al crearse (solo al invocarse), lo que
+  evita que la migración de `ms-usuarios` falle si corre antes de que
+  `ms-salas` haya creado `ranked_ratings` (el orden de arranque entre
+  contenedores no está garantizado).
 - `src/views/SegmentosView.tsx` — `GET/POST /admin/segmentos`, `PATCH
   /admin/segmentos/:id/estado`.
 - `src/lib/api.ts` — un solo `adminFetch()` autenticado para todo
