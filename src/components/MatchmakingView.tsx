@@ -142,10 +142,16 @@ export default function MatchmakingView({ user, tipo, dark, onBack, onGameStart,
   const [reconectando, setReconectando] = useState(true);
   const partyCodeRef = useRef<string | null>(null);
 
+  // Tipo real a mostrar: si ya estamos en una party unida por link de
+  // invitación, `party.tipo` (viene del servidor) manda sobre el prop
+  // `tipo` — que para cualquier link de party llega fijo en 'ranked'
+  // desde App.tsx sin importar si la party es casual (ver autoJoinCodigo).
+  const tipoEfectivo = party?.tipo ?? tipo;
+
   useEffect(() => {
-    if (tipo !== 'ranked') return;
+    if (tipoEfectivo !== 'ranked') return;
     api.ranked.me().then(r => setElo(r.elo)).catch(() => setElo(null));
-  }, [tipo]);
+  }, [tipoEfectivo]);
 
   // Invite link consumido al entrar a esta vista: unirse automáticamente.
   useEffect(() => {
@@ -188,28 +194,54 @@ export default function MatchmakingView({ user, tipo, dark, onBack, onGameStart,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoJoinCodigo]);
 
-  // Poll de la cola mientras estamos buscando
+  // Poll de la cola/party mientras esperamos. Corre también en 'party':
+  // solo el creador llama a buscarConParty(), así que el compañero
+  // invitado nunca dispara la búsqueda él mismo — sin este poll en su
+  // propia pantalla de lobby, nunca se entera de que el creador ya
+  // arrancó la búsqueda ni de que la partida ya emparejó (se queda
+  // esperando ahí para siempre aunque el creador ya esté jugando).
   useEffect(() => {
-    if (pantalla !== 'cola') return;
+    if (pantalla !== 'cola' && pantalla !== 'party') return;
     let cancelado = false;
     const tick = async () => {
       try {
         const st = await api.ranked.estadoCola();
         if (cancelado) return;
-        if (st.en_cola) { setCola(st); return; }
+        if (st.en_cola) { setCola(st); setPantalla('cola'); return; }
         if (st.matched) {
           const sala = await api.salas.detalle(st.sala_id);
           onGameStart(sala);
-        } else {
-          // se salió de la cola por otra vía; volver al menú
-          setPantalla('menu');
+          return;
         }
+        // Sin ticket: en 'cola' significa que se salió por otra vía
+        // (cancelado desde otra pestaña) — volver al menú. En 'party' es
+        // el estado normal antes de que el creador arranque la búsqueda,
+        // no tocar nada.
+        if (pantalla === 'cola') setPantalla('menu');
       } catch { /* silencioso, reintenta en el próximo tick */ }
     };
     tick();
     const id = setInterval(tick, 2000);
     return () => { cancelado = true; clearInterval(id); };
   }, [pantalla, onGameStart]);
+
+  // Refresca la party mientras esperamos en el lobby: sin esto, el
+  // creador se queda con el `party` local congelado en el momento en que
+  // la creó (un solo miembro) y nunca se entera de que el compañero ya
+  // se unió — el botón "Buscar partida (2v2)" nunca se habilita.
+  useEffect(() => {
+    if (pantalla !== 'party' || !party) return;
+    let cancelado = false;
+    const codigo = party.codigo;
+    const tick = async () => {
+      try {
+        const p = await api.ranked.party(codigo);
+        if (!cancelado) setParty(p);
+      } catch { /* silencioso, reintenta en el próximo tick */ }
+    };
+    const id = setInterval(tick, 2000);
+    return () => { cancelado = true; clearInterval(id); };
+  }, [pantalla, party?.codigo]);
 
   const buscarSolo = useCallback(async (modo: 2 | 4) => {
     setBusy(true); setError(null);
@@ -287,7 +319,7 @@ export default function MatchmakingView({ user, tipo, dark, onBack, onGameStart,
     onBack();
   }
 
-  const titulo = tipo === 'ranked' ? 'Partida Ranked' : 'Partida Casual';
+  const titulo = tipoEfectivo === 'ranked' ? 'Partida Ranked' : 'Partida Casual';
   const subtitulo = pantalla === 'menu'
     ? 'Elige cómo quieres buscar partida'
     : pantalla === 'party'
@@ -344,7 +376,7 @@ export default function MatchmakingView({ user, tipo, dark, onBack, onGameStart,
         )}
 
         {pantalla === 'cola' && cola?.en_cola && (
-          <ColaView estado={cola} tipo={tipo} onCancelar={cancelarCola} cancelando={busy} />
+          <ColaView estado={cola} tipo={tipoEfectivo} onCancelar={cancelarCola} cancelando={busy} />
         )}
       </div>
     </div>
