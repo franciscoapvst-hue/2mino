@@ -171,6 +171,30 @@ const SCHEMA = `
     UNIQUE (sala_id, usuario_id)
   );
   CREATE INDEX IF NOT EXISTS idx_partida_result_usuario ON partida_resultados(usuario_id, created_at DESC);
+
+  -- Ledger de puntos: una fila por CADA evento que suma (o intenta sumar)
+  -- puntos durante la partida — cierre de mano (normal/capicúa/tranca,
+  -- incluye "no caben") y el bonus "pasó a todos". turno referencia el
+  -- número corto de partida_movimientos (no su UUID) que originó el punto,
+  -- para poder ubicar "en qué jugada se ganó cada punto" sin tener que
+  -- recorrer el JSON de juegos. marcador_0/marcador_1 guardan el
+  -- marcador YA acumulado después de este evento (evita tener que sumar
+  -- todas las filas anteriores para saber el score en un punto dado).
+  CREATE TABLE IF NOT EXISTS partida_puntos (
+    id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    sala_id       UUID        NOT NULL REFERENCES salas(id) ON DELETE CASCADE,
+    numero_mano   INT         NOT NULL,
+    turno         INT         NOT NULL,
+    tipo          VARCHAR(20) NOT NULL CHECK (tipo IN ('normal','capicua','tranca','paso_a_todos')),
+    equipo        INT         CHECK (equipo IN (0, 1)),  -- NULL = tranca empatada, nadie suma
+    puntos        INT         NOT NULL,                  -- lo que otorga/otorgaría (ver no_caben)
+    no_caben      BOOLEAN     NOT NULL DEFAULT false,     -- true: no se sumó (ver fix "no caben")
+    marcador_0    INT         NOT NULL,
+    marcador_1    INT         NOT NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (sala_id, turno, tipo)
+  );
+  CREATE INDEX IF NOT EXISTS idx_partida_puntos_sala ON partida_puntos(sala_id, numero_mano);
 `;
 
 // Cambios sobre tablas que pueden ya existir de un arranque previo
@@ -180,6 +204,24 @@ const ALTERS = `
   -- Matchmaking sirve para casual y ranked: se distinguen por tipo.
   ALTER TABLE ranked_cola    ADD COLUMN IF NOT EXISTS tipo VARCHAR(20) NOT NULL DEFAULT 'ranked';
   ALTER TABLE ranked_parties ADD COLUMN IF NOT EXISTS tipo VARCHAR(20) NOT NULL DEFAULT 'ranked';
+
+  -- Número de jugada corto y legible (1, 2, 3...) para toda la partida,
+  -- sin resetear por mano — a diferencia de orden (que sí resetea en
+  -- cada mano) y del id (UUID largo, incómodo para referenciar "en qué
+  -- jugada pasó tal cosa"). partida_puntos.turno apunta acá.
+  ALTER TABLE partida_movimientos ADD COLUMN IF NOT EXISTS turno INT;
+
+  -- Backfill para partidas que ya existían antes de este campo — no-op
+  -- una vez que todas las filas ya tienen turno asignado.
+  UPDATE partida_movimientos m
+  SET turno = sub.turno
+  FROM (
+    SELECT id, ROW_NUMBER() OVER (PARTITION BY sala_id ORDER BY numero_mano, orden) AS turno
+    FROM partida_movimientos
+  ) sub
+  WHERE m.id = sub.id AND m.turno IS NULL;
+
+  ALTER TABLE partida_movimientos ALTER COLUMN turno SET NOT NULL;
 `;
 
 export async function runMigrations() {

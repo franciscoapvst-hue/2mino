@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { pool } from '../db/pool';
 import {
   crearPartida, aplicarJugada, aplicarPase, marcarListo, aplicarAbandono, vistaPublica, equipoDe,
+  PUNTOS_PASO_A_TODOS,
 } from '../game/logic';
 import type { PartidaState, Pieza } from '../game/logic';
 import { aplicarEloRanked } from './ranked';
@@ -39,6 +40,13 @@ async function guardarPartida(juegoId: string, salaId: string, partida: PartidaS
     `UPDATE juegos SET partida = $1, estado = $2, updated_at = NOW() WHERE id = $3`,
     [JSON.stringify(partida), terminada ? 'terminado' : 'jugando', juegoId],
   );
+  // Requiere que el/los movimiento(s) de esta jugada ya estén guardados
+  // (ver guardarMovimiento) — necesita su `turno` para anclar el punto.
+  try {
+    await guardarPuntos(salaId, partida);
+  } catch (e) {
+    console.error('Error guardando partida_puntos:', e);
+  }
   if (terminada) {
     await pool.query(
       `UPDATE salas SET estado = 'finalizada', finished_at = NOW(), updated_at = NOW() WHERE id = $1`,
@@ -102,22 +110,68 @@ async function guardarMovimiento(salaId: string, m: MovimientoInput) {
   // Volumen bajo (una partida a 100 puntos son pocas decenas de jugadas);
   // no hace falta llevar un contador en PartidaState, una query de más
   // por jugada es despreciable frente al UPDATE que ya se hace a `juegos`.
+  // `orden` resetea por mano (numero_mano, orden); `turno` NO resetea —
+  // es el número de jugada corto a lo largo de TODA la partida, para
+  // poder referenciarlo desde partida_puntos sin usar el UUID largo.
   const { rows } = await pool.query(
-    `SELECT COALESCE(MAX(orden), -1) + 1 AS next
-     FROM partida_movimientos WHERE sala_id = $1 AND numero_mano = $2`,
+    `SELECT
+       COALESCE(MAX(orden) FILTER (WHERE numero_mano = $2), -1) + 1 AS next_orden,
+       COALESCE(MAX(turno), 0) + 1 AS next_turno
+     FROM partida_movimientos WHERE sala_id = $1`,
     [salaId, m.numeroMano],
   );
   await pool.query(
-    `INSERT INTO partida_movimientos (sala_id, numero_mano, orden, seat, tipo, pieza_a, pieza_b, lado)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-    [salaId, m.numeroMano, rows[0].next, m.seat, m.tipo, m.pieza?.a ?? null, m.pieza?.b ?? null, m.lado],
+    `INSERT INTO partida_movimientos (sala_id, numero_mano, orden, turno, seat, tipo, pieza_a, pieza_b, lado)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+    [salaId, m.numeroMano, rows[0].next_orden, rows[0].next_turno, m.seat, m.tipo, m.pieza?.a ?? null, m.pieza?.b ?? null, m.lado],
   );
 }
 
 async function guardarMovimientos(salaId: string, movimientos: (MovimientoInput | MovimientoBot)[]) {
-  // Secuencial (no Promise.all): el `orden` de cada uno depende de haber
-  // visto ya los INSERTs anteriores de esta misma tanda.
+  // Secuencial (no Promise.all): el `orden`/`turno` de cada uno depende de
+  // haber visto ya los INSERTs anteriores de esta misma tanda.
   for (const m of movimientos) await guardarMovimiento(salaId, m);
+}
+
+// ── Ledger de puntos (turno = partida_movimientos.turno) ────────────
+// Se llama SIEMPRE que se persiste el estado de la partida (guardarPartida)
+// — solo inserta algo si esta jugada cerró una mano (resultadoMano) o
+// disparó el bonus "pasó a todos" (ultimoEvento). Idempotente por sí sola
+// (UNIQUE(sala_id, turno, tipo) + ON CONFLICT DO NOTHING): guardarPartida
+// puede llamarse varias veces con el mismo resultadoMano sin duplicar fila.
+async function guardarPuntos(salaId: string, partida: PartidaState) {
+  const r = partida.resultadoMano;
+  const hayBonus = partida.ultimoEvento?.tipo === 'paso_a_todos';
+  if (!r && !hayBonus) return;
+
+  const { rows } = await pool.query(
+    `SELECT COALESCE(MAX(turno), 0) AS turno FROM partida_movimientos WHERE sala_id = $1`,
+    [salaId],
+  );
+  const turno = rows[0].turno;
+
+  if (r) {
+    const equipo = r.tipo === 'tranca' ? r.equipoGanador : equipoDe(r.ganadorSeat);
+    const noCaben = r.tipo === 'tranca' && !!r.noCaben;
+    await pool.query(
+      `INSERT INTO partida_puntos
+         (sala_id, numero_mano, turno, tipo, equipo, puntos, no_caben, marcador_0, marcador_1)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       ON CONFLICT (sala_id, turno, tipo) DO NOTHING`,
+      [salaId, partida.numeroMano, turno, r.tipo, equipo, r.puntos, noCaben, partida.marcador[0], partida.marcador[1]],
+    );
+  }
+
+  if (hayBonus && partida.ultimoEvento) {
+    const equipo = equipoDe(partida.ultimoEvento.seat);
+    await pool.query(
+      `INSERT INTO partida_puntos
+         (sala_id, numero_mano, turno, tipo, equipo, puntos, no_caben, marcador_0, marcador_1)
+       VALUES ($1,$2,$3,'paso_a_todos',$4,$5,false,$6,$7)
+       ON CONFLICT (sala_id, turno, tipo) DO NOTHING`,
+      [salaId, partida.numeroMano, turno, equipo, PUNTOS_PASO_A_TODOS, partida.marcador[0], partida.marcador[1]],
+    );
+  }
 }
 
 // Un juego a la vez resolviendo bots en segundo plano — sin este guard, una
@@ -136,8 +190,8 @@ export function resolverBotsEnSegundoPlano(juegoId: string, salaId: string, part
   if (resolucionesEnCurso.has(juegoId)) return;
   resolucionesEnCurso.add(juegoId);
   resolverTurnosBotConDelay(partida, async (p, m) => {
-    await guardarPartida(juegoId, salaId, p);
     if (m) await guardarMovimiento(salaId, m);
+    await guardarPartida(juegoId, salaId, p);
   })
     .catch(e => console.error('Error resolviendo turnos de bot:', e))
     .finally(() => resolucionesEnCurso.delete(juegoId));
@@ -294,8 +348,8 @@ export async function juegosRoutes(app: FastifyInstance) {
       numeroMano: numeroManoAntes, seat, tipo: 'jugar', pieza,
       lado: resultado.partida.ultimaJugada?.lado ?? null,
     }];
-    await guardarPartida(juego.id, juego.sala_id, resultado.partida);
     await guardarMovimientos(juego.sala_id, movimientos);
+    await guardarPartida(juego.id, juego.sala_id, resultado.partida);
     resolverBotsEnSegundoPlano(juego.id, juego.sala_id, resultado.partida);
     return reply.send(vistaPublica(resultado.partida, usuario_id));
   });
@@ -337,8 +391,8 @@ export async function juegosRoutes(app: FastifyInstance) {
     const movimientos: MovimientoInput[] = seat === -1 ? [] : [{
       numeroMano: numeroManoAntes, seat, tipo: 'pasar', pieza: null, lado: null,
     }];
-    await guardarPartida(juego.id, juego.sala_id, resultado.partida);
     await guardarMovimientos(juego.sala_id, movimientos);
+    await guardarPartida(juego.id, juego.sala_id, resultado.partida);
     resolverBotsEnSegundoPlano(juego.id, juego.sala_id, resultado.partida);
     return reply.send(vistaPublica(resultado.partida, req.body.usuario_id));
   });
