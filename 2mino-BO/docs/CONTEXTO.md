@@ -33,30 +33,37 @@ son bugs del juego en sí, sin relación con el Back Office.
 
 ## Estado actual
 
-- `src/views/LoginView.tsx` — login admin. **Real**: `POST /auth/login`
-  contra `api-integracion`, rechaza cuentas cuyo `segmento !== 'admin'`.
-- `src/views/FeatureFlagsView.tsx` — listar/activar-desactivar flags.
-  **Real**: `GET/PATCH /admin/feature-flags[/:clave]` (proxy directo a
-  `ms-frontend-landing`, protegido por `requireAdmin()`).
-- `src/views/UsuariosView.tsx` — buscar/listar usuarios, cambiar
-  segmento, banear/reactivar. **Todavía mock** (paso 3 pendiente).
-- `src/views/SegmentosView.tsx` — listar/crear/activar-desactivar
-  segmentos. **Todavía mock** (paso 3 pendiente).
-- `src/lib/api.ts` — mitad real, mitad mock: login/feature-flags pegan a
-  `api-integracion` (`VITE_API_URL`, default `http://localhost:3000`);
-  usuarios/segmentos siguen contra `localStorage` hasta que exista el
-  backend correspondiente. Las funciones mock quedan claramente
-  delimitadas al final del archivo.
-- `src/lib/types.ts` — `FeatureFlag` ya matchea la forma real de
-  `landing_config` (`clave`, `valor`, `descripcion`, `habilitado`,
-  `updated_at` — sin `etiqueta`, esa columna no existe).
+**Cero mock — todo el panel habla contra el backend real de `2mino`.**
+
+- `src/views/LoginView.tsx` — `POST /auth/login`, rechaza cuentas cuyo
+  `segmento !== 'admin'`.
+- `src/views/FeatureFlagsView.tsx` — `GET/PATCH /admin/feature-flags[/:clave]`
+  (proxy directo a `ms-frontend-landing`).
+- `src/views/UsuariosView.tsx` — `GET /admin/usuarios?q=`, `PATCH
+  /admin/usuarios/:id/segmento`, `PATCH /admin/usuarios/:id/estado`
+  (ban/reactivar). Sin columna ELO — no existe en `ms-usuarios` (vive en
+  `ranked_historial` de `ms-salas`, fuera de alcance de esta versión).
+- `src/views/SegmentosView.tsx` — `GET/POST /admin/segmentos`, `PATCH
+  /admin/segmentos/:id/estado`.
+- `src/lib/api.ts` — un solo `adminFetch()` autenticado para todo
+  `/admin/*`; mapea el snake_case de `ms-usuarios` (`segmento_id`) al
+  camelCase que ya esperaban las vistas (`segmentoId`), para no tocarlas.
+- `src/lib/types.ts` — `FeatureFlag`/`Usuario` ya matchean la forma real
+  de sus tablas (`FeatureFlag` sin `etiqueta`, no existe esa columna en
+  `landing_config`; `Usuario` sin `elo`/`creadoEn`, no se muestran hoy).
 - Recorrido reciente en git log: se probó empaquetar como app de
   escritorio (Electron), se revirtió (`DESIGN.md` §14 documenta por qué:
   overhead de mantener un segundo target de build para un panel de uso
   interno), y quedó como **PWA instalable** (`vite-plugin-pwa`,
-  `scripts/serve-pwa.cjs`) que corre localmente.
+  `scripts/serve-pwa.cjs`) que corre localmente — con el service worker
+  **desactivado en dev** (`devOptions.enabled: false`): activarlo causó
+  confusión real (bundle viejo cacheado sirviéndose aunque el código en
+  disco ya hubiera cambiado). Para probar el SW de verdad: `npm run
+  build && npm run serve:pwa` (o `preview`), nunca en `npm run dev`.
 
-**Para promover una cuenta a `admin` hoy** (no hay UI todavía, paso 3):
+**Para promover una cuenta a `admin`**: ya se puede hacer desde la propia
+UI (Usuarios → cambiar segmento a `admin`) una vez que exista al menos
+un admin. Para la primera cuenta (bootstrap), a mano:
 
 ```sql
 UPDATE usuarios SET segmento_id = (SELECT id FROM segmentos WHERE nombre='admin')
@@ -84,9 +91,9 @@ npm run serve:pwa     # sirve el build de la PWA
 npm run lint          # oxlint
 ```
 
-Para que login/feature-flags funcionen de verdad hace falta el stack de
-`2mino` corriendo (`docker compose up -d` en la raíz) — `api-integracion`
-en `localhost:3000`. Usuarios/segmentos no lo necesitan (mock puro).
+Para que cualquier vista funcione hace falta el stack de `2mino`
+corriendo (`docker compose up -d` en la raíz) — `api-integracion` en
+`localhost:3000`. Ya no hay ninguna vista que funcione sin backend.
 
 **Se mantiene local, nunca se despliega al VPS.** El pipeline (`../Jenkinsfile`)
 detecta si un push solo tocó `2mino-BO/` y en ese caso salta type-check,
@@ -101,13 +108,12 @@ que revisar ambos archivos.
 1. ✅ Segmento `admin` + `signToken` con `segmento` + `requireAdmin()` en
    `api-integracion`.
 2. ✅ Feature flags reales (`GET/PATCH /admin/feature-flags`).
-3. **Siguiente**: Usuarios y segmentos (CRUD + ban) — necesita
-   `GET /admin/usuarios` nuevo en `ms-usuarios` (hoy no hay listado, solo
-   `GET /usuarios/:id`), más `PATCH /admin/usuarios/:id/segmento` y
-   `PATCH /admin/usuarios/:id/estado` (ban, requiere columna
-   `usuarios.activo`).
-4. Reglas del juego, torneos, analítica, CRM/pagos — ver el documento
-   completo para el detalle de cada uno (schema SQL incluido).
+3. ✅ Usuarios y segmentos reales (CRUD + ban, `usuarios.activo`).
+4. **Siguiente**: Reglas del juego, torneos, analítica, CRM/pagos — ver
+   el documento completo para el detalle de cada uno (schema SQL
+   incluido). Reglas del juego es lo más chico de este grupo (una tabla
+   `reglas_juego`, mismo patrón clave→valor que `landing_config`); torneos
+   es lo más grande y depende de que esto ya esté sólido.
 
 ## Conexión al backend real (cuando exista)
 
