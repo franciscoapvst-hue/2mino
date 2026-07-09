@@ -2,12 +2,13 @@ import { FastifyInstance } from 'fastify';
 import { pool } from '../db/pool';
 import {
   crearPartida, aplicarJugada, aplicarPase, marcarListo, aplicarAbandono, vistaPublica, equipoDe,
-  PUNTOS_PASO_A_TODOS,
+  PUNTOS_PASO_A_TODOS, PUNTOS_CAPICUA,
 } from '../game/logic';
 import type { PartidaState, Pieza } from '../game/logic';
 import { aplicarEloRanked } from './ranked';
 import { resolverTurnosBotConDelay } from '../game/bots';
 import type { MovimientoBot } from '../game/bots';
+import { getRegla, limiteJugadaMsDe } from '../game/reglas';
 
 const ErrorSchema = {
   type: 'object',
@@ -246,11 +247,16 @@ export async function juegosRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: `Se necesitan ${sala.max_jugadores} jugadores para iniciar` });
     }
 
-    // Objetivo de puntos definido al crear la sala (100/150/200)
+    // Objetivo de puntos definido al crear la sala (100/150/200 por defecto,
+    // configurable desde el Back Office vía reglas_juego.puntos_objetivo)
     const config = typeof sala.config === 'string' ? JSON.parse(sala.config) : (sala.config ?? {});
-    const objetivo = [100, 150, 200].includes(config.puntosObjetivo) ? config.puntosObjetivo : 100;
+    const opcionesObjetivo = getRegla('puntos_objetivo', [100, 150, 200]);
+    const objetivo = opcionesObjetivo.includes(config.puntosObjetivo) ? config.puntosObjetivo : opcionesObjetivo[0];
 
-    const partida = crearPartida(jugadores, objetivo);
+    const partida = crearPartida(
+      jugadores, objetivo, getRegla('puntos_capicua', PUNTOS_CAPICUA),
+      limiteJugadaMsDe(sala.tipo === 'ranked' ? 'ranked' : 'casual'),
+    );
 
     await pool.query(
       `INSERT INTO juegos (sala_id, partida) VALUES ($1, $2)`,

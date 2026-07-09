@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   crearSet, getExtremos, puedeJugar, esCapicua, equipoDe,
   abrirTablero, crearPartida, aplicarJugada, aplicarPase, marcarListo, aplicarAbandono,
+  PUNTOS_CAPICUA,
   type Val, type Pieza, type Asiento, type PartidaState,
 } from './logic';
 
@@ -20,6 +21,7 @@ function partida(over: Partial<PartidaState> = {}): PartidaState {
     maxJugadores: n,
     asientos: asientos(n),
     puntosObjetivo: 100,
+    puntosCapicua: PUNTOS_CAPICUA,
     marcador: [0, 0],
     numeroMano: 1,
     salida: 0,
@@ -38,6 +40,8 @@ function partida(over: Partial<PartidaState> = {}): PartidaState {
     resultadoMano: null,
     ultimoEvento: null,
     abandonadoPorSeat: null,
+    limiteJugadaMs: null,
+    turnoEmpiezaEn: 0,
     ...over,
   };
 }

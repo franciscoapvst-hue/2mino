@@ -7,6 +7,8 @@ import { juegosRoutes } from './routes/juegos';
 import { rankedRoutes } from './routes/ranked';
 import { matchmakingRoutes } from './routes/matchmaking';
 import { historialRoutes } from './routes/historial';
+import { reglasRoutes } from './routes/reglas';
+import { cargarReglas } from './game/reglas';
 
 const app = Fastify({
   logger: true,
@@ -36,6 +38,7 @@ app.register(juegosRoutes);
 app.register(rankedRoutes);
 app.register(matchmakingRoutes);
 app.register(historialRoutes);
+app.register(reglasRoutes);
 
 app.get('/health', {
   schema: {
@@ -52,6 +55,7 @@ app.get('/health', {
 async function start() {
   try {
     await runMigrations();
+    await cargarReglas();
     const port = Number(process.env.PORT) || 6001;
     await app.listen({ port, host: '0.0.0.0' });
     app.log.info(`Swagger UI → http://localhost:${port}/docs`);

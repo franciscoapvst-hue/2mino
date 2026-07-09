@@ -20,38 +20,47 @@ import { BOT_FILL_MS, BOT_IDS, BOT_USERNAMES } from './bots';
 
 // ── Rango de ELO aceptable, creciente con el tiempo de espera ──────
 // 0-15s: ±50 · 15-30s: ±100 · 30-45s: ±200 · 45-60s: ±400 · 60s+: ±800
-const ESCALONES_RANGO = [50, 100, 200, 400, 800];
-const PASO_MS = 15_000;
+export const ESCALONES_RANGO = [50, 100, 200, 400, 800];
+export const PASO_MS = 15_000;
 
-export function rangoPermitido(esperaMs: number): number {
+export function rangoPermitido(
+  esperaMs: number,
+  escalones: number[] = ESCALONES_RANGO,
+  pasoMs: number = PASO_MS,
+): number {
   // esperaMs puede ser levemente negativo: un ticket recién insertado tiene
   // created_at (reloj de la DB) una fracción de ms por delante del Date.now()
   // usado como "ahora". Sin el max(0,…), floor da -1 e indexa fuera del array
   // (undefined) → toda comparación de rango falla y NO empareja al entrar.
-  const paso = Math.max(0, Math.floor(esperaMs / PASO_MS));
-  const idx = Math.min(paso, ESCALONES_RANGO.length - 1);
-  return ESCALONES_RANGO[idx];
+  const paso = Math.max(0, Math.floor(esperaMs / pasoMs));
+  const idx = Math.min(paso, escalones.length - 1);
+  return escalones[idx];
 }
 
 // Umbral de espera tras el cual una party deja de esperar a otra party
 // y acepta rellenar el equipo rival con jugadores sueltos.
-const UMBRAL_RELLENO_MS = PASO_MS; // 15s
+export const UMBRAL_RELLENO_MS = PASO_MS; // 15s
 
-function dentroDeRango(a: Ticket, b: Ticket, ahora: number): boolean {
+function dentroDeRango(a: Ticket, b: Ticket, ahora: number, escalones: number[], pasoMs: number): boolean {
   const espera = Math.min(ahora - a.creadoEn, ahora - b.creadoEn);
-  return Math.abs(a.elo - b.elo) <= rangoPermitido(espera);
+  return Math.abs(a.elo - b.elo) <= rangoPermitido(espera, escalones, pasoMs);
 }
 
 // ── 1v1 ─────────────────────────────────────────────────────────────
 export type Match2p = { par: [Ticket, Ticket] };
 
 /** Empareja los dos tickets más antiguos cuyo ELO caiga dentro de rango. */
-export function tryMatch2p(tickets: Ticket[], ahora: number): Match2p | null {
+export function tryMatch2p(
+  tickets: Ticket[],
+  ahora: number,
+  escalones: number[] = ESCALONES_RANGO,
+  pasoMs: number = PASO_MS,
+): Match2p | null {
   const cola = tickets.filter(t => t.modo === 2).sort((a, b) => a.creadoEn - b.creadoEn);
 
   for (let i = 0; i < cola.length; i++) {
     for (let j = i + 1; j < cola.length; j++) {
-      if (dentroDeRango(cola[i], cola[j], ahora)) {
+      if (dentroDeRango(cola[i], cola[j], ahora, escalones, pasoMs)) {
         return { par: [cola[i], cola[j]] };
       }
     }
@@ -71,7 +80,13 @@ export type Match4p = { equipoA: Ticket[]; equipoB: Ticket[] };
  *     en equipos balanceados (par extremo + par medio: minimiza la
  *     diferencia de promedio entre equipos para una distribución típica).
  */
-export function tryMatch4p(tickets: Ticket[], ahora: number): Match4p | null {
+export function tryMatch4p(
+  tickets: Ticket[],
+  ahora: number,
+  escalones: number[] = ESCALONES_RANGO,
+  pasoMs: number = PASO_MS,
+  umbralRellenoMs: number = UMBRAL_RELLENO_MS,
+): Match4p | null {
   const cola = tickets.filter(t => t.modo === 4);
   const parties = cola.filter(t => t.usuarioIds.length === 2)
     .sort((a, b) => a.creadoEn - b.creadoEn);
@@ -81,7 +96,7 @@ export function tryMatch4p(tickets: Ticket[], ahora: number): Match4p | null {
   // 1) party vs party
   for (let i = 0; i < parties.length; i++) {
     for (let j = i + 1; j < parties.length; j++) {
-      if (dentroDeRango(parties[i], parties[j], ahora)) {
+      if (dentroDeRango(parties[i], parties[j], ahora, escalones, pasoMs)) {
         return { equipoA: [parties[i]], equipoB: [parties[j]] };
       }
     }
@@ -89,8 +104,8 @@ export function tryMatch4p(tickets: Ticket[], ahora: number): Match4p | null {
 
   // 2) party + relleno de solos, si ya esperó el umbral
   for (const p of parties) {
-    if (ahora - p.creadoEn < UMBRAL_RELLENO_MS) continue;
-    const rango = rangoPermitido(ahora - p.creadoEn);
+    if (ahora - p.creadoEn < umbralRellenoMs) continue;
+    const rango = rangoPermitido(ahora - p.creadoEn, escalones, pasoMs);
     const candidatos = solos.filter(s => Math.abs(s.elo - p.elo) <= rango);
     if (candidatos.length >= 2) {
       // los dos más cercanos en ELO al promedio de la party
@@ -104,7 +119,7 @@ export function tryMatch4p(tickets: Ticket[], ahora: number): Match4p | null {
     const ventana = solos.slice(i, i + 4);
     const [p1, p2, p3, p4] = ventana;
     const espera = Math.min(...ventana.map(t => ahora - t.creadoEn));
-    if (p4.elo - p1.elo <= rangoPermitido(espera)) {
+    if (p4.elo - p1.elo <= rangoPermitido(espera, escalones, pasoMs)) {
       // Balance: extremos juntos vs medios juntos (heurística simple)
       return { equipoA: [p1, p4], equipoB: [p2, p3] };
     }

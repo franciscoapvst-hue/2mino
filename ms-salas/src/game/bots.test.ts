@@ -118,6 +118,57 @@ describe('resolverTurnosBot', () => {
   });
 });
 
+describe('resolverTurnosBot — tiempo límite por jugada (docs/PENDIENTES_JUEGO.md §2)', () => {
+  it('sin límite configurado (null), un humano nunca se fuerza aunque pase mucho tiempo', () => {
+    const partida = crearPartida([asiento('humano-1', 'ana', 1), asiento('humano-2', 'beto', 2)]);
+    const vencidaHaceRato: PartidaState = {
+      ...partida, turno: 0, limiteJugadaMs: null, turnoEmpiezaEn: Date.now() - 999_999,
+    };
+    const resultado = resolverTurnosBot(vencidaHaceRato);
+    expect(resultado.partida).toBe(vencidaHaceRato);
+    expect(resultado.movimientos).toEqual([]);
+  });
+
+  it('dentro del límite, un humano no se fuerza', () => {
+    const partida = crearPartida([asiento('humano-1', 'ana', 1), asiento('humano-2', 'beto', 2)]);
+    const dentroDelLimite: PartidaState = {
+      ...partida, turno: 0, limiteJugadaMs: 30_000, turnoEmpiezaEn: Date.now() - 5_000,
+    };
+    const resultado = resolverTurnosBot(dentroDelLimite);
+    expect(resultado.partida).toBe(dentroDelLimite);
+    expect(resultado.movimientos).toEqual([]);
+  });
+
+  it('agotado el límite, se fuerza la jugada del humano en turno', () => {
+    const base = crearPartida([asiento('humano-1', 'ana', 1), asiento('humano-2', 'beto', 2)]);
+    const vencida: PartidaState = {
+      ...base, turno: 0, salidaForzada: null,
+      limiteJugadaMs: 15_000, turnoEmpiezaEn: Date.now() - 20_000,
+    };
+    const { partida, movimientos } = resolverTurnosBot(vencida);
+    expect(movimientos.length).toBeGreaterThan(0);
+    expect(movimientos[0].seat).toBe(0);
+    // Único paso posible (el rival, seat 1, es humano y no venció su propio
+    // límite recién sellado) — el evento de tiempo agotado queda visible.
+    expect(partida.ultimoEvento).toEqual({ tipo: 'tiempo_agotado', seat: 0 });
+  });
+
+  it('agotado el límite y sin fichas jugables, el humano pasa automáticamente', () => {
+    const base = crearPartida([asiento('humano-1', 'ana', 1), asiento('humano-2', 'beto', 2)]);
+    // Tablero abierto en 0-0: ninguna ficha que no toque el valor 0 puede
+    // jugarse ahí, así que este filtro garantiza una mano sin jugada válida.
+    const manoSinJugada = base.manos[0].filter(p => p.a !== 0 && p.b !== 0);
+    const vencida: PartidaState = {
+      ...base, turno: 0, salidaForzada: null,
+      manos: [manoSinJugada, base.manos[1]],
+      tablero: [abrirTablero({ a: 0, b: 0 })],
+      limiteJugadaMs: 15_000, turnoEmpiezaEn: Date.now() - 20_000,
+    };
+    const { movimientos } = resolverTurnosBot(vencida);
+    expect(movimientos[0]).toMatchObject({ seat: 0, tipo: 'pasar', pieza: null });
+  });
+});
+
 describe('BOT_FILL_MS', () => {
   it('es 10 segundos', () => {
     expect(BOT_FILL_MS).toBe(10_000);

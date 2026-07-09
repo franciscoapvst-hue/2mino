@@ -1,8 +1,9 @@
 import { FastifyInstance } from 'fastify';
 import { pool } from '../db/pool';
-import { deltaElo, eloEquipo, ELO_INICIAL } from '../game/elo';
+import { deltaElo, eloEquipo, ELO_INICIAL, K_FACTOR } from '../game/elo';
 import { equipoDe } from '../game/logic';
 import type { PartidaState } from '../game/logic';
+import { getRegla } from '../game/reglas';
 
 const ErrorSchema = {
   type: 'object',
@@ -27,17 +28,20 @@ export async function aplicarEloRanked(salaId: string, partida: PartidaState): P
     'SELECT 1 FROM ranked_historial WHERE sala_id = $1 LIMIT 1', [salaId]);
   if (ya.length) return;
 
+  const eloInicial = getRegla('elo_inicial', ELO_INICIAL);
+  const kFactor    = getRegla('k_factor', K_FACTOR);
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    // Asegurar fila de rating para cada jugador (arranca en ELO_INICIAL)
+    // Asegurar fila de rating para cada jugador (arranca en eloInicial)
     for (const a of partida.asientos) {
       await client.query(
         `INSERT INTO ranked_ratings (usuario_id, username, elo)
          VALUES ($1, $2, $3)
          ON CONFLICT (usuario_id) DO UPDATE SET username = EXCLUDED.username`,
-        [a.usuario_id, a.username, ELO_INICIAL],
+        [a.usuario_id, a.username, eloInicial],
       );
     }
 
@@ -51,18 +55,19 @@ export async function aplicarEloRanked(salaId: string, partida: PartidaState): P
     const ganador  = partida.equipoGanadorPartida;
     const elosDeEq = (eq: 0 | 1) => partida.asientos
       .filter((_, seat) => equipoDe(seat) === eq)
-      .map(a => eloDe.get(a.usuario_id) ?? ELO_INICIAL);
+      .map(a => eloDe.get(a.usuario_id) ?? eloInicial);
 
     // Delta único por cruce: ELO de equipo = promedio de la pareja
     const delta = deltaElo(
       eloEquipo(elosDeEq(ganador)),
       eloEquipo(elosDeEq(ganador === 0 ? 1 : 0)),
+      kFactor,
     );
 
     for (let seat = 0; seat < partida.asientos.length; seat++) {
       const a     = partida.asientos[seat];
       const gano  = equipoDe(seat) === ganador;
-      const antes = eloDe.get(a.usuario_id) ?? ELO_INICIAL;
+      const antes = eloDe.get(a.usuario_id) ?? eloInicial;
       const despues = Math.max(0, antes + (gano ? delta : -delta));
 
       await client.query(
@@ -141,7 +146,7 @@ export async function rankedRoutes(app: FastifyInstance) {
 
     return reply.send({
       usuario_id,
-      elo:      rating[0]?.elo      ?? ELO_INICIAL,
+      elo:      rating[0]?.elo      ?? getRegla('elo_inicial', ELO_INICIAL),
       partidas: rating[0]?.partidas ?? 0,
       ganadas:  rating[0]?.ganadas  ?? 0,
       historial,
@@ -190,7 +195,7 @@ export async function rankedRoutes(app: FastifyInstance) {
     return reply.send({
       usuario_id,
       username:          rating[0]?.username ?? null,
-      elo:               rating[0]?.elo      ?? ELO_INICIAL,
+      elo:               rating[0]?.elo      ?? getRegla('elo_inicial', ELO_INICIAL),
       partidas:          rating[0]?.partidas ?? 0,
       ganadas:           rating[0]?.ganadas  ?? 0,
       capicuas:          Number(agregado[0]?.total_capicuas ?? 0),

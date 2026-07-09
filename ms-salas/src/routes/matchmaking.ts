@@ -1,12 +1,18 @@
 import { FastifyInstance } from 'fastify';
 import { pool } from '../db/pool';
 import { codigoDisponibleEn } from './salas';
-import { crearPartida } from '../game/logic';
+import { crearPartida, PUNTOS_CAPICUA } from '../game/logic';
 import type { Asiento, PartidaState } from '../game/logic';
 import { ELO_INICIAL } from '../game/elo';
-import { tryMatch2p, tryMatch4p, rangoPermitido, rellenoConBots } from '../game/matchmaking';
+import {
+  tryMatch2p, tryMatch4p, rangoPermitido, rellenoConBots,
+  ESCALONES_RANGO as ESCALONES_RANGO_DEFECTO,
+  PASO_MS as PASO_MS_DEFECTO,
+  UMBRAL_RELLENO_MS as UMBRAL_RELLENO_MS_DEFECTO,
+} from '../game/matchmaking';
 import type { Ticket } from '../game/matchmaking';
 import { resolverBotsEnSegundoPlano } from './juegos';
+import { getRegla, limiteJugadaMsDe } from '../game/reglas';
 
 const ErrorSchema = {
   type: 'object',
@@ -15,21 +21,22 @@ const ErrorSchema = {
 
 const AnySchema = { type: 'object', additionalProperties: true } as const;
 
-// Matchmaking sirve casual y ranked. Partida estándar a 100 puntos, sin
-// selector (las salas manuales sí lo eligen).
-const PUNTOS_MM = 100;
+// Matchmaking sirve casual y ranked. Partida estándar: el primer valor
+// configurado en reglas_juego.puntos_objetivo, sin selector (las salas
+// manuales sí lo eligen).
+const PUNTOS_MM_DEFECTO = 100;
 
 type Tipo = 'casual' | 'ranked';
 
 async function getElo(usuarioId: string): Promise<number> {
   const { rows } = await pool.query('SELECT elo FROM ranked_ratings WHERE usuario_id = $1', [usuarioId]);
-  return rows[0]?.elo ?? ELO_INICIAL;
+  return rows[0]?.elo ?? getRegla('elo_inicial', ELO_INICIAL);
 }
 
 // ELO de referencia para la cola. Casual empareja por orden de llegada
 // (FIFO): todos con el mismo valor → el rango de ELO nunca bloquea.
 async function eloRef(usuarioId: string, tipo: Tipo): Promise<number> {
-  return tipo === 'casual' ? ELO_INICIAL : getElo(usuarioId);
+  return tipo === 'casual' ? getRegla('elo_inicial', ELO_INICIAL) : getElo(usuarioId);
 }
 
 // ── Carga los tickets vigentes de un modo+tipo como Ticket[] ────────
@@ -78,12 +85,14 @@ async function crearSala(
   tipo: Tipo,
   asientos: Asiento[],
 ): Promise<{ salaId: string; juegoId: string; partidaInicial: PartidaState }> {
+  const puntosMm = getRegla('puntos_objetivo', [100, 150, 200])[0] ?? PUNTOS_MM_DEFECTO;
+
   const codigo = await codigoDisponibleEn('salas', '2M-');
   const { rows: salaRows } = await client.query(
     `INSERT INTO salas (codigo, creador_id, tipo, modo, max_jugadores, estado, started_at, config)
      VALUES ($1, $2, $3, 'clasico', $4, 'en_juego', NOW(), $5)
      RETURNING id`,
-    [codigo, asientos[0].usuario_id, tipo, modo, JSON.stringify({ puntosObjetivo: PUNTOS_MM })],
+    [codigo, asientos[0].usuario_id, tipo, modo, JSON.stringify({ puntosObjetivo: puntosMm })],
   );
   const salaId = salaRows[0].id;
 
@@ -95,7 +104,9 @@ async function crearSala(
     );
   }
 
-  const partidaInicial = crearPartida(asientos, PUNTOS_MM);
+  const partidaInicial = crearPartida(
+    asientos, puntosMm, getRegla('puntos_capicua', PUNTOS_CAPICUA), limiteJugadaMsDe(tipo),
+  );
   const { rows: juegoRows } = await client.query(
     `INSERT INTO juegos (sala_id, partida) VALUES ($1, $2) RETURNING id`,
     [salaId, JSON.stringify(partidaInicial)],
@@ -127,12 +138,15 @@ async function intentarEmparejar(modo: 2 | 4, tipo: Tipo): Promise<{ matched: bo
 
     const tickets = await cargarTickets(client, modo, tipo);
     const ahora = Date.now();
+    const escalones = getRegla('escalones_rango', ESCALONES_RANGO_DEFECTO);
+    const pasoMs = getRegla('paso_escalon_ms', PASO_MS_DEFECTO);
+    const umbralRellenoMs = getRegla('umbral_relleno_ms', UMBRAL_RELLENO_MS_DEFECTO);
 
     let asientos: Asiento[] | null = null;
     let idsAEliminar: string[] = [];
 
     if (modo === 2) {
-      const m = tryMatch2p(tickets, ahora);
+      const m = tryMatch2p(tickets, ahora, escalones, pasoMs);
       if (m) {
         asientos = [
           { usuario_id: m.par[0].usuarioIds[0], username: m.par[0].usernames[0], posicion: 1 },
@@ -141,7 +155,7 @@ async function intentarEmparejar(modo: 2 | 4, tipo: Tipo): Promise<{ matched: bo
         idsAEliminar = [m.par[0].id, m.par[1].id];
       }
     } else {
-      const m = tryMatch4p(tickets, ahora);
+      const m = tryMatch4p(tickets, ahora, escalones, pasoMs, umbralRellenoMs);
       if (m) {
         asientos = asientosDesdeEquipos(m.equipoA, m.equipoB);
         idsAEliminar = [...m.equipoA, ...m.equipoB].map(t => t.id);
@@ -202,7 +216,8 @@ function respuestaCola(
 ) {
   if (resultado.matched) return { en_cola: false, matched: true, sala_id: resultado.salaId };
   // El ticket se acaba de crear en esta misma llamada: espera ~0.
-  return { en_cola: true, modo, es_party: esParty, espera_ms: 0, rango_actual: rangoPermitido(0) };
+  const rango = rangoPermitido(0, getRegla('escalones_rango', ESCALONES_RANGO_DEFECTO), getRegla('paso_escalon_ms', PASO_MS_DEFECTO));
+  return { en_cola: true, modo, es_party: esParty, espera_ms: 0, rango_actual: rango };
 }
 
 export async function matchmakingRoutes(app: FastifyInstance) {
@@ -451,7 +466,7 @@ export async function matchmakingRoutes(app: FastifyInstance) {
       modo: ticket.modo,
       es_party: !!ticket.party_id,
       espera_ms: esperaMs,
-      rango_actual: rangoPermitido(esperaMs),
+      rango_actual: rangoPermitido(esperaMs, getRegla('escalones_rango', ESCALONES_RANGO_DEFECTO), getRegla('paso_escalon_ms', PASO_MS_DEFECTO)),
     });
   });
 
