@@ -31,42 +31,62 @@ nivel arriba) — es el documento de referencia para todo lo que falta
 construir del lado de backend. No confundir con `../docs/BUGS.md`, que
 son bugs del juego en sí, sin relación con el Back Office.
 
-## Estado actual (rama `feature1.0`)
+## Estado actual
 
-Frontend scaffolded, **sin backend real conectado todavía**:
-
-- `src/views/LoginView.tsx` — login admin.
+- `src/views/LoginView.tsx` — login admin. **Real**: `POST /auth/login`
+  contra `api-integracion`, rechaza cuentas cuyo `segmento !== 'admin'`.
 - `src/views/FeatureFlagsView.tsx` — listar/activar-desactivar flags.
+  **Real**: `GET/PATCH /admin/feature-flags[/:clave]` (proxy directo a
+  `ms-frontend-landing`, protegido por `requireAdmin()`).
 - `src/views/UsuariosView.tsx` — buscar/listar usuarios, cambiar
-  segmento, banear/reactivar.
+  segmento, banear/reactivar. **Todavía mock** (paso 3 pendiente).
 - `src/views/SegmentosView.tsx` — listar/crear/activar-desactivar
-  segmentos.
-- `src/lib/api.ts` — **cliente mock**: reproduce el contrato de
-  `CASOS_DE_USO_BACKOFFICE.md` (§2 login, §3 usuarios, §4 segmentos, §5
-  feature flags) contra `localStorage`/`sessionStorage`, no contra
-  `api-integracion`. Es el único archivo a reemplazar cuando el backend
-  real exista — las vistas ya consumen sus firmas de función, no hacen
-  `fetch` directo.
-- `src/lib/types.ts` — tipos (`Segmento`, `Usuario`, `FeatureFlag`,
-  `AdminSession`) — deben mantenerse en sync con lo que devuelva el
-  backend real cuando se conecte.
+  segmentos. **Todavía mock** (paso 3 pendiente).
+- `src/lib/api.ts` — mitad real, mitad mock: login/feature-flags pegan a
+  `api-integracion` (`VITE_API_URL`, default `http://localhost:3000`);
+  usuarios/segmentos siguen contra `localStorage` hasta que exista el
+  backend correspondiente. Las funciones mock quedan claramente
+  delimitadas al final del archivo.
+- `src/lib/types.ts` — `FeatureFlag` ya matchea la forma real de
+  `landing_config` (`clave`, `valor`, `descripcion`, `habilitado`,
+  `updated_at` — sin `etiqueta`, esa columna no existe).
 - Recorrido reciente en git log: se probó empaquetar como app de
   escritorio (Electron), se revirtió (`DESIGN.md` §14 documenta por qué:
   overhead de mantener un segundo target de build para un panel de uso
   interno), y quedó como **PWA instalable** (`vite-plugin-pwa`,
   `scripts/serve-pwa.cjs`) que corre localmente.
 
+**Para promover una cuenta a `admin` hoy** (no hay UI todavía, paso 3):
+
+```sql
+UPDATE usuarios SET segmento_id = (SELECT id FROM segmentos WHERE nombre='admin')
+WHERE username = 'tu-usuario';
+```
+
+**Dos bugs reales encontrados y arreglados al conectar el primer
+endpoint real** (dejarlos anotados por si aparecen de nuevo en otro
+endpoint nuevo):
+- El CORS del gateway (`api-integracion/src/index.ts`) no incluía
+  `PATCH` en `methods` — rompía el toggle silenciosamente desde el
+  navegador (bloqueado en el preflight; `curl` no lo detecta porque no
+  hace preflight).
+- `UserSchema` de `/auth/*` (`api-integracion/src/routes/auth.ts`) no
+  declaraba `segmento` — Fastify serializa la respuesta según el schema,
+  así que aunque el JWT sí llevara el segmento, el objeto `user` de la
+  respuesta HTTP lo perdía.
+
 ### Cómo correrlo
 
 ```
-npm run dev          # vite dev, localhost (puerto por defecto de Vite)
+npm run dev          # vite dev, localhost:5174
 npm run build         # tsc -b && vite build
 npm run serve:pwa     # sirve el build de la PWA
 npm run lint          # oxlint
 ```
 
-No hay stack de Docker ni backend propio en este repo — todo el dato hoy
-es mock local. No hace falta levantar nada de `2mino` para trabajar en UI.
+Para que login/feature-flags funcionen de verdad hace falta el stack de
+`2mino` corriendo (`docker compose up -d` en la raíz) — `api-integracion`
+en `localhost:3000`. Usuarios/segmentos no lo necesitan (mock puro).
 
 **Se mantiene local, nunca se despliega al VPS.** El pipeline (`../Jenkinsfile`)
 detecta si un push solo tocó `2mino-BO/` y en ese caso salta type-check,
@@ -78,15 +98,14 @@ que revisar ambos archivos.
 
 ## Próximos pasos (orden ya fijado en `CASOS_DE_USO_BACKOFFICE.md` §9)
 
-1. Segmento `admin` + `signToken` con `segmento` + `requireAdmin()` en
-   `api-integracion` (repo `2mino`) — sin esto no hay manera real de
-   proteger `/admin/*`.
-2. Feature flags: reemplazar el mock por `GET/PATCH /admin/feature-flags`
-   (proxy directo a `ms-frontend-landing`, que ya expone
-   `GET /config/todas` / `PATCH /config/:clave` — el gateway solo necesita
-   reenviar).
-3. Usuarios y segmentos (CRUD + ban) — necesita `GET /admin/usuarios`
-   nuevo en `ms-usuarios` (hoy no hay listado, solo `GET /usuarios/:id`).
+1. ✅ Segmento `admin` + `signToken` con `segmento` + `requireAdmin()` en
+   `api-integracion`.
+2. ✅ Feature flags reales (`GET/PATCH /admin/feature-flags`).
+3. **Siguiente**: Usuarios y segmentos (CRUD + ban) — necesita
+   `GET /admin/usuarios` nuevo en `ms-usuarios` (hoy no hay listado, solo
+   `GET /usuarios/:id`), más `PATCH /admin/usuarios/:id/segmento` y
+   `PATCH /admin/usuarios/:id/estado` (ban, requiere columna
+   `usuarios.activo`).
 4. Reglas del juego, torneos, analítica, CRM/pagos — ver el documento
    completo para el detalle de cada uno (schema SQL incluido).
 
