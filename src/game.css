@@ -191,6 +191,7 @@
   color: var(--g-ink) !important;
 }
 .result-points { color: var(--amber) !important; }
+.result-points-no-caben { color: var(--g-muted) !important; text-decoration: line-through; }
 .result-detail { color: var(--g-muted) !important; }
 .result-marcador { color: var(--g-muted) !important; }
 .result-marcador strong { color: var(--g-ink) !important; }
