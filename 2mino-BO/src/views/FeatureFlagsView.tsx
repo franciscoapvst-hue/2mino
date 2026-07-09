@@ -7,16 +7,27 @@ import Badge from '../components/Badge';
 export default function FeatureFlagsView() {
   const [flags, setFlags] = useState<FeatureFlag[] | null>(null);
   const [pending, setPending] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    listFlags().then(setFlags);
-  }, []);
+  function refresh() {
+    setError(null);
+    listFlags()
+      .then(setFlags)
+      .catch((err) => setError(err instanceof Error ? err.message : 'No se pudo cargar.'));
+  }
+
+  useEffect(refresh, []);
 
   async function handleToggle(clave: string, next: boolean) {
     setPending(clave);
-    const updated = await toggleFlag(clave, next);
-    setFlags((prev) => prev?.map((f) => (f.clave === clave ? updated : f)) ?? null);
-    setPending(null);
+    try {
+      const updated = await toggleFlag(clave, next);
+      setFlags((prev) => prev?.map((f) => (f.clave === clave ? updated : f)) ?? null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo actualizar.');
+    } finally {
+      setPending(null);
+    }
   }
 
   return (
@@ -32,7 +43,11 @@ export default function FeatureFlagsView() {
       </div>
 
       <div className="bo-table-wrap">
-        {!flags ? (
+        {error ? (
+          <p className="bo-table-empty bo-form-error">
+            {error} — <button type="button" className="bo-link-btn" onClick={refresh}>reintentar</button>
+          </p>
+        ) : !flags ? (
           <p className="bo-table-empty">Cargando…</p>
         ) : (
           <table className="bo-table">

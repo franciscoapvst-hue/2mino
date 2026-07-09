@@ -11,13 +11,17 @@ export default function UsuariosView() {
   const [query, setQuery] = useState('');
   const [confirmTarget, setConfirmTarget] = useState<Usuario | null>(null);
   const [detalleId, setDetalleId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   function refresh(q = query) {
-    listUsuarios(q).then(setUsuarios);
+    setError(null);
+    listUsuarios(q)
+      .then(setUsuarios)
+      .catch((err) => setError(err instanceof Error ? err.message : 'No se pudo cargar.'));
   }
 
   useEffect(() => {
-    listSegmentos().then(setSegmentos);
+    listSegmentos().then(setSegmentos).catch(() => {});
     refresh('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -31,15 +35,24 @@ export default function UsuariosView() {
   const segmentoById = useMemo(() => new Map(segmentos.map((s) => [s.id, s])), [segmentos]);
 
   async function handleSegmentoChange(u: Usuario, segmentoId: string) {
-    const updated = await setUsuarioSegmento(u.id, segmentoId);
-    setUsuarios((prev) => prev?.map((x) => (x.id === u.id ? updated : x)) ?? null);
+    try {
+      const updated = await setUsuarioSegmento(u.id, segmentoId);
+      setUsuarios((prev) => prev?.map((x) => (x.id === u.id ? updated : x)) ?? null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo cambiar el segmento.');
+    }
   }
 
   async function confirmEstadoToggle() {
     if (!confirmTarget) return;
-    const updated = await setUsuarioEstado(confirmTarget.id, !confirmTarget.activo);
-    setUsuarios((prev) => prev?.map((x) => (x.id === updated.id ? updated : x)) ?? null);
-    setConfirmTarget(null);
+    try {
+      const updated = await setUsuarioEstado(confirmTarget.id, !confirmTarget.activo);
+      setUsuarios((prev) => prev?.map((x) => (x.id === updated.id ? updated : x)) ?? null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo actualizar el estado.');
+    } finally {
+      setConfirmTarget(null);
+    }
   }
 
   return (
@@ -61,9 +74,15 @@ export default function UsuariosView() {
         />
       </div>
 
+      {error && (
+        <p className="bo-form-error" style={{ marginBottom: 12 }}>
+          {error} — <button type="button" className="bo-link-btn" onClick={() => refresh()}>reintentar</button>
+        </p>
+      )}
+
       <div className="bo-table-wrap">
         {!usuarios ? (
-          <p className="bo-table-empty">Cargando…</p>
+          error ? null : <p className="bo-table-empty">Cargando…</p>
         ) : usuarios.length === 0 ? (
           <p className="bo-table-empty">Sin resultados para "{query}".</p>
         ) : (
