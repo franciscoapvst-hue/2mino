@@ -114,7 +114,7 @@ export async function historialRoutes(app: FastifyInstance) {
   // ── GET /salas/:id/replay ─────────────────────────
   app.get<{ Params: { id: string } }>('/salas/:id/replay', {
     schema: {
-      tags: ['salas'], summary: 'Movimientos + resultado para reconstruir la partida (replay)',
+      tags: ['salas'], summary: 'Movimientos + resultado por mano para reconstruir la partida (replay)',
       params: { type: 'object', properties: { id: { type: 'string', format: 'uuid' } } },
       response: { 200: AnySchema, 404: { ...ErrorSchema } },
     },
@@ -124,7 +124,7 @@ export async function historialRoutes(app: FastifyInstance) {
     const { rows: salaRows } = await pool.query('SELECT id FROM salas WHERE id = $1', [id]);
     if (!salaRows.length) return reply.code(404).send({ error: 'Sala no encontrada' });
 
-    const [{ rows: jugadores }, { rows: movimientos }, { rows: ganadorRows }] = await Promise.all([
+    const [{ rows: jugadores }, { rows: movimientos }, { rows: puntosRows }, { rows: ganadorRows }] = await Promise.all([
       pool.query(
         'SELECT usuario_id, username FROM sala_jugadores WHERE sala_id = $1 ORDER BY posicion',
         [id],
@@ -134,6 +134,16 @@ export async function historialRoutes(app: FastifyInstance) {
          FROM partida_movimientos WHERE sala_id = $1 ORDER BY numero_mano, orden`,
         [id],
       ),
+      // partida_puntos solo existe para partidas jugadas después de que se
+      // agregó esta tabla — puede venir vacío para partidas viejas. Incluye
+      // paso_a_todos: una mano puede terminar SIN cierre formal (normal/
+      // capicúa/tranca) si el bono empujó el marcador al objetivo a mitad
+      // de mano — el frontend elige qué mostrar (ver ReplayViewer).
+      pool.query(
+        `SELECT numero_mano, tipo, equipo, puntos, no_caben, marcador_0, marcador_1
+         FROM partida_puntos WHERE sala_id = $1 ORDER BY numero_mano, turno`,
+        [id],
+      ),
       pool.query(
         'SELECT equipo FROM partida_resultados WHERE sala_id = $1 AND gano = true LIMIT 1',
         [id],
@@ -141,7 +151,31 @@ export async function historialRoutes(app: FastifyInstance) {
     ]);
 
     const equipoGanadorPartida: 0 | 1 | null = ganadorRows[0]?.equipo ?? null;
-    const resultado = resultadoUltimaMano(movimientos, equipoGanadorPartida);
+
+    // Partidas viejas (sin filas en partida_puntos, jugadas antes de que
+    // existiera esta tabla): fallback a reconstruir solo el resultado de
+    // la última mano — no hay forma de recuperar el desglose de las manos
+    // anteriores para esas partidas, se perdió al no haberlo guardado en
+    // su momento. `marcador: null` marca explícitamente ese dato como
+    // desconocido (el frontend no debe mostrar un marcador inventado).
+    const resultadoFinal = resultadoUltimaMano(movimientos, equipoGanadorPartida);
+    const manos = puntosRows.length
+      ? puntosRows.map(p => ({
+          numeroMano: p.numero_mano,
+          tipo:       p.tipo as 'normal' | 'capicua' | 'tranca',
+          equipo:     p.equipo,
+          puntos:     p.puntos,
+          noCaben:    p.no_caben,
+          marcador:   [p.marcador_0, p.marcador_1] as [number, number] | null,
+        }))
+      : [{
+          numeroMano: movimientos.length ? Math.max(...movimientos.map(m => m.numero_mano)) : 1,
+          tipo:       resultadoFinal.tipo,
+          equipo:     resultadoFinal.equipoGanador,
+          puntos:     0,
+          noCaben:    false,
+          marcador:   null,
+        }];
 
     return reply.send({
       salaId: id,
@@ -154,7 +188,10 @@ export async function historialRoutes(app: FastifyInstance) {
         ...(m.pieza_a !== null && m.pieza_b !== null ? { pieza: { a: m.pieza_a, b: m.pieza_b } } : {}),
         ...(m.lado ? { lado: m.lado } : {}),
       })),
-      resultado,
+      manos,
+      // Deprecado: se mantiene por compatibilidad, es el resultado de la
+      // última mano nada más. Usar `manos` para el desglose completo.
+      resultado: resultadoUltimaMano(movimientos, equipoGanadorPartida),
     });
   });
 
