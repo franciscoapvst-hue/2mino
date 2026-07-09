@@ -211,4 +211,39 @@
 }
 .game-result-card .btn-salir:hover:not(:disabled) { border-color: #ff8080 !important; color: #ff8080 !important; }
 
+/* ── Fichas reveladas al cerrar la mano (docs/PENDIENTES_JUEGO.md §1) ── */
+.result-manos-reveladas {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  margin: 4px 0 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid var(--g-border) !important;
+}
+.result-mano-jugador {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.result-mano-nombre {
+  flex: 0 0 auto;
+  min-width: 84px;
+  font-size: 0.85rem;
+  color: var(--g-muted) !important;
+}
+.result-mano-fichas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.result-mano-vacia {
+  font-size: 0.85rem;
+  color: var(--amber) !important;
+  font-style: italic;
+}
+
 .game-loading { color: var(--g-muted) !important; }

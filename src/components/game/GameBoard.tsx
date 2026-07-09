@@ -537,6 +537,24 @@ function ManoOverlay({ partida, nombreAsiento, onListo, confirmando }: {
         )}
         <p className="result-detail">{detalle}</p>
         <MarcadorResumen partida={partida} />
+        {partida.manosReveladas && (
+          <div className="result-manos-reveladas">
+            {partida.manosReveladas.map((mano, seat) => (
+              <div key={seat} className="result-mano-jugador">
+                <span className="result-mano-nombre">{nombreAsiento(seat)}</span>
+                <div className="result-mano-fichas">
+                  {mano.length === 0 ? (
+                    <span className="result-mano-vacia">¡Dominó! Sin fichas</span>
+                  ) : (
+                    mano.map((p, i) => (
+                      <DominoPiece key={i} a={p.a} b={p.b} orient="v" style={{ width: 26, height: 48 }} />
+                    ))
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         <p className="result-detail">Sale {nombreAsiento(partida.salida)}</p>
         <button className="btn-primary" onClick={onListo} disabled={yaListo || confirmando}>
           {yaListo

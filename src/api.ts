@@ -51,6 +51,9 @@ export type PartidaPublica = {
   miEquipo:     0 | 1 | null;
   miMano:       Pieza[];
   conteoManos:  number[];
+  // Fichas reales de todos los asientos — null mientras se está jugando,
+  // se revela recién al cerrar la mano (transparencia del conteo de puntos).
+  manosReveladas: Pieza[][] | null;
   tablero:      FichaTablero[];
   turno:        number;
   pasadas:      number;
