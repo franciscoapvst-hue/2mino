@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { login } from '../lib/api';
 import type { AdminSession } from '../lib/types';
+import AmbienteSwitcher from '../components/AmbienteSwitcher';
 import './login.css';
 
 export default function LoginView({ onLogin }: { onLogin: (session: AdminSession) => void }) {
@@ -29,6 +30,11 @@ export default function LoginView({ onLogin }: { onLogin: (session: AdminSession
         <div className="bo-login-mark" aria-hidden="true" />
         <h1>2mino — Back Office</h1>
         <p className="bo-login-sub">Acceso restringido — requiere segmento admin.</p>
+
+        <div className="bo-login-ambiente">
+          <span className="bo-login-ambiente-label">Ambiente</span>
+          <AmbienteSwitcher />
+        </div>
 
         <div className="bo-field">
           <label htmlFor="email">Correo electrónico</label>

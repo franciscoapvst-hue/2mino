@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import AmbienteSwitcher from './AmbienteSwitcher';
 import './shell.css';
 
 export type View = 'flags' | 'usuarios' | 'segmentos';
@@ -24,6 +25,9 @@ export default function Shell({ active, onNavigate, adminUsername, onLogout, chi
         <div className="bo-nav-brand">
           <span className="bo-nav-brand-mark" aria-hidden="true" />
           <span>2mino BO</span>
+        </div>
+        <div className="bo-nav-ambiente">
+          <AmbienteSwitcher />
         </div>
         <ul className="bo-nav-list">
           {NAV.map((item) => (

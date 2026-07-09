@@ -57,6 +57,22 @@
   font-size: 0.8125rem;
 }
 
+.bo-login-ambiente {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  margin-bottom: 20px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.bo-login-ambiente-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
 .bo-login-submit {
   width: 100%;
   justify-content: center;

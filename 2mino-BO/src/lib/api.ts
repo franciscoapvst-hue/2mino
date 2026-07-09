@@ -1,11 +1,13 @@
 import type { AdminSession, FeatureFlag, Segmento, Usuario, UsuarioCompleto } from './types';
+import { apiUrl } from './env';
 
 /**
  * Cliente del Back Office — habla contra api-integracion de verdad
  * (docs/CASOS_DE_USO_BACKOFFICE.md §2/§3/§4/§5, ya completos).
+ * La URL base se resuelve en cada llamada vía apiUrl() (env.ts) — puede
+ * cambiar en caliente si el admin cambia de ambiente (Dev/QA/Prod).
  */
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 const SESSION_KEY = '2mino-admin-token';
 
 // ── Sesión ────────────────────────────────────────────────────────
@@ -28,7 +30,7 @@ function saveSession(session: AdminSession) {
 // request posterior, pero chequear ya en el login evita que alguien sin
 // permisos vea la pantalla de "cargando" antes del primer 403).
 export async function login(email: string, password: string): Promise<AdminSession> {
-  const res = await fetch(`${API_URL}/auth/login`, {
+  const res = await fetch(`${apiUrl()}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
@@ -49,7 +51,7 @@ export async function login(email: string, password: string): Promise<AdminSessi
 // desloguea automáticamente ante 401/403 (token vencido o revocado).
 async function adminFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const session = getSession();
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(`${apiUrl()}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
