@@ -36,12 +36,20 @@ type Session = { user: AuthUser; config: UserConfig };
 // Sin router todavía (ver docs/REFACTOR.md P4): un link de invitación a
 // party tiene forma /party/:codigo. Se parsea una sola vez al cargar y
 // se limpia la URL, para no tener que instalar react-router por esto.
-function leerCodigoPartyDeUrl(): string | null {
+//
+// Se calcula a nivel de módulo (corre una única vez, al cargar el JS),
+// no dentro del inicializador de useState: React 18 StrictMode invoca
+// dos veces el inicializador lazy de useState en dev para detectar
+// funciones impuras — como esta función limpia la URL como efecto
+// secundario, una segunda invocación ya no encuentra el código (la
+// primera, descartada por StrictMode, ya la había limpiado), y el link
+// de invitación queda roto en dev.
+const CODIGO_PARTY_DE_URL: string | null = (() => {
   const m = window.location.pathname.match(/^\/party\/([A-Za-z0-9-]+)/);
   if (!m) return null;
   window.history.replaceState(null, '', '/');
   return m[1];
-}
+})();
 
 export default function App() {
   const [view,     setView]     = useState<AppView>('login');
@@ -56,7 +64,7 @@ export default function App() {
   // corre síncrono en el primer render, ANTES que cualquier efecto —
   // evita que el .then() del restore de sesión capture un valor null por
   // clausura si en vez usáramos un efecto separado para parsear la URL.
-  const [partyCodigo] = useState<string | null>(() => leerCodigoPartyDeUrl());
+  const [partyCodigo] = useState<string | null>(() => CODIGO_PARTY_DE_URL);
   const [dark,    setDark]    = useState<boolean>(
     () => localStorage.getItem('2mino-theme') !== 'light'
   );

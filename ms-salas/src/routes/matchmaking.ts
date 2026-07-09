@@ -233,7 +233,10 @@ export async function matchmakingRoutes(app: FastifyInstance) {
       'INSERT INTO ranked_party_miembros (party_id, usuario_id, username) VALUES ($1, $2, $3)',
       [rows[0].id, usuario_id, username],
     );
-    return reply.code(201).send(rows[0]);
+    // El frontend (Party.miembros) espera este array desde la creación
+    // misma — sin él, PartyView revienta al leer `party.miembros.length`
+    // apenas se crea el equipo (antes de que nadie más se una).
+    return reply.code(201).send({ ...rows[0], miembros: [{ usuario_id, username }] });
   });
 
   app.get<{ Params: { codigo: string } }>('/ranked/party/:codigo', {
@@ -275,8 +278,14 @@ export async function matchmakingRoutes(app: FastifyInstance) {
       const yaEsta = miembros.some((m: any) => m.usuario_id === usuario_id);
       if (!yaEsta) {
         if (miembros.length >= 2) return reply.code(409).send({ error: 'La party ya está completa' });
+        // ON CONFLICT DO NOTHING: dos llamadas concurrentes a /unirse del
+        // mismo usuario (ej. React StrictMode invocando dos veces el
+        // efecto de autoJoin en dev) pasan ambas el chequeo de arriba
+        // antes de que cualquiera inserte — sin esto, la segunda
+        // insertion choca contra la PK (party_id, usuario_id) y tira 500.
         await pool.query(
-          'INSERT INTO ranked_party_miembros (party_id, usuario_id, username) VALUES ($1, $2, $3)',
+          `INSERT INTO ranked_party_miembros (party_id, usuario_id, username)
+           VALUES ($1, $2, $3) ON CONFLICT (party_id, usuario_id) DO NOTHING`,
           [party.id, usuario_id, username],
         );
       }
