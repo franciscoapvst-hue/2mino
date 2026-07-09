@@ -131,19 +131,27 @@ que revisar ambos archivos.
    `reglas_juego`, mismo patrón clave→valor que `landing_config`); torneos
    es lo más grande y depende de que esto ya esté sólido.
 
-## Conexión al backend real (cuando exista)
+## Conexión a producción
 
 Ver `CASOS_DE_USO_BACKOFFICE.md` §10.1: el panel **no expone
-`api-integracion` a internet**. Se conecta vía túnel SSH manual:
+`api-integracion` a internet** — en el VPS solo está publicado en
+`127.0.0.1:3000` (loopback, `docker-compose.yml` raíz), nunca la interfaz
+pública. Se llega por túnel SSH, pero no hace falta correrlo a mano:
 
-```bash
-ssh -N -L 3000:127.0.0.1:3000 root@74.208.119.150
+```
+2mino-BO/conectar-prod.bat
 ```
 
-y `VITE_API_URL` del Back Office apunta a `http://localhost:3000` — mismo
-cliente HTTP sirve para dev local (api-integracion corriendo en la
-máquina) o producción (túnel hacia el VPS), sin que el panel sepa la
-diferencia.
+Doble click, deja la ventana abierta mientras uses "Prod" en el panel.
+Por dentro corre `scripts/tunnel-prod.cjs` (Node + `ssh2`), que lee la
+clave root de `../CREDENCIALES.md` y abre `localhost:3001 ->
+127.0.0.1:3000` en el VPS — sin pedir contraseña ni requerir el cliente
+`ssh` de Windows. El selector de ambiente (`src/lib/env.ts`) ya apunta
+"Prod" a `localhost:3001` (puerto distinto a Dev a propósito, para poder
+tener el Docker local Y el túnel activos a la vez).
+
+**Si el login con "Prod" da error de red**: lo más probable es que el
+túnel no esté corriendo — abrí `conectar-prod.bat` primero.
 
 Las credenciales del VPS (SSH, Postgres, JWT secrets, etc.) **no viven en
 este repo** — están en `../CREDENCIALES.md` (gitignoreado, archivo local
