@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import DominoPiece from '../game/DominoPiece';
-import SnakeBoard from '../game/SnakeBoard';
+import SnakeBoardReadOnly from '../game/SnakeBoardReadOnly';
 import { BackIcon, ChatIcon } from '../icons';
 import { useMeasuredWidth } from '../../hooks/useMeasuredWidth';
 import { aplicarMovimientoTablero } from '../../game/replay-engine';
@@ -83,25 +83,12 @@ export default function TutorialGame({ onSkip, onFinish }: Props) {
         </div>
 
         <div className={`board-center${focoClase('turno')}`} ref={boardRef}>
-          {tablero.length === 0 ? (
-            <p className="board-empty-hint">Toca la ficha resaltada para abrir</p>
-          ) : boardWidth > 0 ? (
-            <SnakeBoard
-              tablero={tablero}
-              containerWidth={boardWidth}
-              nuevaFichaIdx={null}
-              piezaFantasma={null}
-              canIzq={false}
-              canDer={false}
-              sobreIzq={false}
-              sobreDer={false}
-              onPlayIzq={() => {}}
-              onPlayDer={() => {}}
-              onDragOverIzq={() => {}}
-              onDragOverDer={() => {}}
-              onDragLeave={() => {}}
-            />
-          ) : null}
+          <SnakeBoardReadOnly
+            tablero={tablero}
+            containerWidth={boardWidth}
+            emptyHint="Toca la ficha resaltada para abrir"
+            emptyClassName="board-empty-hint"
+          />
         </div>
       </div>
 

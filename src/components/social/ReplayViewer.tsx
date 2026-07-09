@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../api';
 import type { Movimiento, ReplayData } from '../../game/replay-engine';
 import { tableroHastaMovimiento } from '../../game/replay-engine';
-import SnakeBoard from '../game/SnakeBoard';
+import SnakeBoardReadOnly from '../game/SnakeBoardReadOnly';
 import { useMeasuredWidth } from '../../hooks/useMeasuredWidth';
 import { PauseIcon, PlayIcon, SkipBackIcon, SkipForwardIcon } from '../icons';
 import PageHeader from './PageHeader';
@@ -93,25 +93,12 @@ export default function ReplayViewer({ dark, salaId, onBack }: Props) {
             </div>
 
             <div className="replay-board" ref={boardRef}>
-              {tablero.length === 0 ? (
-                <p className="replay-board-empty">La mesa está vacía todavía</p>
-              ) : boardWidth > 0 ? (
-                <SnakeBoard
-                  tablero={tablero}
-                  containerWidth={boardWidth}
-                  nuevaFichaIdx={null}
-                  piezaFantasma={null}
-                  canIzq={false}
-                  canDer={false}
-                  sobreIzq={false}
-                  sobreDer={false}
-                  onPlayIzq={() => {}}
-                  onPlayDer={() => {}}
-                  onDragOverIzq={() => {}}
-                  onDragOverDer={() => {}}
-                  onDragLeave={() => {}}
-                />
-              ) : null}
+              <SnakeBoardReadOnly
+                tablero={tablero}
+                containerWidth={boardWidth}
+                emptyHint="La mesa está vacía todavía"
+                emptyClassName="replay-board-empty"
+              />
             </div>
 
             {resultadoTexto && (
