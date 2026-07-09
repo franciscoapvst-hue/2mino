@@ -35,6 +35,25 @@ const UsuarioSchema = {
   },
 } as const;
 
+const UsuarioCompletoSchema = {
+  type: 'object',
+  properties: {
+    id:              { type: 'string', format: 'uuid' },
+    username:        { type: 'string' },
+    email:           { type: 'string', format: 'email' },
+    avatar:          { type: 'string', nullable: true },
+    activo:          { type: 'boolean' },
+    created_at:      { type: 'string', format: 'date-time' },
+    updated_at:      { type: 'string', format: 'date-time' },
+    segmento_id:     { type: 'string', format: 'uuid' },
+    segmento:        { type: 'string', nullable: true },
+    segmento_config: { type: 'object', additionalProperties: true, nullable: true },
+    elo:             { type: 'integer' },
+    partidas:        { type: 'integer' },
+    ganadas:         { type: 'integer' },
+  },
+} as const;
+
 const SegmentoSchema = {
   type: 'object',
   properties: {
@@ -133,6 +152,28 @@ export async function adminRoutes(app: FastifyInstance) {
   }, async (req, reply) => {
     const qs = req.query.q ? `?q=${encodeURIComponent(req.query.q)}` : '';
     const { status, data } = await callMs(`/usuarios${qs}`, 'GET');
+    return reply.code(status).send(data);
+  });
+
+  // ── GET /admin/usuarios/:id ──────────────────────
+  // Detalle completo (perfil + segmento + ELO) — proxy directo a
+  // ms-usuarios GET /usuarios/:id/completo (función usuario_completo()).
+  app.get<{ Params: { id: string } }>('/admin/usuarios/:id', {
+    preHandler: requireAdmin,
+    schema: {
+      tags:        ['admin'],
+      summary:     'Perfil completo de un usuario (segmento + ELO)',
+      security:    [{ bearerAuth: [] }],
+      params: { type: 'object', properties: { id: { type: 'string', format: 'uuid' } } },
+      response: {
+        200: { description: 'Perfil completo',           ...UsuarioCompletoSchema },
+        401: { description: 'Token inválido o expirado', ...ErrorSchema },
+        403: { description: 'Requiere segmento admin',   ...ErrorSchema },
+        404: { description: 'Usuario no encontrado',     ...ErrorSchema },
+      },
+    },
+  }, async (req, reply) => {
+    const { status, data } = await callMs(`/usuarios/${req.params.id}/completo`, 'GET');
     return reply.code(status).send(data);
   });
 

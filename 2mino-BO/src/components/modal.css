@@ -66,3 +66,64 @@
     animation: none;
   }
 }
+
+/* ── Detalle de usuario (UsuarioDetalleModal) ─────────────────── */
+.bo-modal-wide {
+  width: min(560px, 100%);
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.bo-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.bo-modal-header h2 {
+  margin: 0;
+  font-family: var(--font-mono);
+}
+
+.bo-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 20px;
+}
+.bo-detail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.bo-detail-field-full {
+  grid-column: 1 / -1;
+}
+.bo-detail-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted-dim);
+}
+.bo-detail-value {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  color: var(--ink);
+  word-break: break-word;
+}
+.bo-detail-json {
+  margin: 0;
+  padding: 12px;
+  border-radius: var(--radius-sm, 8px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--muted);
+  overflow-x: auto;
+  max-height: 220px;
+}
+
+@media (max-width: 520px) {
+  .bo-detail-grid { grid-template-columns: 1fr; }
+}

@@ -1,4 +1,4 @@
-import type { AdminSession, FeatureFlag, Segmento, Usuario } from './types';
+import type { AdminSession, FeatureFlag, Segmento, Usuario, UsuarioCompleto } from './types';
 
 /**
  * Cliente del Back Office — habla contra api-integracion de verdad
@@ -132,4 +132,21 @@ export async function setUsuarioEstado(id: string, activo: boolean): Promise<Usu
     body: JSON.stringify({ activo }),
   });
   return mapUsuario(row);
+}
+
+// Detalle completo — click en un usuario dentro de UsuariosView.
+type UsuarioCompletoApi = {
+  id: string; username: string; email: string; avatar: string | null; activo: boolean;
+  created_at: string; updated_at: string; segmento_id: string; segmento: string | null;
+  segmento_config: Record<string, unknown> | null; elo: number; partidas: number; ganadas: number;
+};
+
+export async function getUsuarioCompleto(id: string): Promise<UsuarioCompleto> {
+  const u = await adminFetch<UsuarioCompletoApi>(`/admin/usuarios/${id}`);
+  return {
+    id: u.id, username: u.username, email: u.email, avatar: u.avatar, activo: u.activo,
+    createdAt: u.created_at, updatedAt: u.updated_at, segmentoId: u.segmento_id,
+    segmento: u.segmento, segmentoConfig: u.segmento_config,
+    elo: u.elo, partidas: u.partidas, ganadas: u.ganadas,
+  };
 }

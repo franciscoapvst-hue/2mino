@@ -35,6 +35,25 @@ const UserSchema = {
   },
 } as const;
 
+const UsuarioCompletoSchema = {
+  type: 'object',
+  properties: {
+    id:              { type: 'string', format: 'uuid' },
+    username:        { type: 'string' },
+    email:           { type: 'string', format: 'email' },
+    avatar:          { type: 'string', nullable: true },
+    activo:          { type: 'boolean' },
+    created_at:      { type: 'string', format: 'date-time' },
+    updated_at:      { type: 'string', format: 'date-time' },
+    segmento_id:     { type: 'string', format: 'uuid' },
+    segmento:        { type: 'string', nullable: true },
+    segmento_config: { type: 'object', additionalProperties: true, nullable: true },
+    elo:             { type: 'integer' },
+    partidas:        { type: 'integer' },
+    ganadas:         { type: 'integer' },
+  },
+} as const;
+
 const ErrorSchema = {
   type: 'object',
   properties: { error: { type: 'string' } },
@@ -354,6 +373,37 @@ export async function usuariosRoutes(app: FastifyInstance) {
          FROM usuarios u
          LEFT JOIN segmentos s ON s.id = u.segmento_id
          WHERE u.id = $1`,
+        [req.params.id],
+      );
+      if (!rows.length) return reply.code(404).send({ error: 'Usuario no encontrado' });
+      return reply.send(rows[0]);
+    },
+  );
+
+  // ── GET /usuarios/:id/completo ──────────────────
+  // Back Office §3 "ver detalle" — perfil + segmento + ELO en una sola
+  // consulta, vía la función usuario_completo() (ver db/pool.ts para el
+  // porqué de una función y no una vista para cruzar con ranked_ratings
+  // de ms-salas).
+  app.get<{ Params: { id: string } }>(
+    '/usuarios/:id/completo',
+    {
+      schema: {
+        tags:        ['usuarios'],
+        summary:     'Perfil completo del usuario (segmento + ELO)',
+        params: {
+          type: 'object',
+          properties: { id: { type: 'string', format: 'uuid' } },
+        },
+        response: {
+          200: { description: 'Perfil completo',       ...UsuarioCompletoSchema },
+          404: { description: 'Usuario no encontrado', ...ErrorSchema },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { rows } = await pool.query(
+        `SELECT * FROM usuario_completo($1)`,
         [req.params.id],
       );
       if (!rows.length) return reply.code(404).send({ error: 'Usuario no encontrado' });

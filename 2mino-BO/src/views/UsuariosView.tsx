@@ -3,12 +3,14 @@ import { listSegmentos, listUsuarios, setUsuarioEstado, setUsuarioSegmento } fro
 import type { Segmento, Usuario } from '../lib/types';
 import Badge from '../components/Badge';
 import ConfirmModal from '../components/ConfirmModal';
+import UsuarioDetalleModal from '../components/UsuarioDetalleModal';
 
 export default function UsuariosView() {
   const [usuarios, setUsuarios] = useState<Usuario[] | null>(null);
   const [segmentos, setSegmentos] = useState<Segmento[]>([]);
   const [query, setQuery] = useState('');
   const [confirmTarget, setConfirmTarget] = useState<Usuario | null>(null);
+  const [detalleId, setDetalleId] = useState<string | null>(null);
 
   function refresh(q = query) {
     listUsuarios(q).then(setUsuarios);
@@ -78,7 +80,16 @@ export default function UsuariosView() {
             <tbody>
               {usuarios.map((u) => (
                 <tr key={u.id}>
-                  <td style={{ fontFamily: 'var(--font-ui)', fontWeight: 600 }}>{u.username}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="bo-link-btn"
+                      style={{ fontFamily: 'var(--font-ui)', fontWeight: 600 }}
+                      onClick={() => setDetalleId(u.id)}
+                    >
+                      {u.username}
+                    </button>
+                  </td>
                   <td style={{ color: 'var(--muted)' }}>{u.email}</td>
                   <td>
                     <select
@@ -128,6 +139,8 @@ export default function UsuariosView() {
         onConfirm={confirmEstadoToggle}
         onCancel={() => setConfirmTarget(null)}
       />
+
+      <UsuarioDetalleModal usuarioId={detalleId} onClose={() => setDetalleId(null)} />
 
       {segmentoById.size === 0 && null}
     </div>
