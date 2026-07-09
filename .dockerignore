@@ -7,3 +7,7 @@ ms-frontend-landing
 ms-salas
 api-integracion
 docs
+
+# Back Office: se mantiene local, nunca se despliega — no tiene sentido
+# arrastrarlo al contexto de build de ninguna imagen Docker.
+2mino-BO

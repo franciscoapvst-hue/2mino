@@ -68,6 +68,14 @@ npm run lint          # oxlint
 No hay stack de Docker ni backend propio en este repo — todo el dato hoy
 es mock local. No hace falta levantar nada de `2mino` para trabajar en UI.
 
+**Se mantiene local, nunca se despliega al VPS.** El pipeline (`../Jenkinsfile`)
+detecta si un push solo tocó `2mino-BO/` y en ese caso salta type-check,
+tests, Sonar y el deploy — no tiene sentido correr nada de eso para un
+panel que no se sube a ningún lado. Además, `../.dockerignore` excluye
+esta carpeta para que no infle el build context de la imagen del
+frontend. Si en algún momento esto cambia (se decide desplegarlo), hay
+que revisar ambos archivos.
+
 ## Próximos pasos (orden ya fijado en `CASOS_DE_USO_BACKOFFICE.md` §9)
 
 1. Segmento `admin` + `signToken` con `segmento` + `requireAdmin()` en
