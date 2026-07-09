@@ -1,28 +1,110 @@
 import type { AdminSession, FeatureFlag, Segmento, Usuario } from './types';
 
 /**
- * Cliente mock del Back Office. Reproduce el contrato de
- * docs/CASOS_DE_USO_BACKOFFICE.md (§2 login, §3 usuarios, §4 segmentos,
- * §5 feature flags) contra localStorage en vez de api-integracion.
- * Cuando el backend real exista, este es el único archivo a reemplazar —
- * las vistas ya consumen estas firmas de función, no fetch directo.
+ * Cliente del Back Office. §2 (login) y §5 (feature flags) de
+ * docs/CASOS_DE_USO_BACKOFFICE.md ya hablan con api-integracion de verdad.
+ * §3 (usuarios) y §4 (segmentos) siguen mock contra localStorage hasta que
+ * exista el backend correspondiente — se reemplazan función por función,
+ * sin que las vistas necesiten cambiar (ya consumen estas firmas).
  */
+
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+const SESSION_KEY = '2mino-admin-token';
+
+// ── Sesión ────────────────────────────────────────────────────────
+export function getSession(): AdminSession | null {
+  const raw = sessionStorage.getItem(SESSION_KEY);
+  return raw ? (JSON.parse(raw) as AdminSession) : null;
+}
+
+export function logout() {
+  sessionStorage.removeItem(SESSION_KEY);
+}
+
+function saveSession(session: AdminSession) {
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+}
+
+// ── §2 Login admin — real, contra api-integracion ──────────────────
+// Mismo POST /auth/login que usa el frontend de jugadores; acá además
+// se exige segmento === 'admin' (requireAdmin lo revalida en cada
+// request posterior, pero chequear ya en el login evita que alguien sin
+// permisos vea la pantalla de "cargando" antes del primer 403).
+export async function login(email: string, password: string): Promise<AdminSession> {
+  const res = await fetch(`${API_URL}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error((data as { error?: string }).error ?? 'Credenciales inválidas.');
+
+  const { token, user } = data as { token: string; user: { username: string; segmento?: string } };
+  if (user.segmento !== 'admin') {
+    throw new Error('Esta cuenta no tiene acceso al Back Office (requiere segmento admin).');
+  }
+  const session: AdminSession = { username: user.username, segmento: 'admin', token };
+  saveSession(session);
+  return session;
+}
+
+// Cliente autenticado genérico para /admin/* — adjunta el Bearer y
+// desloguea automáticamente ante 401/403 (token vencido o revocado).
+async function adminFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const session = getSession();
+  const res = await fetch(`${API_URL}${path}`, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(session ? { Authorization: `Bearer ${session.token}` } : {}),
+      ...init?.headers,
+    },
+  });
+  if (res.status === 401 || res.status === 403) {
+    logout();
+    throw new Error('Sesión expirada o sin permisos — volvé a iniciar sesión.');
+  }
+  const data = await res.json();
+  if (!res.ok) throw new Error((data as { error?: string }).error ?? 'Error de red.');
+  return data as T;
+}
+
+// ── §5 Feature flags — real, contra api-integracion ────────────────
+export async function listFlags(): Promise<FeatureFlag[]> {
+  return adminFetch<FeatureFlag[]>('/admin/feature-flags');
+}
+
+export async function toggleFlag(clave: string, habilitado: boolean): Promise<FeatureFlag> {
+  await adminFetch(`/admin/feature-flags/${clave}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ habilitado }),
+  });
+  // El PATCH real solo devuelve {clave, habilitado} — se recarga la lista
+  // completa para tener descripcion/valor/updated_at ya actualizados.
+  const flags = await listFlags();
+  const flag = flags.find((f) => f.clave === clave);
+  if (!flag) throw new Error(`Flag '${clave}' no encontrada tras actualizar.`);
+  return flag;
+}
+
+// ════════════════════════════════════════════════════════════════
+// A partir de acá: mock contra localStorage — §3 y §4 todavía no
+// tienen backend real (ver docs/CASOS_DE_USO_BACKOFFICE.md §3/§4).
+// ════════════════════════════════════════════════════════════════
 
 const LATENCY_MS = 320;
 const STORAGE_KEY = '2mino-bo-data';
-const SESSION_KEY = '2mino-admin-token';
 
 function delay<T>(value: T): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), LATENCY_MS));
 }
 
-type DB = {
+type MockDB = {
   segmentos: Segmento[];
   usuarios: Usuario[];
-  flags: FeatureFlag[];
 };
 
-function seed(): DB {
+function seed(): MockDB {
   return {
     segmentos: [
       { id: 'seg-jugador', nombre: 'jugador', descripcion: 'Segmento por defecto de cualquier usuario registrado', activo: true, config: { tema: 'oscuro' } },
@@ -36,65 +118,24 @@ function seed(): DB {
       { id: 'u-4', username: 'tranquero99', email: 'tranca@example.com', segmentoId: 'seg-jugador', activo: false, elo: 980, creadoEn: '2026-03-05T21:45:00Z' },
       { id: 'u-5', username: 'reina_de_picas', email: 'reina@example.com', segmentoId: 'seg-jugador', activo: true, elo: 1050, creadoEn: '2026-04-11T14:20:00Z' },
     ],
-    flags: [
-      { clave: 'torneos_habilitado', etiqueta: 'Torneos', descripcion: 'Muestra la sección de torneos en el dashboard del jugador', habilitado: false },
-      { clave: 'chat_partida', etiqueta: 'Chat en partida', descripcion: 'Botón de chat flotante dentro del GameBoard', habilitado: true },
-      { clave: 'tutorial_onboarding', etiqueta: 'Tutorial de onboarding', descripcion: 'Pregunta de nivel + tutorial interactivo para usuarios nuevos', habilitado: true },
-      { clave: 'leaderboard_extendido', etiqueta: 'Leaderboard extendido', descripcion: 'Historial y estadísticas ampliadas en el leaderboard', habilitado: true },
-      { clave: 'matchmaking_ranked', etiqueta: 'Matchmaking ranked', descripcion: 'Cola competitiva con ELO (fuera de esto, solo casual)', habilitado: true },
-    ],
   };
 }
 
-function loadDB(): DB {
+function loadDB(): MockDB {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) {
     const fresh = seed();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
     return fresh;
   }
-  return JSON.parse(raw) as DB;
+  return JSON.parse(raw) as MockDB;
 }
 
-function saveDB(db: DB) {
+function saveDB(db: MockDB) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
 }
 
-// ── §2 Login admin ──────────────────────────────────────────────
-export async function login(username: string, password: string): Promise<AdminSession> {
-  if (!username.trim() || !password.trim()) {
-    throw new Error('Usuario y contraseña son requeridos.');
-  }
-  const session: AdminSession = { username, segmento: 'admin', token: `mock.${btoa(username)}.${Date.now()}` };
-  await delay(null);
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  return session;
-}
-
-export function getSession(): AdminSession | null {
-  const raw = sessionStorage.getItem(SESSION_KEY);
-  return raw ? (JSON.parse(raw) as AdminSession) : null;
-}
-
-export function logout() {
-  sessionStorage.removeItem(SESSION_KEY);
-}
-
-// ── §5 Feature flags ────────────────────────────────────────────
-export async function listFlags(): Promise<FeatureFlag[]> {
-  return delay(loadDB().flags);
-}
-
-export async function toggleFlag(clave: string, habilitado: boolean): Promise<FeatureFlag> {
-  const db = loadDB();
-  const flag = db.flags.find((f) => f.clave === clave);
-  if (!flag) throw new Error('Flag no encontrado');
-  flag.habilitado = habilitado;
-  saveDB(db);
-  return delay(flag);
-}
-
-// ── §4 Segmentos ────────────────────────────────────────────────
+// ── §4 Segmentos (mock) ──────────────────────────────────────────
 export async function listSegmentos(): Promise<Segmento[]> {
   return delay(loadDB().segmentos);
 }
@@ -116,7 +157,7 @@ export async function toggleSegmentoEstado(id: string, activo: boolean): Promise
   return delay(seg);
 }
 
-// ── §3 Usuarios ─────────────────────────────────────────────────
+// ── §3 Usuarios (mock) ───────────────────────────────────────────
 export async function listUsuarios(query: string): Promise<Usuario[]> {
   const db = loadDB();
   const q = query.trim().toLowerCase();

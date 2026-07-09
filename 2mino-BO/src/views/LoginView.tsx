@@ -4,7 +4,7 @@ import type { AdminSession } from '../lib/types';
 import './login.css';
 
 export default function LoginView({ onLogin }: { onLogin: (session: AdminSession) => void }) {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -14,7 +14,7 @@ export default function LoginView({ onLogin }: { onLogin: (session: AdminSession
     setError(null);
     setLoading(true);
     try {
-      const session = await login(username, password);
+      const session = await login(email, password);
       onLogin(session);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo iniciar sesión.');
@@ -31,14 +31,15 @@ export default function LoginView({ onLogin }: { onLogin: (session: AdminSession
         <p className="bo-login-sub">Acceso restringido — requiere segmento admin.</p>
 
         <div className="bo-field">
-          <label htmlFor="username">Usuario</label>
+          <label htmlFor="email">Correo electrónico</label>
           <input
-            id="username"
+            id="email"
+            type="email"
             className="bo-input"
             autoFocus
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="tu-usuario"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="tu-cuenta@correo.com"
             autoComplete="username"
           />
         </div>
@@ -62,8 +63,8 @@ export default function LoginView({ onLogin }: { onLogin: (session: AdminSession
         </button>
 
         <p className="bo-login-note">
-          Mock local — cualquier usuario/contraseña entra. El login real llamará a{' '}
-          <code>POST /auth/login</code> y validará <code>segmento === "admin"</code>.
+          Misma cuenta y contraseña que usás en el juego — solo entra si tu
+          usuario tiene el segmento <code>admin</code>.
         </p>
       </form>
     </div>

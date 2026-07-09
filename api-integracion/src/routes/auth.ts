@@ -19,6 +19,7 @@ const UserSchema = {
     username:   { type: 'string', example: 'jugador42' },
     email:      { type: 'string', format: 'email' },
     avatar:     { type: 'string', nullable: true },
+    segmento:   { type: 'string', example: 'jugador' },
     created_at: { type: 'string', format: 'date-time' },
   },
 } as const;

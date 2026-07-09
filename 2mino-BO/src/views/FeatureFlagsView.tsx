@@ -47,12 +47,8 @@ export default function FeatureFlagsView() {
             <tbody>
               {flags.map((flag) => (
                 <tr key={flag.clave}>
-                  <td>
-                    <strong style={{ fontFamily: 'var(--font-ui)', fontWeight: 600 }}>{flag.etiqueta}</strong>
-                    <br />
-                    <span style={{ color: 'var(--muted-dim)' }}>{flag.clave}</span>
-                  </td>
-                  <td style={{ fontFamily: 'var(--font-ui)', whiteSpace: 'normal', color: 'var(--muted)', maxWidth: 420 }}>
+                  <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted-dim)' }}>{flag.clave}</td>
+                  <td style={{ fontFamily: 'var(--font-ui)', whiteSpace: 'normal', color: 'var(--ink)', maxWidth: 420 }}>
                     {flag.descripcion}
                   </td>
                   <td>
@@ -62,7 +58,7 @@ export default function FeatureFlagsView() {
                     <Toggle
                       checked={flag.habilitado}
                       disabled={pending === flag.clave}
-                      label={`Activar ${flag.etiqueta}`}
+                      label={`Activar ${flag.clave}`}
                       onChange={(next) => handleToggle(flag.clave, next)}
                     />
                   </td>

@@ -16,11 +16,14 @@ export type Usuario = {
   creadoEn: string;
 };
 
+// Forma real de landing_config (ms-frontend-landing) — sin "etiqueta",
+// no existe esa columna. La vista usa `descripcion` como título.
 export type FeatureFlag = {
   clave: string;
-  etiqueta: string;
+  valor: unknown;
   descripcion: string;
   habilitado: boolean;
+  updated_at?: string;
 };
 
 export type AdminSession = {

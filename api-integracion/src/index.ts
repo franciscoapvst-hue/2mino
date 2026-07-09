@@ -7,6 +7,7 @@ import { frontendRoutes } from './routes/frontend';
 import { salasGatewayRoutes } from './routes/salas';
 import { rankedGatewayRoutes } from './routes/ranked';
 import { socialGatewayRoutes } from './routes/social';
+import { adminRoutes } from './routes/admin';
 
 const app = Fastify({
   logger: true,
@@ -16,7 +17,7 @@ const app = Fastify({
 // ── CORS ─────────────────────────────────────────
 app.register(cors, {
   origin:  process.env.CORS_ORIGIN ?? '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 });
 
 // ── OpenAPI / Swagger ─────────────────────────────
@@ -39,6 +40,7 @@ app.register(swagger, {
       { name: 'juego',    description: 'Estado y movimientos de la partida' },
       { name: 'ranked',   description: 'ELO, leaderboard y matchmaking' },
       { name: 'social',   description: 'Amigos, bandeja de entrada, chat de partida' },
+      { name: 'admin',    description: 'Back Office — requiere JWT con segmento admin' },
       { name: 'system',   description: 'Estado del servicio' },
     ],
     components: {
@@ -69,6 +71,7 @@ app.register(frontendRoutes);
 app.register(salasGatewayRoutes);
 app.register(rankedGatewayRoutes);
 app.register(socialGatewayRoutes);
+app.register(adminRoutes);
 
 app.get('/health', {
   schema: {
