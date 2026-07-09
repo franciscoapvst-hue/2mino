@@ -554,7 +554,7 @@ function ManoOverlay({ partida, nombreAsiento, onListo, confirmando }: {
                     ))
                   )}
                 </div>
-                <span className="result-mano-suma">{sumaPips(mano)} pips</span>
+                <span className="result-mano-suma">{sumaPips(mano)} puntos</span>
               </div>
             ))}
           </div>
