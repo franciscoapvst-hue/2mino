@@ -10,6 +10,23 @@ const ErrorSchema = {
   properties: { error: { type: 'string' } },
 } as const;
 
+// 401/403 se repiten en toda ruta /admin/* (requireAdmin) — un solo lugar.
+const AuthErrors = {
+  401: { description: 'Token inválido o expirado', ...ErrorSchema },
+  403: { description: 'Requiere segmento admin',   ...ErrorSchema },
+} as const;
+
+const UuidParamSchema = {
+  type: 'object',
+  properties: { id: { type: 'string', format: 'uuid' } },
+} as const;
+
+const EstadoBodySchema = {
+  type: 'object',
+  required: ['activo'],
+  properties: { activo: { type: 'boolean' } },
+} as const;
+
 const FeatureFlagSchema = {
   type: 'object',
   properties: {
@@ -35,17 +52,12 @@ const UsuarioSchema = {
   },
 } as const;
 
+// Superset de UsuarioSchema (perfil + segmento + ELO) — GET /admin/usuarios/:id.
 const UsuarioCompletoSchema = {
   type: 'object',
   properties: {
-    id:              { type: 'string', format: 'uuid' },
-    username:        { type: 'string' },
-    email:           { type: 'string', format: 'email' },
+    ...UsuarioSchema.properties,
     avatar:          { type: 'string', nullable: true },
-    activo:          { type: 'boolean' },
-    created_at:      { type: 'string', format: 'date-time' },
-    updated_at:      { type: 'string', format: 'date-time' },
-    segmento_id:     { type: 'string', format: 'uuid' },
     segmento:        { type: 'string', nullable: true },
     segmento_config: { type: 'object', additionalProperties: true, nullable: true },
     elo:             { type: 'integer' },
@@ -84,8 +96,7 @@ export async function adminRoutes(app: FastifyInstance) {
       security:    [{ bearerAuth: [] }],
       response: {
         200: { description: 'Lista completa', type: 'array', items: FeatureFlagSchema },
-        401: { description: 'Token inválido o expirado', ...ErrorSchema },
-        403: { description: 'Requiere segmento admin',   ...ErrorSchema },
+        ...AuthErrors,
       },
     },
   }, async (_req, reply) => {
@@ -117,9 +128,8 @@ export async function adminRoutes(app: FastifyInstance) {
             type: 'object',
             properties: { clave: { type: 'string' }, habilitado: { type: 'boolean' } },
           },
-          401: { description: 'Token inválido o expirado', ...ErrorSchema },
-          403: { description: 'Requiere segmento admin',   ...ErrorSchema },
-          404: { description: 'Flag no encontrada',        ...ErrorSchema },
+          ...AuthErrors,
+          404: { description: 'Flag no encontrada', ...ErrorSchema },
         },
       },
     },
@@ -145,8 +155,7 @@ export async function adminRoutes(app: FastifyInstance) {
       },
       response: {
         200: { description: 'Usuarios encontrados', type: 'array', items: UsuarioSchema },
-        401: { description: 'Token inválido o expirado', ...ErrorSchema },
-        403: { description: 'Requiere segmento admin',   ...ErrorSchema },
+        ...AuthErrors,
       },
     },
   }, async (req, reply) => {
@@ -164,12 +173,11 @@ export async function adminRoutes(app: FastifyInstance) {
       tags:        ['admin'],
       summary:     'Perfil completo de un usuario (segmento + ELO)',
       security:    [{ bearerAuth: [] }],
-      params: { type: 'object', properties: { id: { type: 'string', format: 'uuid' } } },
+      params: UuidParamSchema,
       response: {
-        200: { description: 'Perfil completo',           ...UsuarioCompletoSchema },
-        401: { description: 'Token inválido o expirado', ...ErrorSchema },
-        403: { description: 'Requiere segmento admin',   ...ErrorSchema },
-        404: { description: 'Usuario no encontrado',     ...ErrorSchema },
+        200: { description: 'Perfil completo', ...UsuarioCompletoSchema },
+        ...AuthErrors,
+        404: { description: 'Usuario no encontrado', ...ErrorSchema },
       },
     },
   }, async (req, reply) => {
@@ -186,17 +194,16 @@ export async function adminRoutes(app: FastifyInstance) {
         tags:        ['admin'],
         summary:     'Cambiar el segmento de un usuario',
         security:    [{ bearerAuth: [] }],
-        params: { type: 'object', properties: { id: { type: 'string', format: 'uuid' } } },
+        params: UuidParamSchema,
         body: {
           type: 'object',
           required: ['segmentoId'],
           properties: { segmentoId: { type: 'string', format: 'uuid' } },
         },
         response: {
-          200: { description: 'Usuario actualizado',        ...UsuarioSchema },
-          401: { description: 'Token inválido o expirado',  ...ErrorSchema },
-          403: { description: 'Requiere segmento admin',    ...ErrorSchema },
-          404: { description: 'Usuario no encontrado',      ...ErrorSchema },
+          200: { description: 'Usuario actualizado', ...UsuarioSchema },
+          ...AuthErrors,
+          404: { description: 'Usuario no encontrado', ...ErrorSchema },
         },
       },
     },
@@ -215,17 +222,12 @@ export async function adminRoutes(app: FastifyInstance) {
         tags:        ['admin'],
         summary:     'Banear o reactivar una cuenta',
         security:    [{ bearerAuth: [] }],
-        params: { type: 'object', properties: { id: { type: 'string', format: 'uuid' } } },
-        body: {
-          type: 'object',
-          required: ['activo'],
-          properties: { activo: { type: 'boolean' } },
-        },
+        params: UuidParamSchema,
+        body: EstadoBodySchema,
         response: {
-          200: { description: 'Usuario actualizado',       ...UsuarioSchema },
-          401: { description: 'Token inválido o expirado', ...ErrorSchema },
-          403: { description: 'Requiere segmento admin',   ...ErrorSchema },
-          404: { description: 'Usuario no encontrado',     ...ErrorSchema },
+          200: { description: 'Usuario actualizado', ...UsuarioSchema },
+          ...AuthErrors,
+          404: { description: 'Usuario no encontrado', ...ErrorSchema },
         },
       },
     },
@@ -246,8 +248,7 @@ export async function adminRoutes(app: FastifyInstance) {
       security:    [{ bearerAuth: [] }],
       response: {
         200: { description: 'Segmentos', type: 'array', items: SegmentoSchema },
-        401: { description: 'Token inválido o expirado', ...ErrorSchema },
-        403: { description: 'Requiere segmento admin',   ...ErrorSchema },
+        ...AuthErrors,
       },
     },
   }, async (_req, reply) => {
@@ -271,9 +272,8 @@ export async function adminRoutes(app: FastifyInstance) {
         },
       },
       response: {
-        201: { description: 'Segmento creado',           ...SegmentoSchema },
-        401: { description: 'Token inválido o expirado', ...ErrorSchema },
-        403: { description: 'Requiere segmento admin',   ...ErrorSchema },
+        201: { description: 'Segmento creado', ...SegmentoSchema },
+        ...AuthErrors,
         409: { description: 'Ya existe un segmento con ese nombre', ...ErrorSchema },
       },
     },
@@ -291,17 +291,12 @@ export async function adminRoutes(app: FastifyInstance) {
         tags:        ['admin'],
         summary:     'Activar o desactivar un segmento',
         security:    [{ bearerAuth: [] }],
-        params: { type: 'object', properties: { id: { type: 'string', format: 'uuid' } } },
-        body: {
-          type: 'object',
-          required: ['activo'],
-          properties: { activo: { type: 'boolean' } },
-        },
+        params: UuidParamSchema,
+        body: EstadoBodySchema,
         response: {
-          200: { description: 'Segmento actualizado',      ...SegmentoSchema },
-          401: { description: 'Token inválido o expirado', ...ErrorSchema },
-          403: { description: 'Requiere segmento admin',   ...ErrorSchema },
-          404: { description: 'Segmento no encontrado',    ...ErrorSchema },
+          200: { description: 'Segmento actualizado', ...SegmentoSchema },
+          ...AuthErrors,
+          404: { description: 'Segmento no encontrado', ...ErrorSchema },
         },
       },
     },

@@ -35,17 +35,11 @@ const UserSchema = {
   },
 } as const;
 
+// Superset de UserSchema (perfil + segmento + ELO) — GET /usuarios/:id/completo.
 const UsuarioCompletoSchema = {
   type: 'object',
   properties: {
-    id:              { type: 'string', format: 'uuid' },
-    username:        { type: 'string' },
-    email:           { type: 'string', format: 'email' },
-    avatar:          { type: 'string', nullable: true },
-    activo:          { type: 'boolean' },
-    created_at:      { type: 'string', format: 'date-time' },
-    updated_at:      { type: 'string', format: 'date-time' },
-    segmento_id:     { type: 'string', format: 'uuid' },
+    ...UserSchema.properties,
     segmento:        { type: 'string', nullable: true },
     segmento_config: { type: 'object', additionalProperties: true, nullable: true },
     elo:             { type: 'integer' },
