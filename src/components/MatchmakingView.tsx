@@ -135,6 +135,11 @@ export default function MatchmakingView({ user, tipo, dark, onBack, onGameStart,
   const [error, setError]         = useState<string | null>(null);
   const [busy, setBusy]           = useState(false);
   const [elo, setElo]             = useState<number | null>(null);
+  // Antes de mostrar el menú, hay que saber si ya hay algo en curso (cola
+  // o partida ya emparejada) — si no, un refresh/otra pestaña siempre
+  // ofrece "buscar de nuevo" y termina en ticket duplicado o, peor, deja
+  // al jugador sin forma de volver a la partida que ya le tocó.
+  const [reconectando, setReconectando] = useState(true);
   const partyCodeRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -153,8 +158,34 @@ export default function MatchmakingView({ user, tipo, dark, onBack, onGameStart,
         setPantalla('party');
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : 'No se pudo unir al equipo');
+      } finally {
+        setReconectando(false);
       }
     })();
+  }, [autoJoinCodigo]);
+
+  // Al montar (sin link de invitación): reconectar a la cola/partida en
+  // curso en vez de arrancar siempre en el menú. Mismo chequeo que el
+  // poll de abajo, una sola vez.
+  useEffect(() => {
+    if (autoJoinCodigo) return;
+    let cancelado = false;
+    (async () => {
+      try {
+        const st = await api.ranked.estadoCola();
+        if (cancelado) return;
+        if (st.en_cola) {
+          setCola(st);
+          setPantalla('cola');
+        } else if (st.matched) {
+          const sala = await api.salas.detalle(st.sala_id);
+          if (!cancelado) onGameStart(sala);
+        }
+      } catch { /* sin ticket previo o error de red: arranca en menú */ }
+      finally { if (!cancelado) setReconectando(false); }
+    })();
+    return () => { cancelado = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoJoinCodigo]);
 
   // Poll de la cola mientras estamos buscando
@@ -287,14 +318,19 @@ export default function MatchmakingView({ user, tipo, dark, onBack, onGameStart,
       <div className="social-body mm-body">
         {error && <div className="social-error">⚠ {error}</div>}
 
-        {pantalla === 'menu' && (
+        {reconectando ? (
+          <div className="mm-panel mm-cola">
+            <div className="boot-spinner" />
+            <h3>Verificando si ya tenías una búsqueda en curso…</h3>
+          </div>
+        ) : pantalla === 'menu' ? (
           <Menu
             tipo={tipo}
             onSolo2={() => buscarSolo(2)}
             onSolo4={() => buscarSolo(4)}
             onCrearParty={crearParty}
           />
-        )}
+        ) : null}
 
         {pantalla === 'party' && party && (
           <PartyView

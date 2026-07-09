@@ -365,8 +365,16 @@ export async function matchmakingRoutes(app: FastifyInstance) {
     const { usuario_id, username, modo } = req.body;
     const tipo: Tipo = req.body.tipo === 'casual' ? 'casual' : 'ranked';
 
+    // Ojo: los tickets de party NO llevan usuario_id (van por party_id, ver
+    // crearSala/cargarTickets) — un chequeo que solo mirara usuario_id no
+    // detecta que este jugador ya está en cola vía su equipo, y dejaría
+    // crear un segundo ticket (solo) en paralelo al de la party.
     const { rows: yaEnCola } = await pool.query(
-      'SELECT 1 FROM ranked_cola WHERE usuario_id = $1', [usuario_id]);
+      `SELECT 1 FROM ranked_cola c
+       WHERE c.usuario_id = $1
+          OR c.party_id IN (SELECT party_id FROM ranked_party_miembros WHERE usuario_id = $1)`,
+      [usuario_id],
+    );
     if (yaEnCola.length) return reply.code(400).send({ error: 'Ya estás en cola' });
 
     const ref = await eloRef(usuario_id, tipo);
