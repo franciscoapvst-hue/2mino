@@ -1,0 +1,107 @@
+.bo-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 140ms ease-out, border-color 140ms ease-out, color 140ms ease-out;
+}
+
+.bo-btn-primary {
+  background: var(--primary);
+  color: var(--primary-ink);
+}
+.bo-btn-primary:hover {
+  background: var(--primary-hi);
+}
+
+.bo-btn-danger {
+  background: var(--danger);
+  color: var(--danger-ink);
+}
+.bo-btn-danger:hover {
+  filter: brightness(1.08);
+}
+
+.bo-btn-ghost {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--ink);
+}
+.bo-btn-ghost:hover {
+  border-color: var(--muted);
+}
+
+.bo-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.bo-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bo-input,
+.bo-select {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.bo-input::placeholder {
+  color: var(--muted);
+}
+
+.bo-input:focus-visible,
+.bo-select:focus-visible {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 40%, transparent);
+}
+
+.bo-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.bo-field label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.bo-inline-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.bo-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.bo-form-error {
+  color: var(--danger);
+  font-size: 0.8125rem;
+  margin: -4px 0 12px;
+}

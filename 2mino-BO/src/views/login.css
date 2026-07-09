@@ -1,0 +1,93 @@
+.bo-login-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(60% 50% at 50% 0%, color-mix(in oklch, var(--primary) 12%, transparent), transparent),
+    var(--bg);
+  padding: 20px;
+}
+
+.bo-login-card {
+  width: min(360px, 100%);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 32px 28px;
+  animation: bo-login-in 220ms ease-out both;
+}
+
+@keyframes bo-login-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bo-login-card {
+    animation: none;
+  }
+}
+
+.bo-login-mark {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--primary);
+  box-shadow: 0 0 14px color-mix(in oklch, var(--primary) 70%, transparent);
+  margin-bottom: 16px;
+}
+
+.bo-login-card h1 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.bo-login-sub {
+  margin: 6px 0 24px;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.bo-login-ambiente {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  margin-bottom: 20px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.bo-login-ambiente-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.bo-login-submit {
+  width: 100%;
+  justify-content: center;
+  height: 38px;
+  margin-top: 4px;
+}
+
+.bo-login-note {
+  margin: 18px 0 0;
+  font-size: 0.75rem;
+  color: var(--muted-dim);
+  line-height: 1.5;
+}
+
+.bo-login-note code {
+  font-family: var(--font-mono);
+  color: var(--muted);
+}

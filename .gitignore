@@ -21,6 +21,7 @@ Thumbs.db
 
 # credenciales de prueba locales
 usuarios-prueba.txt
+CREDENCIALES.md
 
 # build outputs
 ms-usuarios/dist/

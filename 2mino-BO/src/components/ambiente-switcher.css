@@ -1,0 +1,52 @@
+.amb-switch {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.amb-btn {
+  border: none;
+  background: transparent;
+  color: var(--muted-dim);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 4px 9px;
+  border-radius: calc(var(--radius-sm) - 2px);
+  cursor: pointer;
+  transition: background 120ms ease-out, color 120ms ease-out;
+}
+
+.amb-btn:hover:not(:disabled):not(.is-active) {
+  color: var(--ink);
+  background: var(--surface-hi);
+}
+
+.amb-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.amb-btn-dev.is-active {
+  background: var(--primary);
+  color: var(--primary-ink);
+}
+
+.amb-btn-qa.is-active {
+  background: var(--warning);
+  color: var(--warning-ink);
+}
+
+.amb-btn-prod.is-active {
+  background: var(--danger);
+  color: var(--danger-ink);
+}
+
+/* Recordatorio persistente y difícil de ignorar mientras estás en prod. */
+.amb-switch-prod {
+  box-shadow: 0 0 0 1px var(--danger), 0 0 12px 1px color-mix(in oklch, var(--danger) 45%, transparent);
+}

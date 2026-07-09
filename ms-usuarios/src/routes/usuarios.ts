@@ -29,8 +29,28 @@ const UserSchema = {
     segmento:        { type: 'string' },
     segmento_config: { type: 'object', additionalProperties: true },
     avatar:          { type: 'string', nullable: true },
+    activo:          { type: 'boolean' },
     created_at:      { type: 'string', format: 'date-time' },
     updated_at:      { type: 'string', format: 'date-time' },
+  },
+} as const;
+
+const UsuarioCompletoSchema = {
+  type: 'object',
+  properties: {
+    id:              { type: 'string', format: 'uuid' },
+    username:        { type: 'string' },
+    email:           { type: 'string', format: 'email' },
+    avatar:          { type: 'string', nullable: true },
+    activo:          { type: 'boolean' },
+    created_at:      { type: 'string', format: 'date-time' },
+    updated_at:      { type: 'string', format: 'date-time' },
+    segmento_id:     { type: 'string', format: 'uuid' },
+    segmento:        { type: 'string', nullable: true },
+    segmento_config: { type: 'object', additionalProperties: true, nullable: true },
+    elo:             { type: 'integer' },
+    partidas:        { type: 'integer' },
+    ganadas:         { type: 'integer' },
   },
 } as const;
 
@@ -48,10 +68,15 @@ const MessageSchema = {
 export async function usuariosRoutes(app: FastifyInstance) {
 
   // ── GET /segmentos ──────────────────────────────
-  app.get('/segmentos', {
+  app.get<{ Querystring: { incluirInactivos?: string } }>('/segmentos', {
     schema: {
       tags:    ['segmentos'],
-      summary: 'Listar todos los segmentos activos',
+      summary: 'Listar segmentos',
+      description: 'Por defecto solo los activos. `incluirInactivos=true` trae todos (uso del Back Office).',
+      querystring: {
+        type: 'object',
+        properties: { incluirInactivos: { type: 'string', enum: ['true', 'false'] } },
+      },
       response: {
         200: {
           description: 'Lista de segmentos',
@@ -60,12 +85,163 @@ export async function usuariosRoutes(app: FastifyInstance) {
         },
       },
     },
-  }, async (_req, reply) => {
+  }, async (req, reply) => {
+    const todos = req.query.incluirInactivos === 'true';
     const { rows } = await pool.query(
       `SELECT id, nombre, descripcion, config, activo, created_at, updated_at
-       FROM segmentos WHERE activo = true ORDER BY nombre`,
+       FROM segmentos ${todos ? '' : 'WHERE activo = true'} ORDER BY nombre`,
     );
     return reply.send(rows);
+  });
+
+  // ── POST /segmentos ─────────────────────────────
+  // Back Office §4 — crear un segmento nuevo (config vacía, se edita después).
+  app.post<{ Body: { nombre: string; descripcion?: string } }>('/segmentos', {
+    schema: {
+      tags:        ['segmentos'],
+      summary:     'Crear segmento',
+      body: {
+        type: 'object',
+        required: ['nombre'],
+        properties: {
+          nombre:      { type: 'string', minLength: 2, maxLength: 50, example: 'beta_tester' },
+          descripcion: { type: 'string', maxLength: 200 },
+        },
+      },
+      response: {
+        201: { description: 'Segmento creado', ...SegmentoSchema },
+        409: { description: 'Ya existe un segmento con ese nombre', ...ErrorSchema },
+      },
+    },
+  }, async (req, reply) => {
+    const { nombre, descripcion = '' } = req.body;
+    try {
+      const { rows } = await pool.query(
+        `INSERT INTO segmentos (nombre, descripcion, config)
+         VALUES ($1, $2, '{}') RETURNING id, nombre, descripcion, config, activo, created_at, updated_at`,
+        [nombre, descripcion],
+      );
+      return reply.code(201).send(rows[0]);
+    } catch (err: any) {
+      if (err.code === '23505') return reply.code(409).send({ error: `El segmento '${nombre}' ya existe` });
+      throw err;
+    }
+  });
+
+  // ── PATCH /segmentos/:id/estado ─────────────────
+  app.patch<{ Params: { id: string }; Body: { activo: boolean } }>('/segmentos/:id/estado', {
+    schema: {
+      tags:        ['segmentos'],
+      summary:     'Activar o desactivar un segmento',
+      params: { type: 'object', properties: { id: { type: 'string', format: 'uuid' } } },
+      body: {
+        type: 'object',
+        required: ['activo'],
+        properties: { activo: { type: 'boolean' } },
+      },
+      response: {
+        200: { description: 'Segmento actualizado',   ...SegmentoSchema },
+        404: { description: 'Segmento no encontrado', ...ErrorSchema },
+      },
+    },
+  }, async (req, reply) => {
+    const { rows } = await pool.query(
+      `UPDATE segmentos SET activo = $1, updated_at = NOW() WHERE id = $2
+       RETURNING id, nombre, descripcion, config, activo, created_at, updated_at`,
+      [req.body.activo, req.params.id],
+    );
+    if (!rows.length) return reply.code(404).send({ error: 'Segmento no encontrado' });
+    return reply.send(rows[0]);
+  });
+
+  // ── GET /usuarios ────────────────────────────────
+  // Back Office §3 — buscar/listar. Sin cursor de paginación todavía (el
+  // volumen de usuarios hoy no lo justifica); ordenado por más reciente.
+  app.get<{ Querystring: { q?: string } }>('/usuarios', {
+    schema: {
+      tags:        ['usuarios'],
+      summary:     'Buscar/listar usuarios (Back Office)',
+      querystring: {
+        type: 'object',
+        properties: { q: { type: 'string', maxLength: 100 } },
+      },
+      response: {
+        200: { description: 'Usuarios encontrados', type: 'array', items: UserSchema },
+      },
+    },
+  }, async (req, reply) => {
+    const q = (req.query.q ?? '').trim();
+    const { rows } = await pool.query(
+      `SELECT u.id, u.username, u.email, u.segmento_id, u.activo, u.created_at, u.updated_at,
+              s.nombre as segmento
+       FROM usuarios u
+       LEFT JOIN segmentos s ON s.id = u.segmento_id
+       WHERE $1 = '' OR u.username ILIKE '%' || $1 || '%' OR u.email ILIKE '%' || $1 || '%'
+       ORDER BY u.created_at DESC
+       LIMIT 100`,
+      [q],
+    );
+    return reply.send(rows);
+  });
+
+  // ── PATCH /usuarios/:id/segmento ─────────────────
+  app.patch<{ Params: { id: string }; Body: { segmentoId: string } }>('/usuarios/:id/segmento', {
+    schema: {
+      tags:        ['usuarios'],
+      summary:     'Cambiar el segmento de un usuario',
+      params: { type: 'object', properties: { id: { type: 'string', format: 'uuid' } } },
+      body: {
+        type: 'object',
+        required: ['segmentoId'],
+        properties: { segmentoId: { type: 'string', format: 'uuid' } },
+      },
+      response: {
+        200: { description: 'Usuario actualizado',    ...UserSchema },
+        404: { description: 'Usuario no encontrado',  ...ErrorSchema },
+      },
+    },
+  }, async (req, reply) => {
+    const { rowCount } = await pool.query(
+      `UPDATE usuarios SET segmento_id = $1, updated_at = NOW() WHERE id = $2`,
+      [req.body.segmentoId, req.params.id],
+    );
+    if (!rowCount) return reply.code(404).send({ error: 'Usuario no encontrado' });
+
+    const { rows } = await pool.query(
+      `SELECT u.id, u.username, u.email, u.segmento_id, u.activo, u.created_at, u.updated_at,
+              s.nombre as segmento
+       FROM usuarios u LEFT JOIN segmentos s ON s.id = u.segmento_id WHERE u.id = $1`,
+      [req.params.id],
+    );
+    return reply.send(rows[0]);
+  });
+
+  // ── PATCH /usuarios/:id/estado ───────────────────
+  // Banear/reactivar — nunca borra: /usuarios/verificar (login) rechaza
+  // si activo=false. Reversible, no rompe FKs de salas/ranked/amigos.
+  app.patch<{ Params: { id: string }; Body: { activo: boolean } }>('/usuarios/:id/estado', {
+    schema: {
+      tags:        ['usuarios'],
+      summary:     'Banear o reactivar una cuenta',
+      params: { type: 'object', properties: { id: { type: 'string', format: 'uuid' } } },
+      body: {
+        type: 'object',
+        required: ['activo'],
+        properties: { activo: { type: 'boolean' } },
+      },
+      response: {
+        200: { description: 'Usuario actualizado',   ...UserSchema },
+        404: { description: 'Usuario no encontrado', ...ErrorSchema },
+      },
+    },
+  }, async (req, reply) => {
+    const { rows } = await pool.query(
+      `UPDATE usuarios SET activo = $1, updated_at = NOW() WHERE id = $2
+       RETURNING id, username, email, segmento_id, activo, created_at, updated_at`,
+      [req.body.activo, req.params.id],
+    );
+    if (!rows.length) return reply.code(404).send({ error: 'Usuario no encontrado' });
+    return reply.send(rows[0]);
   });
 
   // ── POST /usuarios ──────────────────────────────
@@ -164,6 +340,7 @@ export async function usuariosRoutes(app: FastifyInstance) {
       const user = rows[0];
       const valid = await bcrypt.compare(password, user.password_hash);
       if (!valid) return reply.code(401).send({ error: 'Credenciales inválidas' });
+      if (user.activo === false) return reply.code(401).send({ error: 'Cuenta desactivada' });
 
       const { password_hash, ...safeUser } = user;
       return reply.send(safeUser);
@@ -191,11 +368,42 @@ export async function usuariosRoutes(app: FastifyInstance) {
     },
     async (req, reply) => {
       const { rows } = await pool.query(
-        `SELECT u.id, u.username, u.email, u.segmento_id, u.avatar, u.created_at, u.updated_at,
+        `SELECT u.id, u.username, u.email, u.segmento_id, u.avatar, u.activo, u.created_at, u.updated_at,
                 s.nombre as segmento, s.config as segmento_config
          FROM usuarios u
          LEFT JOIN segmentos s ON s.id = u.segmento_id
          WHERE u.id = $1`,
+        [req.params.id],
+      );
+      if (!rows.length) return reply.code(404).send({ error: 'Usuario no encontrado' });
+      return reply.send(rows[0]);
+    },
+  );
+
+  // ── GET /usuarios/:id/completo ──────────────────
+  // Back Office §3 "ver detalle" — perfil + segmento + ELO en una sola
+  // consulta, vía la función usuario_completo() (ver db/pool.ts para el
+  // porqué de una función y no una vista para cruzar con ranked_ratings
+  // de ms-salas).
+  app.get<{ Params: { id: string } }>(
+    '/usuarios/:id/completo',
+    {
+      schema: {
+        tags:        ['usuarios'],
+        summary:     'Perfil completo del usuario (segmento + ELO)',
+        params: {
+          type: 'object',
+          properties: { id: { type: 'string', format: 'uuid' } },
+        },
+        response: {
+          200: { description: 'Perfil completo',       ...UsuarioCompletoSchema },
+          404: { description: 'Usuario no encontrado', ...ErrorSchema },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { rows } = await pool.query(
+        `SELECT * FROM usuario_completo($1)`,
         [req.params.id],
       );
       if (!rows.length) return reply.code(404).send({ error: 'Usuario no encontrado' });

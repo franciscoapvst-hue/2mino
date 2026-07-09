@@ -1,0 +1,129 @@
+.bo-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal-backdrop);
+  background: oklch(0 0 0 / 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: bo-fade-in 140ms ease-out both;
+}
+
+.bo-modal {
+  position: relative;
+  z-index: var(--z-modal);
+  width: min(420px, 100%);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  animation: bo-modal-in 160ms ease-out both;
+}
+
+.bo-modal h2 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.bo-modal p {
+  margin: 0 0 20px;
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.bo-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+@keyframes bo-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes bo-modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bo-modal-backdrop,
+  .bo-modal {
+    animation: none;
+  }
+}
+
+/* ── Detalle de usuario (UsuarioDetalleModal) ─────────────────── */
+.bo-modal-wide {
+  width: min(560px, 100%);
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.bo-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.bo-modal-header h2 {
+  margin: 0;
+  font-family: var(--font-mono);
+}
+
+.bo-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 20px;
+}
+.bo-detail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.bo-detail-field-full {
+  grid-column: 1 / -1;
+}
+.bo-detail-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted-dim);
+}
+.bo-detail-value {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  color: var(--ink);
+  word-break: break-word;
+}
+.bo-detail-json {
+  margin: 0;
+  padding: 12px;
+  border-radius: var(--radius-sm, 8px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--muted);
+  overflow-x: auto;
+  max-height: 220px;
+}
+
+@media (max-width: 520px) {
+  .bo-detail-grid { grid-template-columns: 1fr; }
+}
