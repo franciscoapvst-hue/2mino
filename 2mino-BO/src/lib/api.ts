@@ -1,11 +1,8 @@
 import type { AdminSession, FeatureFlag, Segmento, Usuario } from './types';
 
 /**
- * Cliente del Back Office. §2 (login) y §5 (feature flags) de
- * docs/CASOS_DE_USO_BACKOFFICE.md ya hablan con api-integracion de verdad.
- * §3 (usuarios) y §4 (segmentos) siguen mock contra localStorage hasta que
- * exista el backend correspondiente — se reemplazan función por función,
- * sin que las vistas necesiten cambiar (ya consumen estas firmas).
+ * Cliente del Back Office — habla contra api-integracion de verdad
+ * (docs/CASOS_DE_USO_BACKOFFICE.md §2/§3/§4/§5, ya completos).
  */
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
@@ -87,98 +84,52 @@ export async function toggleFlag(clave: string, habilitado: boolean): Promise<Fe
   return flag;
 }
 
-// ════════════════════════════════════════════════════════════════
-// A partir de acá: mock contra localStorage — §3 y §4 todavía no
-// tienen backend real (ver docs/CASOS_DE_USO_BACKOFFICE.md §3/§4).
-// ════════════════════════════════════════════════════════════════
-
-const LATENCY_MS = 320;
-const STORAGE_KEY = '2mino-bo-data';
-
-function delay<T>(value: T): Promise<T> {
-  return new Promise((resolve) => setTimeout(() => resolve(value), LATENCY_MS));
-}
-
-type MockDB = {
-  segmentos: Segmento[];
-  usuarios: Usuario[];
-};
-
-function seed(): MockDB {
-  return {
-    segmentos: [
-      { id: 'seg-jugador', nombre: 'jugador', descripcion: 'Segmento por defecto de cualquier usuario registrado', activo: true, config: { tema: 'oscuro' } },
-      { id: 'seg-tester', nombre: 'tester', descripcion: 'Acceso anticipado a features en prueba', activo: true, config: { tema: 'oscuro', features: ['torneos_beta'] } },
-      { id: 'seg-admin', nombre: 'admin', descripcion: 'Acceso al Back Office', activo: true, config: {} },
-    ],
-    usuarios: [
-      { id: 'u-1', username: 'franciscoapv', email: 'franciscoapvst@gmail.com', segmentoId: 'seg-admin', activo: true, elo: 1420, creadoEn: '2026-01-14T10:00:00Z' },
-      { id: 'u-2', username: 'capicua_king', email: 'capicua@example.com', segmentoId: 'seg-jugador', activo: true, elo: 1180, creadoEn: '2026-02-02T18:30:00Z' },
-      { id: 'u-3', username: 'domino_pro', email: 'pro@example.com', segmentoId: 'seg-tester', activo: true, elo: 1560, creadoEn: '2026-02-20T09:12:00Z' },
-      { id: 'u-4', username: 'tranquero99', email: 'tranca@example.com', segmentoId: 'seg-jugador', activo: false, elo: 980, creadoEn: '2026-03-05T21:45:00Z' },
-      { id: 'u-5', username: 'reina_de_picas', email: 'reina@example.com', segmentoId: 'seg-jugador', activo: true, elo: 1050, creadoEn: '2026-04-11T14:20:00Z' },
-    ],
-  };
-}
-
-function loadDB(): MockDB {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    const fresh = seed();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
-    return fresh;
-  }
-  return JSON.parse(raw) as MockDB;
-}
-
-function saveDB(db: MockDB) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-}
-
-// ── §4 Segmentos (mock) ──────────────────────────────────────────
+// ── §4 Segmentos — real, contra api-integracion ────────────────────
 export async function listSegmentos(): Promise<Segmento[]> {
-  return delay(loadDB().segmentos);
+  return adminFetch<Segmento[]>('/admin/segmentos');
 }
 
 export async function createSegmento(input: { nombre: string; descripcion: string }): Promise<Segmento> {
-  const db = loadDB();
-  const nuevo: Segmento = { id: `seg-${crypto.randomUUID().slice(0, 8)}`, nombre: input.nombre, descripcion: input.descripcion, activo: true, config: {} };
-  db.segmentos.push(nuevo);
-  saveDB(db);
-  return delay(nuevo);
+  return adminFetch<Segmento>('/admin/segmentos', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }
 
 export async function toggleSegmentoEstado(id: string, activo: boolean): Promise<Segmento> {
-  const db = loadDB();
-  const seg = db.segmentos.find((s) => s.id === id);
-  if (!seg) throw new Error('Segmento no encontrado');
-  seg.activo = activo;
-  saveDB(db);
-  return delay(seg);
+  return adminFetch<Segmento>(`/admin/segmentos/${id}/estado`, {
+    method: 'PATCH',
+    body: JSON.stringify({ activo }),
+  });
 }
 
-// ── §3 Usuarios (mock) ───────────────────────────────────────────
+// ── §3 Usuarios — real, contra api-integracion ─────────────────────
+// ms-usuarios devuelve snake_case (segmento_id) — se mapea acá al
+// camelCase que ya esperan las vistas, sin tocarlas.
+type UsuarioApi = { id: string; username: string; email: string; segmento_id: string; activo: boolean };
+
+function mapUsuario(u: UsuarioApi): Usuario {
+  return { id: u.id, username: u.username, email: u.email, segmentoId: u.segmento_id, activo: u.activo };
+}
+
 export async function listUsuarios(query: string): Promise<Usuario[]> {
-  const db = loadDB();
-  const q = query.trim().toLowerCase();
-  const rows = q ? db.usuarios.filter((u) => u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)) : db.usuarios;
-  return delay(rows);
+  const qs = query.trim() ? `?q=${encodeURIComponent(query.trim())}` : '';
+  const rows = await adminFetch<UsuarioApi[]>(`/admin/usuarios${qs}`);
+  return rows.map(mapUsuario);
 }
 
 export async function setUsuarioSegmento(id: string, segmentoId: string): Promise<Usuario> {
-  const db = loadDB();
-  const u = db.usuarios.find((x) => x.id === id);
-  if (!u) throw new Error('Usuario no encontrado');
-  u.segmentoId = segmentoId;
-  saveDB(db);
-  return delay(u);
+  const row = await adminFetch<UsuarioApi>(`/admin/usuarios/${id}/segmento`, {
+    method: 'PATCH',
+    body: JSON.stringify({ segmentoId }),
+  });
+  return mapUsuario(row);
 }
 
 export async function setUsuarioEstado(id: string, activo: boolean): Promise<Usuario> {
-  const db = loadDB();
-  const u = db.usuarios.find((x) => x.id === id);
-  if (!u) throw new Error('Usuario no encontrado');
-  u.activo = activo;
-  saveDB(db);
-  return delay(u);
+  const row = await adminFetch<UsuarioApi>(`/admin/usuarios/${id}/estado`, {
+    method: 'PATCH',
+    body: JSON.stringify({ activo }),
+  });
+  return mapUsuario(row);
 }

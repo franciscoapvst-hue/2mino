@@ -70,7 +70,6 @@ export default function UsuariosView() {
               <tr>
                 <th>Usuario</th>
                 <th>Email</th>
-                <th>ELO</th>
                 <th>Segmento</th>
                 <th>Estado</th>
                 <th aria-label="Acciones" />
@@ -81,7 +80,6 @@ export default function UsuariosView() {
                 <tr key={u.id}>
                   <td style={{ fontFamily: 'var(--font-ui)', fontWeight: 600 }}>{u.username}</td>
                   <td style={{ color: 'var(--muted)' }}>{u.email}</td>
-                  <td>{u.elo}</td>
                   <td>
                     <select
                       className="bo-select"

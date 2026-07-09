@@ -57,6 +57,12 @@ const SCHEMA = `
   ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS segmento_id UUID REFERENCES segmentos(id);
   ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS avatar VARCHAR(100);
 
+  -- Ban reversible (Back Office, docs/CASOS_DE_USO_BACKOFFICE.md §3): un
+  -- DELETE real rompería las FK de salas/ranked_historial/amigos; un flag
+  -- es reversible y no rompe integridad. POST /usuarios/verificar rechaza
+  -- el login si activo=false.
+  ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT true;
+
   -- Asigna segmento tester a usuarios sin segmento
   UPDATE usuarios
   SET segmento_id = (SELECT id FROM segmentos WHERE nombre = 'tester')

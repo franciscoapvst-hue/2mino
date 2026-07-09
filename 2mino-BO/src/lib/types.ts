@@ -12,8 +12,6 @@ export type Usuario = {
   email: string;
   segmentoId: string;
   activo: boolean;
-  elo: number;
-  creadoEn: string;
 };
 
 // Forma real de landing_config (ms-frontend-landing) — sin "etiqueta",
