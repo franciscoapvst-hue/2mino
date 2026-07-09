@@ -44,6 +44,15 @@ export type FeatureFlag = {
   updated_at?: string;
 };
 
+// Forma real de reglas_juego (ms-salas) — sin "habilitado" (a diferencia
+// de FeatureFlag): estas filas siempre están activas, no son toggles.
+export type ReglaJuego = {
+  clave: string;
+  valor: unknown;
+  descripcion: string;
+  updated_at?: string;
+};
+
 export type AdminSession = {
   username: string;
   segmento: 'admin';

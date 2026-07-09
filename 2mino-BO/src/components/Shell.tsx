@@ -2,12 +2,13 @@ import type { ReactNode } from 'react';
 import AmbienteSwitcher from './AmbienteSwitcher';
 import './shell.css';
 
-export type View = 'flags' | 'usuarios' | 'segmentos';
+export type View = 'flags' | 'usuarios' | 'segmentos' | 'reglas';
 
 const NAV: { view: View; label: string; hint: string }[] = [
   { view: 'flags', label: 'Feature flags', hint: 'FF' },
   { view: 'usuarios', label: 'Usuarios', hint: 'US' },
   { view: 'segmentos', label: 'Segmentos', hint: 'SG' },
+  { view: 'reglas', label: 'Reglas del juego', hint: 'RJ' },
 ];
 
 type Props = {

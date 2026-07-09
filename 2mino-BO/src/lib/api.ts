@@ -1,4 +1,4 @@
-import type { AdminSession, FeatureFlag, Segmento, Usuario, UsuarioCompleto } from './types';
+import type { AdminSession, FeatureFlag, ReglaJuego, Segmento, Usuario, UsuarioCompleto } from './types';
 import { apiUrl } from './env';
 
 /**
@@ -84,6 +84,20 @@ export async function toggleFlag(clave: string, habilitado: boolean): Promise<Fe
   const flag = flags.find((f) => f.clave === clave);
   if (!flag) throw new Error(`Flag '${clave}' no encontrada tras actualizar.`);
   return flag;
+}
+
+// ── §6 Reglas del juego — real, contra api-integracion ─────────────
+export async function listReglas(): Promise<ReglaJuego[]> {
+  return adminFetch<ReglaJuego[]>('/admin/reglas');
+}
+
+export async function updateRegla(clave: string, valor: unknown): Promise<ReglaJuego> {
+  // A diferencia de feature-flags, el PATCH de reglas SÍ devuelve la fila
+  // completa ya actualizada — no hace falta recargar la lista entera.
+  return adminFetch<ReglaJuego>(`/admin/reglas/${clave}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ valor }),
+  });
 }
 
 // ── §4 Segmentos — real, contra api-integracion ────────────────────
