@@ -1,0 +1,38 @@
+.bo-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.bo-badge-success {
+  background: var(--success);
+  color: var(--success-ink);
+}
+
+.bo-badge-danger {
+  background: var(--danger);
+  color: var(--danger-ink);
+}
+
+.bo-badge-warning {
+  background: var(--warning);
+  color: var(--warning-ink);
+}
+
+.bo-badge-accent {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.bo-badge-muted {
+  background: var(--surface-hi);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
