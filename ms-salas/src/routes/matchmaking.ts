@@ -12,7 +12,7 @@ import {
 } from '../game/matchmaking';
 import type { Ticket } from '../game/matchmaking';
 import { resolverBotsEnSegundoPlano } from './juegos';
-import { getRegla } from '../game/reglas';
+import { getRegla, limiteJugadaMsDe } from '../game/reglas';
 
 const ErrorSchema = {
   type: 'object',
@@ -104,7 +104,9 @@ async function crearSala(
     );
   }
 
-  const partidaInicial = crearPartida(asientos, puntosMm, getRegla('puntos_capicua', PUNTOS_CAPICUA));
+  const partidaInicial = crearPartida(
+    asientos, puntosMm, getRegla('puntos_capicua', PUNTOS_CAPICUA), limiteJugadaMsDe(tipo),
+  );
   const { rows: juegoRows } = await client.query(
     `INSERT INTO juegos (sala_id, partida) VALUES ($1, $2) RETURNING id`,
     [salaId, JSON.stringify(partidaInicial)],

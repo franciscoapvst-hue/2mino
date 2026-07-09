@@ -40,6 +40,8 @@ function partida(over: Partial<PartidaState> = {}): PartidaState {
     resultadoMano: null,
     ultimoEvento: null,
     abandonadoPorSeat: null,
+    limiteJugadaMs: null,
+    turnoEmpiezaEn: 0,
     ...over,
   };
 }

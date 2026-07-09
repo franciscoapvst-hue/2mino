@@ -79,6 +79,39 @@
   color: var(--amber) !important;
 }
 
+/* Countdown del tiempo límite por jugada (docs/PENDIENTES_JUEGO.md §2) —
+   grande y al lado del indicador de turno (el nombre de quién juega),
+   para que sea imposible no verlo. */
+.game-turn-countdown {
+  font-size: 1.4rem !important;
+  font-weight: 800 !important;
+  color: var(--g-muted) !important;
+  padding: 6px 16px !important;
+  border-radius: 24px !important;
+  background: var(--g-surface) !important;
+  border: 2px solid var(--g-border);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.game-turn-countdown.countdown-urgente {
+  background: rgba(255, 128, 128, 0.16) !important;
+  border-color: rgba(255, 128, 128, 0.6) !important;
+  color: #ff8080 !important;
+  animation: countdownAlarma 0.8s ease-in-out infinite;
+}
+@keyframes countdownAlarma {
+  0%, 100% {
+    background: rgba(255, 128, 128, 0.16);
+    box-shadow: 0 0 0 0 rgba(255, 128, 128, 0.5);
+    transform: scale(1);
+  }
+  50% {
+    background: rgba(255, 128, 128, 0.42);
+    box-shadow: 0 0 14px 4px rgba(255, 128, 128, 0.4);
+    transform: scale(1.08);
+  }
+}
+
 /* ── Marcador ────────────────────────────────────── */
 .score-bar {
   background: var(--g-surface) !important;
@@ -212,3 +245,10 @@
 .game-result-card .btn-salir:hover:not(:disabled) { border-color: #ff8080 !important; color: #ff8080 !important; }
 
 .game-loading { color: var(--g-muted) !important; }
+
+@media (max-width: 480px) {
+  .game-turn-countdown {
+    font-size: 1.05rem !important;
+    padding: 4px 11px !important;
+  }
+}

@@ -117,8 +117,13 @@ export type PartidaState = {
   ultimoQueJugo:  number | null; // seat que puso la última ficha
   salidaForzada:  Pieza | null;  // mano 1: obligado a abrir con esta ficha
   resultadoMano:  ResultadoMano | null; // de la mano recién cerrada
-  ultimoEvento:   { tipo: 'paso_a_todos'; seat: number } | null;
+  ultimoEvento:   { tipo: 'paso_a_todos'; seat: number } | { tipo: 'tiempo_agotado'; seat: number } | null;
   abandonadoPorSeat: number | null;     // set si la partida terminó por abandono
+  // Tiempo límite por jugada (docs/PENDIENTES_JUEGO.md §2) — resuelto UNA
+  // vez al crear la partida desde reglas_juego.tiempo_limite_jugada_ms
+  // según el tipo de sala (casual/ranked); null = sin límite.
+  limiteJugadaMs: number | null;
+  turnoEmpiezaEn: number;        // epoch ms — se re-sella cada vez que `turno` cambia
 };
 
 type Resultado = { ok: true; partida: PartidaState } | { ok: false; error: string };
@@ -146,6 +151,7 @@ export function crearPartida(
   jugadores: Asiento[],
   puntosObjetivo = 100,
   puntosCapicua = PUNTOS_CAPICUA,
+  limiteJugadaMs: number | null = null,
 ): PartidaState {
   const ordenados = [...jugadores].sort((a, b) => a.posicion - b.posicion);
   const maxJugadores = ordenados.length;
@@ -179,6 +185,8 @@ export function crearPartida(
     resultadoMano: null,
     ultimoEvento: null,
     abandonadoPorSeat: null,
+    limiteJugadaMs,
+    turnoEmpiezaEn: Date.now(),
   };
 }
 
@@ -319,6 +327,7 @@ export function aplicarJugada(
     ultimoQueJugo: seat,
     ultimoEvento: pasoATodos ? { tipo: 'paso_a_todos', seat } : null,
     turno: (partida.turno + 1) % partida.maxJugadores,
+    turnoEmpiezaEn: Date.now(),
   };
 
   // El bonus puede cerrar la partida a mitad de mano
@@ -399,6 +408,7 @@ export function aplicarPase(partida: PartidaState, usuarioId: string): Resultado
       ultimaJugada: null,
       ultimoEvento: null,
       turno: (partida.turno + 1) % partida.maxJugadores,
+      turnoEmpiezaEn: Date.now(),
     },
   };
 }
@@ -436,6 +446,7 @@ export function marcarListo(partida: PartidaState, usuarioId: string): Resultado
       numeroMano: partida.numeroMano + 1,
       fase: 'jugando',
       listos: new Array(partida.maxJugadores).fill(false),
+      turnoEmpiezaEn: Date.now(),
     },
   };
 }
@@ -462,9 +473,12 @@ export type PartidaPublica = {
   salidaForzada:  Pieza | null;
   resultadoMano:  ResultadoMano | null;
   equipoGanadorPartida: 0 | 1 | null;
-  ultimoEvento:   { tipo: 'paso_a_todos'; seat: number } | null;
+  ultimoEvento:   { tipo: 'paso_a_todos'; seat: number } | { tipo: 'tiempo_agotado'; seat: number } | null;
   abandonadoPorSeat: number | null;
   estado:         'jugando' | 'entre_manos' | 'terminado';
+  // Tiempo límite por jugada (docs/PENDIENTES_JUEGO.md §2) — null = sin límite.
+  limiteJugadaMs: number | null;
+  turnoEmpiezaEn: number;
 };
 
 export function vistaPublica(partida: PartidaState, usuarioId: string): PartidaPublica {
@@ -494,5 +508,7 @@ export function vistaPublica(partida: PartidaState, usuarioId: string): PartidaP
     estado: partida.fase === 'fin_partida' ? 'terminado'
           : partida.fase === 'entre_manos' ? 'entre_manos'
           : 'jugando',
+    limiteJugadaMs: partida.limiteJugadaMs,
+    turnoEmpiezaEn: partida.turnoEmpiezaEn,
   };
 }
