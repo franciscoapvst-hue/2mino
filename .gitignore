@@ -23,6 +23,12 @@ Thumbs.db
 usuarios-prueba.txt
 CREDENCIALES.md
 
+# Docs de consumo personal (notas/planificación) — quedan locales, no versionados
+docs/BUGS.md
+docs/CASOS_DE_USO_BACKOFFICE.md
+docs/CASOS_DE_USO_BACKOFFICE.docx
+docs/PENDIENTES_JUEGO.md
+
 # build outputs
 ms-usuarios/dist/
 ms-frontend-landing/dist/
