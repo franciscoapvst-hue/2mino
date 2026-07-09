@@ -514,6 +514,9 @@ function tituloResultado(
 
 const equipoDeSeat = (seat: number) => seat % 2;
 
+/** Suma de pips de una mano — para mostrar junto a las fichas reveladas al cerrar la mano. */
+const sumaPips = (mano: Pieza[]) => mano.reduce((s, p) => s + p.a + p.b, 0);
+
 function ManoOverlay({ partida, nombreAsiento, onListo, confirmando }: {
   partida: PartidaPublica;
   nombreAsiento: (seat: number) => string;
@@ -551,6 +554,7 @@ function ManoOverlay({ partida, nombreAsiento, onListo, confirmando }: {
                     ))
                   )}
                 </div>
+                <span className="result-mano-suma">{sumaPips(mano)} pips</span>
               </div>
             ))}
           </div>

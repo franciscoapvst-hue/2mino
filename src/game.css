@@ -239,11 +239,19 @@
   flex-wrap: wrap;
   gap: 4px;
   align-items: center;
+  flex: 1;
 }
 .result-mano-vacia {
   font-size: 0.85rem;
   color: var(--amber) !important;
   font-style: italic;
+}
+.result-mano-suma {
+  flex: 0 0 auto;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--g-ink) !important;
+  font-variant-numeric: tabular-nums;
 }
 
 .game-loading { color: var(--g-muted) !important; }
