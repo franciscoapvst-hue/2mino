@@ -13,7 +13,9 @@ export default function SegmentosView() {
   const [saving, setSaving] = useState(false);
 
   function refresh() {
-    listSegmentos().then(setSegmentos);
+    listSegmentos()
+      .then(setSegmentos)
+      .catch((err) => setError(err instanceof Error ? err.message : 'No se pudo cargar.'));
   }
 
   useEffect(refresh, []);
@@ -30,17 +32,26 @@ export default function SegmentosView() {
       return;
     }
     setSaving(true);
-    await createSegmento({ nombre: nombre.trim(), descripcion: descripcion.trim() });
-    setSaving(false);
-    setNombre('');
-    setDescripcion('');
-    setShowForm(false);
-    refresh();
+    try {
+      await createSegmento({ nombre: nombre.trim(), descripcion: descripcion.trim() });
+      setNombre('');
+      setDescripcion('');
+      setShowForm(false);
+      refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo crear el segmento.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleToggleEstado(id: string, activo: boolean) {
-    await toggleSegmentoEstado(id, activo);
-    refresh();
+    try {
+      await toggleSegmentoEstado(id, activo);
+      refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo actualizar el segmento.');
+    }
   }
 
   return (
@@ -81,7 +92,7 @@ export default function SegmentosView() {
 
       <div className="bo-table-wrap" style={{ marginTop: showForm || error ? 16 : 0 }}>
         {!segmentos ? (
-          <p className="bo-table-empty">Cargando…</p>
+          error ? null : <p className="bo-table-empty">Cargando…</p>
         ) : (
           <table className="bo-table">
             <thead>

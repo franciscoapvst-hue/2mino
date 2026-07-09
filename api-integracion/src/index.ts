@@ -15,8 +15,16 @@ const app = Fastify({
 });
 
 // ── CORS ─────────────────────────────────────────
+// CORS_ORIGIN acepta una lista separada por comas — en producción hace
+// falta más de un origen permitido: el frontend público (2mino.online)
+// Y el Back Office local, que llega al mismo api-integracion por túnel
+// SSH (ver docs/CASOS_DE_USO_BACKOFFICE.md §10.1) con origin
+// http://localhost:5174. Sin esto, el navegador bloquea las respuestas
+// de /admin/* aunque el request llegue bien (se ve como "se queda
+// cargando" en el panel, no como un error de red obvio).
+const corsOrigin = process.env.CORS_ORIGIN ?? '*';
 app.register(cors, {
-  origin:  process.env.CORS_ORIGIN ?? '*',
+  origin:  corsOrigin === '*' ? '*' : corsOrigin.split(',').map(o => o.trim()),
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 });
 
