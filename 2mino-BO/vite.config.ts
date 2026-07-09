@@ -31,8 +31,12 @@ export default defineConfig({
         navigateFallback: 'index.html',
       },
       devOptions: {
-        // Permite probar el SW con `npm run dev`, no solo en build de producción
-        enabled: true,
+        // Desactivado: un SW registrado en `npm run dev` sirve el bundle
+        // viejo cacheado aunque el código en disco ya haya cambiado —
+        // durante desarrollo activo esto se confunde con "sigue mockeado"
+        // (pasó justo eso). Para probar el SW de verdad: `npm run build
+        // && npm run serve:pwa` (o preview), nunca en dev.
+        enabled: false,
       },
     }),
   ],
