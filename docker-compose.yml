@@ -86,7 +86,13 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
     depends_on:
       - ms-usuarios
-    # Sin puerto externo: el frontend lo alcanza vía la red Docker (proxy /api de nginx)
+    # El frontend lo alcanza vía la red Docker (proxy /api de nginx) — no
+    # hace falta puerto para eso. Se publica igual en 127.0.0.1:3000 (solo
+    # loopback, nunca la interfaz pública) para que el Back Office pueda
+    # llegar por túnel SSH (ver docs/CASOS_DE_USO_BACKOFFICE.md §10.1) sin
+    # exponer el gateway a internet.
+    ports:
+      - "127.0.0.1:3000:3000"
 
   # ── Frontend (build estático servido por nginx) ──
   frontend:
