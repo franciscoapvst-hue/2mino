@@ -79,6 +79,23 @@
   color: var(--amber) !important;
 }
 
+/* Countdown del tiempo límite por jugada (docs/PENDIENTES_JUEGO.md §2) */
+.game-turn-countdown {
+  font-size: 0.8rem !important;
+  font-weight: 700 !important;
+  color: var(--g-muted) !important;
+  padding: 5px 11px !important;
+  border-radius: 20px !important;
+  background: var(--g-surface) !important;
+  border: 1px solid var(--g-border);
+  font-variant-numeric: tabular-nums;
+}
+.game-turn-countdown.countdown-urgente {
+  background: rgba(255, 128, 128, 0.12) !important;
+  border-color: rgba(255, 128, 128, 0.35) !important;
+  color: #ff8080 !important;
+}
+
 /* ── Marcador ────────────────────────────────────── */
 .score-bar {
   background: var(--g-surface) !important;

@@ -55,18 +55,30 @@ function elegirJugadaBot(partida: PartidaState, seat: number): Pieza | null {
 /**
  * Resuelve UN solo paso de bot a partir del estado actual: una jugada, un
  * pase, o una confirmación de "listo" entre manos. Devuelve `null` si no
- * hay nada que resolver (le toca a un humano, o la fase no aplica).
+ * hay nada que resolver (le toca a un humano dentro de su tiempo, o la
+ * fase no aplica).
+ *
+ * También fuerza el turno de un HUMANO si se agotó `limiteJugadaMs`
+ * (docs/PENDIENTES_JUEGO.md §2) — reusa la misma heurística "primera
+ * ficha jugable, o pasar" que ya usan los bots, y este mismo mecanismo de
+ * red de seguridad (ver juegos.ts) para no necesitar un timer propio.
  *
  * `movimiento` es `null` para las confirmaciones de "listo" — esas no son
  * movimientos de partida y no van al log de replay.
  */
 function resolverUnPasoBot(
   partida: PartidaState,
-): { partida: PartidaState; movimiento: MovimientoBot | null } | null {
+): { partida: PartidaState; movimiento: MovimientoBot | null; forzadoPorTiempo: boolean } | null {
   if (partida.fase === 'jugando') {
     const seat = partida.turno;
     const asiento = partida.asientos[seat];
-    if (!asiento || !esBot(asiento.usuario_id)) return null;
+    if (!asiento) return null;
+
+    const esTurnoDeBot = esBot(asiento.usuario_id);
+    const tiempoAgotado = !esTurnoDeBot
+      && partida.limiteJugadaMs != null
+      && Date.now() - partida.turnoEmpiezaEn > partida.limiteJugadaMs;
+    if (!esTurnoDeBot && !tiempoAgotado) return null;
 
     const numeroMano = partida.numeroMano;
     const pieza = elegirJugadaBot(partida, seat);
@@ -75,14 +87,21 @@ function resolverUnPasoBot(
       : aplicarPase(partida, asiento.usuario_id);
     if (!resultado.ok) return null; // no debería ocurrir; corta por seguridad
 
+    // Si fue forzado por tiempo (no por ser bot), avisar al frontend cuál
+    // asiento se quedó sin tiempo — mismo mecanismo que "pasó a todos".
+    const partidaFinal = tiempoAgotado
+      ? { ...resultado.partida, ultimoEvento: { tipo: 'tiempo_agotado' as const, seat } }
+      : resultado.partida;
+
     return {
-      partida: resultado.partida,
+      partida: partidaFinal,
       movimiento: {
         numeroMano, seat,
         tipo:  pieza ? 'jugar' : 'pasar',
         pieza: pieza ?? null,
         lado:  pieza ? resultado.partida.ultimaJugada?.lado ?? null : null,
       },
+      forzadoPorTiempo: tiempoAgotado,
     };
   }
 
@@ -93,7 +112,7 @@ function resolverUnPasoBot(
     if (pendiente === -1) return null; // sin bots pendientes: espera a los humanos
     const resultado = marcarListo(partida, partida.asientos[pendiente].usuario_id);
     if (!resultado.ok) return null;
-    return { partida: resultado.partida, movimiento: null };
+    return { partida: resultado.partida, movimiento: null, forzadoPorTiempo: false };
   }
 
   return null; // fin_partida u otra fase: nada que resolver
@@ -121,6 +140,11 @@ export function resolverTurnosBot(
     if (!paso) break;
     actual = paso.partida;
     if (paso.movimiento) movimientos.push(paso.movimiento);
+    // Un turno forzado por tiempo (no un bot) corta la cadena acá: si
+    // siguiéramos resolviendo el próximo turno (ej. un bot) de una,
+    // `ultimoEvento: tiempo_agotado` quedaría pisado antes de que
+    // cualquier cliente llegue a verlo (ver resolverTurnosBotConDelay).
+    if (paso.forzadoPorTiempo) break;
   }
   return { partida: actual, movimientos };
 }
@@ -136,6 +160,12 @@ export const BOT_MOVE_DELAY_MS = 1_500;
  * delay) para que el caller persista ese estado intermedio — así el
  * polling del cliente lo va mostrando progresivamente en vez de saltar
  * directo al estado final.
+ *
+ * Si el paso fue un turno forzado por tiempo agotado (no un bot), corta
+ * la cadena ahí — sin esto, el turno siguiente (típicamente un bot) se
+ * resolvería en el mismo ciclo ~1.5s después y pisaría `ultimoEvento:
+ * tiempo_agotado` antes de que el polling del cliente (cada 2s) llegue a
+ * verlo. El próximo trigger (poll o acción) retoma desde ahí.
  */
 export async function resolverTurnosBotConDelay(
   partida: PartidaState,
@@ -147,6 +177,7 @@ export async function resolverTurnosBotConDelay(
     if (!paso) break;
     actual = paso.partida;
     await onPaso(actual, paso.movimiento);
+    if (paso.forzadoPorTiempo) break;
     await new Promise(resolve => setTimeout(resolve, BOT_MOVE_DELAY_MS));
   }
   return actual;

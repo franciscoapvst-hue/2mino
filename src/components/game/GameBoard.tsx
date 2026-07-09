@@ -31,21 +31,41 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
   const [boardWidth, boardRef] = useMeasuredWidth();
   const [handWidth,  handRef]  = useMeasuredWidth();
 
-  // Aviso efímero del bonus "+30 pasó a todos"
-  const [eventoVisible, setEventoVisible] = useState<{ seat: number } | null>(null);
+  // Aviso efímero del bonus "+30 pasó a todos" o de un turno vencido por tiempo
+  const [eventoVisible, setEventoVisible] = useState<{ tipo: 'paso_a_todos' | 'tiempo_agotado'; seat: number } | null>(null);
   const eventoPrevRef = useRef<string | null>(null);
 
   useEffect(() => {
     const ev = partida?.ultimoEvento;
     if (!ev) return;
-    // Firma única por evento (el polling repite el mismo estado)
-    const firma = `${partida.numeroMano}:${ev.seat}:${partida.marcador[0]}-${partida.marcador[1]}`;
+    // Firma única por evento: turnoEmpiezaEn se re-sella (Date.now()) en
+    // CADA cambio de turno, incluidos los forzados por tiempo — a
+    // diferencia de basarse en el marcador (no todo evento lo cambia, ej.
+    // dos tiempo_agotado seguidos del mismo asiento sin puntos de por
+    // medio tendrían la misma firma y el segundo banner nunca se vería).
+    const firma = `${ev.tipo}:${ev.seat}:${partida.turnoEmpiezaEn}`;
     if (eventoPrevRef.current === firma) return;
     eventoPrevRef.current = firma;
-    setEventoVisible({ seat: ev.seat });
+    setEventoVisible({ tipo: ev.tipo, seat: ev.seat });
     const id = setTimeout(() => setEventoVisible(null), 3000);
     return () => clearTimeout(id);
-  }, [partida?.ultimoEvento, partida?.marcador, partida?.numeroMano]);
+  }, [partida?.ultimoEvento, partida?.turnoEmpiezaEn]);
+
+  // ── Countdown del tiempo límite por jugada ────
+  // Se recalcula localmente cada segundo a partir de turnoEmpiezaEn/
+  // limiteJugadaMs, y se resincroniza solo con el poll de 2s existente
+  // (no hay websocket de partida, ver GameBoard/PartidaPublica).
+  const [restanteMs, setRestanteMs] = useState<number | null>(null);
+  useEffect(() => {
+    if (!partida || partida.fase !== 'jugando' || partida.limiteJugadaMs == null) {
+      setRestanteMs(null);
+      return;
+    }
+    const calcular = () => Math.max(0, partida.limiteJugadaMs! - (Date.now() - partida.turnoEmpiezaEn));
+    setRestanteMs(calcular());
+    const id = setInterval(() => setRestanteMs(calcular()), 1000);
+    return () => clearInterval(id);
+  }, [partida?.fase, partida?.limiteJugadaMs, partida?.turnoEmpiezaEn, partida?.turno]);
 
   // ── Carga y polling ────────────────────────────
   const fetchPartida = useCallback(async () => {
@@ -270,6 +290,11 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
         <button className="btn-back" onClick={onClickSalir}><BackIcon /> Salir</button>
         <span className="game-room-code">{sala.codigo}</span>
         <span className={`game-turn-indicator${esMiTurno ? ' my-turn' : ''}`}>{turnoLabel}</span>
+        {restanteMs !== null && (
+          <span className={`game-turn-countdown${restanteMs <= 5000 ? ' countdown-urgente' : ''}`}>
+            ⏱ {Math.ceil(restanteMs / 1000)}s
+          </span>
+        )}
       </nav>
 
       {/* ── Marcador ─────────────────────────────── */}
@@ -286,7 +311,9 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
       {error && <div className="game-error-banner">⚠ {error}</div>}
       {eventoVisible && (
         <div className="game-event-banner">
-          ⚡ +30 · ¡{nombreAsiento(eventoVisible.seat)} pasó a todos!
+          {eventoVisible.tipo === 'tiempo_agotado'
+            ? <>⏱ ¡Se acabó el tiempo de {nombreAsiento(eventoVisible.seat)}! Jugamos por {partida.miSeat === eventoVisible.seat ? 'ti' : 'él/ella'}.</>
+            : <>⚡ +30 · ¡{nombreAsiento(eventoVisible.seat)} pasó a todos!</>}
         </div>
       )}
 

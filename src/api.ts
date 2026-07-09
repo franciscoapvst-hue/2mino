@@ -65,9 +65,12 @@ export type PartidaPublica = {
   salidaForzada:  Pieza | null;
   resultadoMano:  ResultadoMano | null;
   equipoGanadorPartida: 0 | 1 | null;
-  ultimoEvento:   { tipo: 'paso_a_todos'; seat: number } | null;
+  ultimoEvento:   { tipo: 'paso_a_todos'; seat: number } | { tipo: 'tiempo_agotado'; seat: number } | null;
   abandonadoPorSeat: number | null;
   estado:         'jugando' | 'entre_manos' | 'terminado';
+  // Tiempo límite por jugada (docs/PENDIENTES_JUEGO.md §2) — null = sin límite.
+  limiteJugadaMs: number | null;
+  turnoEmpiezaEn: number;
 };
 
 export type AuthUser = {

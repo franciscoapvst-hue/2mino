@@ -8,7 +8,7 @@ import type { PartidaState, Pieza } from '../game/logic';
 import { aplicarEloRanked } from './ranked';
 import { resolverTurnosBotConDelay } from '../game/bots';
 import type { MovimientoBot } from '../game/bots';
-import { getRegla } from '../game/reglas';
+import { getRegla, limiteJugadaMsDe } from '../game/reglas';
 
 const ErrorSchema = {
   type: 'object',
@@ -253,7 +253,10 @@ export async function juegosRoutes(app: FastifyInstance) {
     const opcionesObjetivo = getRegla('puntos_objetivo', [100, 150, 200]);
     const objetivo = opcionesObjetivo.includes(config.puntosObjetivo) ? config.puntosObjetivo : opcionesObjetivo[0];
 
-    const partida = crearPartida(jugadores, objetivo, getRegla('puntos_capicua', PUNTOS_CAPICUA));
+    const partida = crearPartida(
+      jugadores, objetivo, getRegla('puntos_capicua', PUNTOS_CAPICUA),
+      limiteJugadaMsDe(sala.tipo === 'ranked' ? 'ranked' : 'casual'),
+    );
 
     await pool.query(
       `INSERT INTO juegos (sala_id, partida) VALUES ($1, $2)`,

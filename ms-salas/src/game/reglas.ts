@@ -24,6 +24,12 @@ export function invalidarRegla(clave: string, valor: ReglaValor): void {
   cache.set(clave, valor);
 }
 
+/** Tiempo límite por jugada (ms) para un tipo de sala — null = sin límite. */
+export function limiteJugadaMsDe(tipo: 'casual' | 'ranked'): number | null {
+  const limites = getRegla('tiempo_limite_jugada_ms', { casual: null, ranked: null } as const);
+  return limites[tipo];
+}
+
 /** Solo para tests: resetea la cache a un estado conocido. */
 export function _resetCacheParaTests(valores: Record<string, ReglaValor> = {}): void {
   cache = new Map(Object.entries(valores));
