@@ -38,5 +38,12 @@ export default defineConfig({
   ],
   server: {
     port: 5174,
+    // Si el puerto ya está ocupado, falla en vez de saltar a otro en
+    // silencio — la PWA instalada apunta siempre a localhost:5174 fijo.
+    strictPort: true,
+  },
+  preview: {
+    port: 5174,
+    strictPort: true,
   },
 })
