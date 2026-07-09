@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../api';
-import type { Movimiento, ReplayData } from '../../game/replay-engine';
-import { tableroHastaMovimiento } from '../../game/replay-engine';
+import type { Movimiento, ReplayData, ResultadoMano } from '../../game/replay-engine';
+import { agruparPorMano, resultadoDeMano, tableroHastaMovimiento } from '../../game/replay-engine';
 import SnakeBoardReadOnly from '../game/SnakeBoardReadOnly';
 import { useMeasuredWidth } from '../../hooks/useMeasuredWidth';
 import { PauseIcon, PlayIcon, SkipBackIcon, SkipForwardIcon } from '../icons';
@@ -22,10 +22,25 @@ function describirMovimiento(m: Movimiento, nombre: string): string {
   return `${nombre} jugó ${p.a}|${p.b} — ${m.lado === 'der' ? 'derecha' : 'izquierda'}`;
 }
 
+function textoResultadoMano(r: ResultadoMano, nombreDeEquipo: (eq: 0 | 1) => string): string {
+  const equipoTxt = r.equipo !== null ? nombreDeEquipo(r.equipo) : '—';
+  if (r.tipo === 'paso_a_todos') {
+    // La mano no tuvo cierre formal: el bono empujó el marcador al
+    // objetivo a mitad de mano y ahí terminó la partida.
+    return `¡Bono "pasó a todos"! +${r.puntos} para el equipo de ${equipoTxt} — así cerró la partida`;
+  }
+  if (r.tipo === 'tranca') {
+    if (r.noCaben) return 'Tranca — ¡No caben! (se pasaría de objetivo, no suma)';
+    return r.equipo === null ? 'Tranca — empate, nadie suma' : `Tranca — gana el equipo de ${nombreDeEquipo(r.equipo)}`;
+  }
+  return r.tipo === 'capicua' ? `¡Capicúa! Gana el equipo de ${equipoTxt}` : `Mano ganada por el equipo de ${equipoTxt}`;
+}
+
 export default function ReplayViewer({ dark, salaId, onBack }: Props) {
   const [data, setData] = useState<ReplayData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [indice, setIndice] = useState(-1); // -1 = tablero vacío, antes del primer movimiento
+  const [manoActual, setManoActual] = useState(0);
+  const [indice, setIndice] = useState(-1); // -1 = tablero vacío, antes del primer movimiento DE ESTA MANO
   const [reproduciendo, setReproduciendo] = useState(false);
   const [velocidad, setVelocidad] = useState<typeof VELOCIDADES[number]>(1);
   const [boardWidth, boardRef] = useMeasuredWidth();
@@ -37,11 +52,19 @@ export default function ReplayViewer({ dark, salaId, onBack }: Props) {
       .catch(() => setError('No se pudo cargar la repetición'));
   }, [salaId]);
 
-  const total = data?.movimientos.length ?? 0;
+  // Movimientos agrupados por mano — cada mano arranca con el tablero
+  // vacío (se reparten fichas nuevas), nunca se mezclan entre sí.
+  const gruposPorMano = useMemo(() => (data ? agruparPorMano(data.movimientos) : []), [data]);
+  const totalManos = gruposPorMano.length;
+  const movimientosDeEstaMano = gruposPorMano[manoActual] ?? [];
+  const total = movimientosDeEstaMano.length;
+  const numeroManoActual = movimientosDeEstaMano[0]?.numeroMano ?? manoActual + 1;
+  const resultadoDeEstaMano = data ? resultadoDeMano(data.manos, numeroManoActual) : null;
 
-  // Autoplay
+  // Autoplay — se detiene al llegar al final de la mano actual (no avanza
+  // solo a la siguiente, para que el jugador vea el resultado con calma).
   useEffect(() => {
-    if (!reproduciendo || !data) return;
+    if (!reproduciendo) return;
     timerRef.current = setInterval(() => {
       setIndice(i => {
         if (i >= total - 1) {
@@ -52,28 +75,38 @@ export default function ReplayViewer({ dark, salaId, onBack }: Props) {
       });
     }, MS_BASE / velocidad);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [reproduciendo, velocidad, data, total]);
+  }, [reproduciendo, velocidad, total]);
 
   const nombreDeSeat = useMemo(() => (seat: number) => data?.asientos[seat]?.username ?? '—', [data]);
+  const nombreDeEquipo = useMemo(() => (eq: 0 | 1) => {
+    if (!data) return '—';
+    const nombres = data.asientos.filter((_, i) => i % 2 === eq).map(a => `@${a.username}`);
+    return nombres.join(' y ') || '—';
+  }, [data]);
 
-  const tablero = data ? tableroHastaMovimiento(data.movimientos, indice) : [];
-  const movActual = data && indice >= 0 ? data.movimientos[indice] : null;
-  const terminado = total > 0 && indice === total - 1;
+  const tablero = tableroHastaMovimiento(movimientosDeEstaMano, indice);
+  const movActual = indice >= 0 ? movimientosDeEstaMano[indice] : null;
+  const terminadaEstaMano = total > 0 && indice === total - 1;
+  const esUltimaMano = manoActual === totalManos - 1;
+
+  function irAIndice(i: number) {
+    setReproduciendo(false);
+    setIndice(Math.max(-1, Math.min(total - 1, i)));
+  }
 
   function togglePlay() {
     if (indice >= total - 1) setIndice(-1); // si ya terminó, reinicia al darle play
     setReproduciendo(r => !r);
   }
 
-  const resultadoTexto = (() => {
-    if (!terminado || !data) return null;
-    const { tipo, ganadorSeat, equipoGanador } = data.resultado;
-    if (tipo === 'tranca') {
-      return equipoGanador === null ? 'Tranca — empate, nadie suma' : `Tranca — gana el equipo de ${equipoGanador === 0 ? nombreDeSeat(0) : nombreDeSeat(1)}`;
-    }
-    const nombre = ganadorSeat !== null ? nombreDeSeat(ganadorSeat) : '—';
-    return tipo === 'capicua' ? `¡Capicúa! Cierra ${nombre}` : `Mano ganada por ${nombre}`;
-  })();
+  function irAMano(i: number) {
+    if (i < 0 || i >= totalManos) return;
+    setReproduciendo(false);
+    setManoActual(i);
+    setIndice(-1);
+  }
+
+  const resultadoTexto = resultadoDeEstaMano ? textoResultadoMano(resultadoDeEstaMano, nombreDeEquipo) : null;
 
   return (
     <div className={`dash social-page${dark ? '' : ' is-light'}`}>
@@ -86,6 +119,23 @@ export default function ReplayViewer({ dark, salaId, onBack }: Props) {
           <div className="social-loading"><div className="boot-spinner" /><p>Cargando repetición…</p></div>
         ) : data ? (
           <>
+            {totalManos > 1 && (
+              <div className="replay-manos-nav">
+                <button className="replay-btn" onClick={() => irAMano(manoActual - 1)} disabled={manoActual === 0} aria-label="Mano anterior">
+                  ‹
+                </button>
+                <div className="replay-manos-dots">
+                  {gruposPorMano.map((_, i) => (
+                    <span key={i} className={`replay-mano-dot${i === manoActual ? ' is-active' : ''}${i < manoActual ? ' is-done' : ''}`} />
+                  ))}
+                </div>
+                <span className="replay-manos-label">Mano {manoActual + 1} de {totalManos}</span>
+                <button className="replay-btn" onClick={() => irAMano(manoActual + 1)} disabled={manoActual === totalManos - 1} aria-label="Mano siguiente">
+                  ›
+                </button>
+              </div>
+            )}
+
             <div className="replay-caption">
               {movActual
                 ? <span>Jugada {indice + 1}/{total} · {describirMovimiento(movActual, nombreDeSeat(movActual.seat))}</span>
@@ -101,8 +151,21 @@ export default function ReplayViewer({ dark, salaId, onBack }: Props) {
               />
             </div>
 
-            {resultadoTexto && (
-              <div className="replay-result-banner">{resultadoTexto}</div>
+            {resultadoTexto && terminadaEstaMano && (
+              <div className="replay-result-banner">
+                {resultadoTexto}
+                {resultadoDeEstaMano?.marcador && (
+                  <span className="replay-result-marcador">
+                    {' '}· {resultadoDeEstaMano.marcador[0]} - {resultadoDeEstaMano.marcador[1]}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {terminadaEstaMano && !esUltimaMano && (
+              <button className="replay-siguiente-mano-btn" onClick={() => irAMano(manoActual + 1)}>
+                Mano siguiente →
+              </button>
             )}
 
             <div className="replay-controls">
@@ -112,18 +175,24 @@ export default function ReplayViewer({ dark, salaId, onBack }: Props) {
                   min={-1}
                   max={total - 1}
                   value={indice}
-                  onChange={e => { setReproduciendo(false); setIndice(Number(e.target.value)); }}
+                  onChange={e => irAIndice(Number(e.target.value))}
                 />
               </div>
 
               <div className="replay-buttons">
-                <button className="replay-btn" onClick={() => { setReproduciendo(false); setIndice(-1); }} aria-label="Reiniciar">
+                <button className="replay-btn" onClick={() => irAIndice(-1)} aria-label="Reiniciar mano">
                   <SkipBackIcon />
+                </button>
+                <button className="replay-btn replay-btn-step" onClick={() => irAIndice(indice - 1)} disabled={indice <= -1} aria-label="Jugada anterior">
+                  ‹
                 </button>
                 <button className="replay-btn replay-btn-play" onClick={togglePlay} aria-label={reproduciendo ? 'Pausar' : 'Reproducir'}>
                   {reproduciendo ? <PauseIcon /> : <PlayIcon />}
                 </button>
-                <button className="replay-btn" onClick={() => { setReproduciendo(false); setIndice(total - 1); }} aria-label="Ir al final">
+                <button className="replay-btn replay-btn-step" onClick={() => irAIndice(indice + 1)} disabled={indice >= total - 1} aria-label="Jugada siguiente">
+                  ›
+                </button>
+                <button className="replay-btn" onClick={() => irAIndice(total - 1)} aria-label="Ir al final de la mano">
                   <SkipForwardIcon />
                 </button>
 
