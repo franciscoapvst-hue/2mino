@@ -39,7 +39,8 @@ export type Asiento = { usuario_id: string; username: string; posicion: number }
 export type ResultadoMano =
   | { tipo: 'normal';  ganadorSeat: number; puntos: number }
   | { tipo: 'capicua'; ganadorSeat: number; puntos: number }
-  | { tipo: 'tranca';  equipoGanador: 0 | 1 | null; puntos: number };
+  // noCaben = true: los pips hubieran superado el objetivo, no se sumaron.
+  | { tipo: 'tranca';  equipoGanador: 0 | 1 | null; puntos: number; noCaben?: boolean };
 
 export type Fase = 'jugando' | 'entre_manos' | 'fin_partida';
 

@@ -492,6 +492,12 @@ function tituloResultado(
 ): { titulo: string; detalle: string } {
   const miEq = partida.miEquipo ?? 0;
   if (r.tipo === 'tranca') {
+    if (r.noCaben) {
+      return {
+        titulo: '🔒 ¡No caben!',
+        detalle: `Esos ${r.puntos} pts se pasarían de ${partida.puntosObjetivo} — no suman. Sigue la partida.`,
+      };
+    }
     return {
       titulo: '🔒 Tranca',
       detalle: r.equipoGanador === null ? 'Empate: nadie suma'
@@ -524,7 +530,11 @@ function ManoOverlay({ partida, nombreAsiento, onListo, confirmando }: {
     <div className="game-result-overlay">
       <div className="game-result-card">
         <h2>{titulo}</h2>
-        <p className="result-points">+{r.puntos} pts</p>
+        {r.tipo === 'tranca' && r.noCaben ? (
+          <p className="result-points result-points-no-caben">+0 pts</p>
+        ) : (
+          <p className="result-points">+{r.puntos} pts</p>
+        )}
         <p className="result-detail">{detalle}</p>
         <MarcadorResumen partida={partida} />
         <p className="result-detail">Sale {nombreAsiento(partida.salida)}</p>

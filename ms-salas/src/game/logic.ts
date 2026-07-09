@@ -81,8 +81,11 @@ export function equipoDe(seat: number): 0 | 1 {
 export type ResultadoMano =
   | { tipo: 'normal';  ganadorSeat: number; puntos: number }
   | { tipo: 'capicua'; ganadorSeat: number; puntos: number }
-  // equipoGanador null = tranca empatada (nadie suma)
-  | { tipo: 'tranca';  equipoGanador: 0 | 1 | null; puntos: number };
+  // equipoGanador null = tranca empatada (nadie suma). noCaben = true
+  // cuando los pips hubieran superado puntosObjetivo — no se suman (ver
+  // cerrarMano) y la partida sigue; `puntos` queda con el valor que
+  // HUBIERA sumado, solo informativo para la UI ("¡No caben!").
+  | { tipo: 'tranca';  equipoGanador: 0 | 1 | null; puntos: number; noCaben?: boolean };
 
 // ── Estado completo de una PARTIDA (lo que se guarda como TEXT) ─────
 export type Asiento = { usuario_id: string; username: string; posicion: number };
@@ -201,10 +204,25 @@ function cerrarMano(
   const equipo = resultado.tipo === 'tranca'
     ? resultado.equipoGanador
     : equipoDe(resultado.ganadorSeat);
-  if (equipo !== null) marcador[equipo] += resultado.puntos;
+
+  // "No caben": una tranca cuyos pips llevarían el marcador POR ENCIMA
+  // del objetivo no suma nada — la partida no puede cerrarse por una
+  // trancada de suerte, solo por dominó/capicúa exacta o una tranca que
+  // sí entre. El marcador queda igual, se reparte mano nueva y se sigue.
+  const excedeTranca = resultado.tipo === 'tranca'
+    && equipo !== null
+    && marcador[equipo] + resultado.puntos > partida.puntosObjetivo;
+
+  const resultadoFinal: ResultadoMano = excedeTranca
+    ? { ...resultado, noCaben: true }
+    : resultado;
+
+  if (equipo !== null && !excedeTranca) marcador[equipo] += resultado.puntos;
 
   // Contadores acumulados de toda la partida (partida_resultados en el
   // historial/leaderboard). Un "normal" no suma a ninguno de los dos.
+  // La tranca cuenta para el contador aunque "no quepa" (sí ocurrió),
+  // solo el puntaje queda sin aplicar.
   const capicuasPorEquipo: [number, number] = [...partida.capicuasPorEquipo];
   const trancasPorEquipo:  [number, number] = [...partida.trancasPorEquipo];
   if (resultado.tipo === 'capicua') capicuasPorEquipo[equipoDe(resultado.ganadorSeat)]++;
@@ -221,7 +239,7 @@ function cerrarMano(
     marcador,
     capicuasPorEquipo,
     trancasPorEquipo,
-    resultadoMano: resultado,
+    resultadoMano: resultadoFinal,
     salida: proximaSalida,
     fase: ganadorPartida !== null ? 'fin_partida' : 'entre_manos',
     equipoGanadorPartida: ganadorPartida,
