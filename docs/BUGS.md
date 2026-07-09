@@ -74,43 +74,17 @@ explícito si no existe ya.
 
 ---
 
-## 4. ✅ RESUELTO — 2v2 en equipo no funciona en partida casual
+## 4. 2v2 en equipo no funciona en partida casual
 
 **Síntoma**: crear/jugar una partida casual en modo equipo (2v2) no
-funciona.
+funciona — reportado sin más detalle todavía, hace falta reproducir para
+aislar si es un problema de matchmaking casual (armado de parties/equipos),
+de creación de sala, o de la lógica de turnos 2v2 dentro del `GameBoard`.
 
-**Causas reales (4 bugs distintos en la misma feature, ninguno específico
-de "casual" — afectaba igual al 2v2 en equipo ranked)**:
+**Siguiente paso**: reproducir el flujo completo (crear party de 2,
+buscar partida casual 2v2, ver qué falla exactamente — no arma la sala,
+arma mal los equipos, o rompe una vez adentro) antes de asumir dónde está
+la causa raíz.
 
-1. `POST /ranked/party` (`ms-salas/src/routes/matchmaking.ts`) devolvía
-   la fila de `ranked_parties` SIN el array `miembros` — `PartyView`
-   (`src/components/MatchmakingView.tsx`) lee `party.miembros.length` de
-   entrada y crasheaba al renderizar apenas se creaba el equipo (pantalla
-   en negro, ni siquiera se llegaba a ver el código de invitación).
-2. `leerCodigoPartyDeUrl()` (`src/App.tsx`) parseaba `/party/:codigo` Y
-   limpiaba la URL (`history.replaceState`) dentro del inicializador de
-   `useState` — React 18 StrictMode invoca ese inicializador dos veces en
-   dev para detectar funciones impuras; la primera invocación (descartada)
-   ya limpiaba la URL, así que la segunda nunca encontraba el código. El
-   link de invitación quedaba roto en dev (movido a una constante de
-   módulo, se calcula una sola vez).
-3. El creador de la party nunca refrescaba su `party` local tras crearla
-   — se quedaba viendo "Esperando compañero…" para siempre aunque el
-   invitado ya se hubiera unido del lado del servidor, y el botón
-   "Buscar partida (2v2)" nunca se habilitaba (agregado poll cada 2s en
-   `MatchmakingView.tsx` mientras `pantalla === 'party'`).
-4. Solo el creador llamaba a `buscarConParty()` — el compañero invitado
-   nunca disparaba ningún poll propio, así que si la partida ya había
-   emparejado (sala creada, bots rellenando huecos) nunca se enteraba y
-   se quedaba en el lobby para siempre (mismo poll de arriba extendido a
-   avisar el match).
-   
-   De paso, `POST /ranked/party/:codigo/unirse` tenía una carrera (dos
-   llamadas concurrentes al mismo `unirse` — típico con StrictMode —
-   podían chocar contra la PK `(party_id, usuario_id)` y tirar 500);
-   arreglado con `ON CONFLICT DO NOTHING`.
-
-**Verificado**: dos sesiones reales (Playwright, dos usuarios distintos)
-— creador crea equipo casual, comparte link, invitado se une, creador
-arranca la búsqueda, ambos entran automáticamente al tablero (2v2 real,
-huecos rellenados con bots tras el timeout de casual).
+**Sospechosos**: `ms-salas/src/game/matchmaking.ts` (rama casual 2v2),
+`src/` — flujo de creación de party y armado de equipos para casual.
