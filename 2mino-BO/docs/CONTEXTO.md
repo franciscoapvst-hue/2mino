@@ -1,12 +1,18 @@
 # Contexto del proyecto — Back Office de 2mino
 
-Este repo (`2mino-BO`) es un proyecto **separado** de `2mino` (el juego),
-con su propio git — pero vive **anidado** dentro de la carpeta del juego
-(`C:\Users\balbi\Documents\2mino\2mino-BO`) para que un agente/IDE que
-abra `2mino` como workspace tenga ambos en el mismo árbol de archivos.
-No comparten `node_modules`/build ni son el mismo repo git
-(`2mino/.gitignore` ignora esta carpeta a propósito), pero el Back Office
-**depende** de la API del juego (nunca toca la base de datos directo).
+`2mino-BO` es una carpeta más del monorepo `2mino` (mismo repo git, mismo
+historial de commits desde acá en adelante) — antes era un repo git
+separado, pero se fusionó a propósito **sin conservar ese historial**
+(sigue disponible en `github.com/franciscoapvst-hue/2mino-BO` si hiciera
+falta consultarlo). El motivo del cambio: la mayoría del trabajo real que
+falta (segmento `admin`, `requireAdmin()`, endpoints `/admin/*`) toca a
+la vez `api-integracion`/`ms-usuarios` Y el panel — con dos repos
+separados eso eran siempre dos PRs/pushes por feature, sin forma de
+commitear el cambio como una unidad atómica. Tiene su propio
+`package.json`/Vite/`node_modules` (no comparte build con el resto del
+monorepo — mismo patrón que `ms-usuarios`, `ms-salas`, etc., cada uno con
+su propio `package.json`), pero el Back Office **depende** de la API del
+juego (nunca toca la base de datos directo).
 
 ## Qué es esto
 
