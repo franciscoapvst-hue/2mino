@@ -514,6 +514,9 @@ function tituloResultado(
 
 const equipoDeSeat = (seat: number) => seat % 2;
 
+/** Suma de pips de una mano — para mostrar junto a las fichas reveladas al cerrar la mano. */
+const sumaPips = (mano: Pieza[]) => mano.reduce((s, p) => s + p.a + p.b, 0);
+
 function ManoOverlay({ partida, nombreAsiento, onListo, confirmando }: {
   partida: PartidaPublica;
   nombreAsiento: (seat: number) => string;
@@ -537,6 +540,25 @@ function ManoOverlay({ partida, nombreAsiento, onListo, confirmando }: {
         )}
         <p className="result-detail">{detalle}</p>
         <MarcadorResumen partida={partida} />
+        {partida.manosReveladas && (
+          <div className="result-manos-reveladas">
+            {partida.manosReveladas.map((mano, seat) => (
+              <div key={seat} className="result-mano-jugador">
+                <span className="result-mano-nombre">{nombreAsiento(seat)}</span>
+                <div className="result-mano-fichas">
+                  {mano.length === 0 ? (
+                    <span className="result-mano-vacia">¡Dominó! Sin fichas</span>
+                  ) : (
+                    mano.map((p, i) => (
+                      <DominoPiece key={i} a={p.a} b={p.b} orient="v" style={{ width: 26, height: 48 }} />
+                    ))
+                  )}
+                </div>
+                <span className="result-mano-suma">{sumaPips(mano)} puntos</span>
+              </div>
+            ))}
+          </div>
+        )}
         <p className="result-detail">Sale {nombreAsiento(partida.salida)}</p>
         <button className="btn-primary" onClick={onListo} disabled={yaListo || confirmando}>
           {yaListo

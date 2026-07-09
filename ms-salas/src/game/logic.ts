@@ -442,6 +442,11 @@ export type PartidaPublica = {
   miEquipo:     0 | 1 | null;
   miMano:       Pieza[];
   conteoManos:  number[];
+  // Fichas reales de TODOS los asientos — null mientras la mano está en
+  // juego (anti-cheat: no revelar la mano rival a mitad de partida). Se
+  // expone recién al cerrar la mano (docs/PENDIENTES_JUEGO.md §1), para
+  // que se pueda verificar el conteo de pips de una tranca a simple vista.
+  manosReveladas: Pieza[][] | null;
   tablero:      FichaTablero[];
   turno:        number;
   pasadas:      number;
@@ -470,6 +475,7 @@ export function vistaPublica(partida: PartidaState, usuarioId: string): PartidaP
     miEquipo:     miSeat >= 0 ? equipoDe(miSeat) : null,
     miMano:       miSeat >= 0 ? partida.manos[miSeat] ?? [] : [],
     conteoManos:  partida.manos.map(h => h.length),
+    manosReveladas: partida.fase !== 'jugando' ? partida.manos : null,
     tablero:      partida.tablero,
     turno:        partida.turno,
     pasadas:      partida.pasadas,
