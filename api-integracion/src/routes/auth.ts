@@ -72,7 +72,7 @@ export async function authRoutes(app: FastifyInstance) {
       const { status, data } = await callMs('/usuarios', 'POST', req.body);
       if (status !== 201) return reply.code(status).send(data);
 
-      const user = data as { id: string; username: string };
+      const user = data as { id: string; username: string; segmento: string };
       const token = signToken(user);
       return reply.code(201).send({ token, user });
     },
@@ -104,7 +104,7 @@ export async function authRoutes(app: FastifyInstance) {
       const { status, data } = await callMs('/usuarios/verificar', 'POST', req.body);
       if (status !== 200) return reply.code(status).send(data);
 
-      const user = data as { id: string; username: string };
+      const user = data as { id: string; username: string; segmento: string };
       const token = signToken(user);
       return reply.send({ token, user });
     },
@@ -225,7 +225,7 @@ export async function authRoutes(app: FastifyInstance) {
       });
       if (status !== 200 && status !== 201) return reply.code(status).send(data);
 
-      const user = data as { id: string; username: string };
+      const user = data as { id: string; username: string; segmento: string };
       const token = signToken(user);
       return reply.code(status).send({ token, user });
     },

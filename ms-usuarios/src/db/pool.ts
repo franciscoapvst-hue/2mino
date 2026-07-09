@@ -34,6 +34,14 @@ const SCHEMA = `
     '{"tema":"dark","idioma":"es","modos_juego":["clasico","rapido","torneo"],"features":{"registro_habilitado":true,"login_habilitado":true,"tabla_clasificacion":true,"perfil_publico":true,"chat_partida":true,"replay":true}}'
   ) ON CONFLICT (nombre) DO NOTHING;
 
+  -- Segmento admin: no accede al juego, solo al Back Office. requireAdmin()
+  -- en api-integracion exige payload.segmento === 'admin' en cada /admin/*.
+  INSERT INTO segmentos (nombre, descripcion, config) VALUES (
+    'admin',
+    'Acceso al Back Office (uso interno, no jugadores)',
+    '{}'
+  ) ON CONFLICT (nombre) DO NOTHING;
+
   CREATE TABLE IF NOT EXISTS usuarios (
     id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     username      VARCHAR(20) UNIQUE NOT NULL,
