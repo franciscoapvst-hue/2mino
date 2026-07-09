@@ -97,6 +97,7 @@ export type PartidaState = {
   asientos:     Asiento[];       // orden por seat
   // — partida —
   puntosObjetivo: number;        // 100 | 150 | 200
+  puntosCapicua:  number;        // bonus por capicúa/tranca — reglas_juego.puntos_capicua
   marcador:       [number, number]; // [equipo 0, equipo 1]
   numeroMano:     number;        // 1-based
   salida:         number;        // seat que abre la mano actual
@@ -141,7 +142,11 @@ function dobleMasAlto(manos: Pieza[][]): { seat: number; pieza: Pieza } | null {
 }
 
 // ── Construye el estado inicial de una partida ─────────────────────
-export function crearPartida(jugadores: Asiento[], puntosObjetivo = 100): PartidaState {
+export function crearPartida(
+  jugadores: Asiento[],
+  puntosObjetivo = 100,
+  puntosCapicua = PUNTOS_CAPICUA,
+): PartidaState {
   const ordenados = [...jugadores].sort((a, b) => a.posicion - b.posicion);
   const maxJugadores = ordenados.length;
   const { manos } = repartir(maxJugadores);
@@ -155,6 +160,7 @@ export function crearPartida(jugadores: Asiento[], puntosObjetivo = 100): Partid
     maxJugadores,
     asientos: ordenados,
     puntosObjetivo,
+    puntosCapicua,
     marcador: [0, 0],
     numeroMano: 1,
     salida: apertura?.seat ?? 0,
@@ -326,7 +332,7 @@ export function aplicarJugada(
   if (nuevasManos[seat].length === 0) {
     const extFinal = getExtremos(nuevoTablero)!;
     const resultado: ResultadoMano = esCapicua(pieza, extFinal)
-      ? { tipo: 'capicua', ganadorSeat: seat, puntos: PUNTOS_CAPICUA }
+      ? { tipo: 'capicua', ganadorSeat: seat, puntos: partida.puntosCapicua }
       : {
           tipo: 'normal',
           ganadorSeat: seat,

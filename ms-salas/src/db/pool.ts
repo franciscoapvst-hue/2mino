@@ -195,6 +195,27 @@ const SCHEMA = `
     UNIQUE (sala_id, turno, tipo)
   );
   CREATE INDEX IF NOT EXISTS idx_partida_puntos_sala ON partida_puntos(sala_id, numero_mano);
+
+  -- Config editable en caliente, sin redeploy — mismo patrón clave/valor
+  -- que landing_config (ms-frontend-landing). Sin columna habilitado: a
+  -- diferencia de un feature flag, estas filas siempre están activas.
+  CREATE TABLE IF NOT EXISTS reglas_juego (
+    clave       VARCHAR(50) PRIMARY KEY,
+    valor       JSONB       NOT NULL,
+    descripcion TEXT,
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  INSERT INTO reglas_juego (clave, valor, descripcion) VALUES
+    ('elo_inicial',        '1000',                     'ELO inicial de un jugador nuevo'),
+    ('k_factor',           '32',                       'Sensibilidad del cambio de ELO por partida'),
+    ('puntos_capicua',     '30',                       'Bonus por capicúa o tranca'),
+    ('puntos_objetivo',    '[100,150,200]',            'Opciones de puntaje al crear una sala'),
+    ('escalones_rango',    '[50,100,200,400,800]',     'Ampliación de rango ELO del matchmaking por tiempo de espera'),
+    ('paso_escalon_ms',    '15000',                    'Milisegundos entre cada escalón de rango'),
+    ('umbral_relleno_ms',  '15000',                    'Espera de una party antes de rellenar con jugadores solos'),
+    ('tiempo_limite_jugada_ms', '{"casual":null,"ranked":null}', 'Tiempo límite por turno para jugar, según tipo de partida — null = sin límite')
+  ON CONFLICT (clave) DO NOTHING;
 `;
 
 // Cambios sobre tablas que pueden ya existir de un arranque previo
