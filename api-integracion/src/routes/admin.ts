@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { callService, callMs } from '../http';
+import { callService, callMs, callSalas } from '../http';
 import { requireAdmin } from '../jwt';
 
 const MS_LANDING = () => (process.env.MS_FRONTEND_LANDING_URL ?? 'http://localhost:5000').trim();
@@ -34,6 +34,16 @@ const FeatureFlagSchema = {
     valor:       { additionalProperties: true },
     descripcion: { type: 'string' },
     habilitado:  { type: 'boolean' },
+    updated_at:  { type: 'string', format: 'date-time' },
+  },
+} as const;
+
+const ReglaJuegoSchema = {
+  type: 'object',
+  properties: {
+    clave:       { type: 'string' },
+    valor:       {},
+    descripcion: { type: 'string' },
     updated_at:  { type: 'string', format: 'date-time' },
   },
 } as const;
@@ -137,6 +147,58 @@ export async function adminRoutes(app: FastifyInstance) {
       const { status, data } = await callService(
         MS_LANDING(), `/config/${req.params.clave}`, 'PATCH', req.body,
       );
+      return reply.code(status).send(data);
+    },
+  );
+
+  // ── GET /admin/reglas ───────────────────────────
+  // Proxy directo a ms-salas (GET /reglas, nuevo) — reglas del juego
+  // configurables sin redeploy (docs/CASOS_DE_USO_BACKOFFICE.md §6).
+  app.get('/admin/reglas', {
+    preHandler: requireAdmin,
+    schema: {
+      tags:        ['admin'],
+      summary:     'Listar todas las reglas de juego configurables',
+      security:    [{ bearerAuth: [] }],
+      response: {
+        200: { description: 'Lista completa', type: 'array', items: ReglaJuegoSchema },
+        ...AuthErrors,
+      },
+    },
+  }, async (_req, reply) => {
+    const { status, data } = await callSalas('/reglas', 'GET');
+    return reply.code(status).send(data);
+  });
+
+  // ── PATCH /admin/reglas/:clave ───────────────────
+  // Proxy directo a ms-salas (PATCH /reglas/:clave, nuevo).
+  app.patch<{ Params: { clave: string }; Body: { valor: unknown } }>(
+    '/admin/reglas/:clave',
+    {
+      preHandler: requireAdmin,
+      schema: {
+        tags:        ['admin'],
+        summary:     'Editar el valor de una regla de juego',
+        security:    [{ bearerAuth: [] }],
+        params: {
+          type: 'object',
+          properties: { clave: { type: 'string', example: 'k_factor' } },
+        },
+        body: {
+          type: 'object',
+          required: ['valor'],
+          properties: { valor: {} },
+        },
+        response: {
+          200: ReglaJuegoSchema,
+          ...AuthErrors,
+          400: { description: 'Valor mal formado para esta clave', ...ErrorSchema },
+          404: { description: 'Regla no encontrada', ...ErrorSchema },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { status, data } = await callSalas(`/reglas/${req.params.clave}`, 'PATCH', req.body);
       return reply.code(status).send(data);
     },
   );

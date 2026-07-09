@@ -6,6 +6,7 @@ import LoginView from './views/LoginView';
 import FeatureFlagsView from './views/FeatureFlagsView';
 import UsuariosView from './views/UsuariosView';
 import SegmentosView from './views/SegmentosView';
+import ReglasJuegoView from './views/ReglasJuegoView';
 
 export default function App() {
   const [session, setSession] = useState<AdminSession | null>(null);
@@ -33,6 +34,7 @@ export default function App() {
       {view === 'flags' && <FeatureFlagsView />}
       {view === 'usuarios' && <UsuariosView />}
       {view === 'segmentos' && <SegmentosView />}
+      {view === 'reglas' && <ReglasJuegoView />}
     </Shell>
   );
 }
