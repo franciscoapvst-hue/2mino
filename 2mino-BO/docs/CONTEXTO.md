@@ -35,6 +35,13 @@ son bugs del juego en sí, sin relación con el Back Office.
 
 **Cero mock — todo el panel habla contra el backend real de `2mino`.**
 
+- `src/lib/env.ts` + `AmbienteSwitcher` — selector Dev/QA/Prod, visible
+  en el login y en el nav. La URL activa vive en `localStorage`, no en
+  build-time — cambiar de ambiente desloguea y recarga (un JWT de un
+  ambiente no sirve en otro). Dev por default `localhost:3000`; Prod
+  por default `localhost:3001` (túnel SSH al VPS en un puerto distinto
+  al de dev, para no chocar — ver `VITE_API_URL_PROD` en `.env.example`
+  y §10.1 más abajo). QA sin URL configurada = botón deshabilitado.
 - `src/views/LoginView.tsx` — `POST /auth/login`, rechaza cuentas cuyo
   `segmento !== 'admin'`.
 - `src/views/FeatureFlagsView.tsx` — `GET/PATCH /admin/feature-flags[/:clave]`
