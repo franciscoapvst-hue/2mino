@@ -41,6 +41,12 @@ conn.on('ready', () => {
   console.log(`Conectado a ${USER}@${HOST}.`);
 
   const server = net.createServer((socket) => {
+    // Sin este handler, un ECONNRESET del lado del navegador (pestaña
+    // cerrada, request cancelado, etc. — algo normal y frecuente) tira
+    // una excepción no capturada y mata TODO el túnel, no solo esa
+    // conexión puntual.
+    socket.on('error', () => { /* conexión individual cortada, no pasa nada */ });
+
     conn.forwardOut(
       socket.remoteAddress || '127.0.0.1',
       socket.remotePort || 0,
@@ -52,6 +58,9 @@ conn.on('ready', () => {
           socket.end();
           return;
         }
+        // Mismo motivo: el canal SSH también puede cortarse solo (VPN
+        // inestable, VPS reinicia, etc.) — no debe tirar todo el túnel.
+        stream.on('error', () => { /* canal cortado, no pasa nada */ });
         socket.pipe(stream).pipe(socket);
       },
     );
