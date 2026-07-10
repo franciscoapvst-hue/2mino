@@ -67,6 +67,29 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
     return () => clearInterval(id);
   }, [partida?.fase, partida?.limiteJugadaMs, partida?.turnoEmpiezaEn, partida?.turno]);
 
+  // ── Espera antes de mostrar la pantalla de fin de mano ────
+  // Configurable desde el BO (reglas_juego.delay_fin_mano_ms) — deja ver
+  // el tablero final un momento antes de que el overlay lo tape. Guard
+  // por numeroMano para no reprogramar el timer en cada poll mientras
+  // seguimos en 'entre_manos' esperando que todos confirmen "listo".
+  const [mostrarFinMano, setMostrarFinMano] = useState(false);
+  const finManoProgramadaRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!partida || partida.fase !== 'entre_manos') {
+      setMostrarFinMano(false);
+      finManoProgramadaRef.current = null;
+      return;
+    }
+    if (finManoProgramadaRef.current === partida.numeroMano) return;
+    finManoProgramadaRef.current = partida.numeroMano;
+
+    const delay = partida.delayFinManoMs || 0;
+    if (delay <= 0) { setMostrarFinMano(true); return; }
+    setMostrarFinMano(false);
+    const id = setTimeout(() => setMostrarFinMano(true), delay);
+    return () => clearTimeout(id);
+  }, [partida?.fase, partida?.numeroMano, partida?.delayFinManoMs]);
+
   // ── Carga y polling ────────────────────────────
   const fetchPartida = useCallback(async () => {
     try {
@@ -414,7 +437,7 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
       </div>
 
       {/* ── Fin de mano: resultado + listos ──────── */}
-      {partida.fase === 'entre_manos' && (
+      {partida.fase === 'entre_manos' && mostrarFinMano && (
         <ManoOverlay
           partida={partida}
           nombreAsiento={nombreAsiento}

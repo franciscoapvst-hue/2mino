@@ -42,6 +42,7 @@ function partida(over: Partial<PartidaState> = {}): PartidaState {
     abandonadoPorSeat: null,
     limiteJugadaMs: null,
     turnoEmpiezaEn: 0,
+    delayFinManoMs: 0,
     ...over,
   };
 }
@@ -91,6 +92,16 @@ describe('crearPartida', () => {
     const holder = p.manos.findIndex(m => m.some(x => x.a === 6 && x.b === 6));
     expect(p.salida).toBe(holder);
     expect(p.turno).toBe(holder);
+  });
+
+  it('delayFinManoMs por defecto es 0 (sin límite explícito, no rompe partidas viejas)', () => {
+    const p = crearPartida(asientos(2));
+    expect(p.delayFinManoMs).toBe(0);
+  });
+
+  it('acepta un delayFinManoMs explícito (configurado desde reglas_juego)', () => {
+    const p = crearPartida(asientos(2), 100, PUNTOS_CAPICUA, null, 2500);
+    expect(p.delayFinManoMs).toBe(2500);
   });
 });
 

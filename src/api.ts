@@ -74,6 +74,8 @@ export type PartidaPublica = {
   // Tiempo límite por jugada (docs/PENDIENTES_JUEGO.md §2) — null = sin límite.
   limiteJugadaMs: number | null;
   turnoEmpiezaEn: number;
+  // Espera (ms) configurable desde el BO antes de mostrar la pantalla de fin de mano.
+  delayFinManoMs: number;
 };
 
 export type AuthUser = {

@@ -214,7 +214,8 @@ const SCHEMA = `
     ('escalones_rango',    '[50,100,200,400,800]',     'Ampliación de rango ELO del matchmaking por tiempo de espera'),
     ('paso_escalon_ms',    '15000',                    'Milisegundos entre cada escalón de rango'),
     ('umbral_relleno_ms',  '15000',                    'Espera de una party antes de rellenar con jugadores solos'),
-    ('tiempo_limite_jugada_ms', '{"casual":null,"ranked":null}', 'Tiempo límite por turno para jugar, según tipo de partida — null = sin límite')
+    ('tiempo_limite_jugada_ms', '{"casual":null,"ranked":null}', 'Tiempo límite por turno para jugar, según tipo de partida — null = sin límite'),
+    ('delay_fin_mano_ms',  '2000',                     'Espera (ms) antes de mostrar la pantalla de fin de mano, para ver el tablero final un momento antes')
   ON CONFLICT (clave) DO NOTHING;
 `;
 

@@ -256,6 +256,7 @@ export async function juegosRoutes(app: FastifyInstance) {
     const partida = crearPartida(
       jugadores, objetivo, getRegla('puntos_capicua', PUNTOS_CAPICUA),
       limiteJugadaMsDe(sala.tipo === 'ranked' ? 'ranked' : 'casual'),
+      getRegla('delay_fin_mano_ms', 2000),
     );
 
     await pool.query(

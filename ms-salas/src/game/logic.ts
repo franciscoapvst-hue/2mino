@@ -124,6 +124,11 @@ export type PartidaState = {
   // según el tipo de sala (casual/ranked); null = sin límite.
   limiteJugadaMs: number | null;
   turnoEmpiezaEn: number;        // epoch ms — se re-sella cada vez que `turno` cambia
+  // Espera (ms) que el cliente debe dejar pasar antes de mostrar la
+  // pantalla de fin de mano — puramente de presentación, no autoritativo
+  // (no hay nada que hacer trampa acá), resuelto UNA vez al crear la
+  // partida desde reglas_juego.delay_fin_mano_ms.
+  delayFinManoMs: number;
 };
 
 type Resultado = { ok: true; partida: PartidaState } | { ok: false; error: string };
@@ -152,6 +157,7 @@ export function crearPartida(
   puntosObjetivo = 100,
   puntosCapicua = PUNTOS_CAPICUA,
   limiteJugadaMs: number | null = null,
+  delayFinManoMs = 0,
 ): PartidaState {
   const ordenados = [...jugadores].sort((a, b) => a.posicion - b.posicion);
   const maxJugadores = ordenados.length;
@@ -187,6 +193,7 @@ export function crearPartida(
     abandonadoPorSeat: null,
     limiteJugadaMs,
     turnoEmpiezaEn: Date.now(),
+    delayFinManoMs,
   };
 }
 
@@ -484,6 +491,10 @@ export type PartidaPublica = {
   // Tiempo límite por jugada (docs/PENDIENTES_JUEGO.md §2) — null = sin límite.
   limiteJugadaMs: number | null;
   turnoEmpiezaEn: number;
+  // Espera (ms) antes de mostrar la pantalla de fin de mano — configurable
+  // desde el Back Office (reglas_juego.delay_fin_mano_ms), puramente de
+  // presentación (no autoritativo).
+  delayFinManoMs: number;
 };
 
 export function vistaPublica(partida: PartidaState, usuarioId: string): PartidaPublica {
@@ -516,5 +527,6 @@ export function vistaPublica(partida: PartidaState, usuarioId: string): PartidaP
           : 'jugando',
     limiteJugadaMs: partida.limiteJugadaMs,
     turnoEmpiezaEn: partida.turnoEmpiezaEn,
+    delayFinManoMs: partida.delayFinManoMs,
   };
 }

@@ -106,6 +106,7 @@ async function crearSala(
 
   const partidaInicial = crearPartida(
     asientos, puntosMm, getRegla('puntos_capicua', PUNTOS_CAPICUA), limiteJugadaMsDe(tipo),
+    getRegla('delay_fin_mano_ms', 2000),
   );
   const { rows: juegoRows } = await client.query(
     `INSERT INTO juegos (sala_id, partida) VALUES ($1, $2) RETURNING id`,
