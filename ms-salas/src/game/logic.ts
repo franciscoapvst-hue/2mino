@@ -117,7 +117,7 @@ export type PartidaState = {
   ultimoQueJugo:  number | null; // seat que puso la última ficha
   salidaForzada:  Pieza | null;  // mano 1: obligado a abrir con esta ficha
   resultadoMano:  ResultadoMano | null; // de la mano recién cerrada
-  ultimoEvento:   { tipo: 'paso_a_todos'; seat: number } | { tipo: 'tiempo_agotado'; seat: number } | null;
+  ultimoEvento:   { tipo: 'paso_a_todos'; seat: number; noCaben: boolean } | { tipo: 'tiempo_agotado'; seat: number } | null;
   abandonadoPorSeat: number | null;     // set si la partida terminó por abandono
   // Tiempo límite por jugada (docs/PENDIENTES_JUEGO.md §2) — resuelto UNA
   // vez al crear la partida desde reglas_juego.tiempo_limite_jugada_ms
@@ -314,8 +314,16 @@ export function aplicarJugada(
     partida.pasadas === partida.maxJugadores - 1 &&
     partida.ultimoQueJugo === seat;
 
+  const equipoBono = equipoDe(seat);
+  // "No caben": igual que la tranca (ver cerrarMano), el bono NO se aplica
+  // si empujaría el marcador POR ENCIMA del objetivo — no se puede ganar
+  // la partida de pura suerte por un bono, solo por dominó/capicúa exacta
+  // o un cierre cuyos pips sí entren. Sin este chequeo, un +30 fijo podía
+  // pasarse de largo del objetivo y aun así cerrar la partida.
+  const excedeBono = pasoATodos && partida.marcador[equipoBono] + PUNTOS_PASO_A_TODOS > partida.puntosObjetivo;
+
   const marcador: [number, number] = [...partida.marcador];
-  if (pasoATodos) marcador[equipoDe(seat)] += PUNTOS_PASO_A_TODOS;
+  if (pasoATodos && !excedeBono) marcador[equipoBono] += PUNTOS_PASO_A_TODOS;
 
   const siguiente: PartidaState = {
     ...partida,
@@ -325,15 +333,15 @@ export function aplicarJugada(
     pasadas: 0,
     ultimaJugada: { lado: ladoJugado },
     ultimoQueJugo: seat,
-    ultimoEvento: pasoATodos ? { tipo: 'paso_a_todos', seat } : null,
+    ultimoEvento: pasoATodos ? { tipo: 'paso_a_todos', seat, noCaben: excedeBono } : null,
     turno: (partida.turno + 1) % partida.maxJugadores,
     turnoEmpiezaEn: Date.now(),
   };
 
-  // El bonus puede cerrar la partida a mitad de mano
-  if (pasoATodos && marcador[equipoDe(seat)] >= partida.puntosObjetivo) {
+  // El bonus puede cerrar la partida a mitad de mano, pero solo si SÍ entró
+  if (pasoATodos && !excedeBono && marcador[equipoBono] >= partida.puntosObjetivo) {
     siguiente.fase = 'fin_partida';
-    siguiente.equipoGanadorPartida = equipoDe(seat);
+    siguiente.equipoGanadorPartida = equipoBono;
     return { ok: true, partida: siguiente };
   }
 
@@ -478,7 +486,7 @@ export type PartidaPublica = {
   salidaForzada:  Pieza | null;
   resultadoMano:  ResultadoMano | null;
   equipoGanadorPartida: 0 | 1 | null;
-  ultimoEvento:   { tipo: 'paso_a_todos'; seat: number } | { tipo: 'tiempo_agotado'; seat: number } | null;
+  ultimoEvento:   { tipo: 'paso_a_todos'; seat: number; noCaben: boolean } | { tipo: 'tiempo_agotado'; seat: number } | null;
   abandonadoPorSeat: number | null;
   estado:         'jugando' | 'entre_manos' | 'terminado';
   // Tiempo límite por jugada (docs/PENDIENTES_JUEGO.md §2) — null = sin límite.

@@ -25,6 +25,7 @@ function describirMovimiento(m: Movimiento, nombre: string): string {
 function textoResultadoMano(r: ResultadoMano, nombreDeEquipo: (eq: 0 | 1) => string): string {
   const equipoTxt = r.equipo !== null ? nombreDeEquipo(r.equipo) : '—';
   if (r.tipo === 'paso_a_todos') {
+    if (r.noCaben) return `¡Bono "pasó a todos"! Pero no caben — no suma, sigue la partida`;
     // La mano no tuvo cierre formal: el bono empujó el marcador al
     // objetivo a mitad de mano y ahí terminó la partida.
     return `¡Bono "pasó a todos"! +${r.puntos} para el equipo de ${equipoTxt} — así cerró la partida`;

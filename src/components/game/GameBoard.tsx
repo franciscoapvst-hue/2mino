@@ -32,7 +32,9 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
   const [handWidth,  handRef]  = useMeasuredWidth();
 
   // Aviso efímero del bonus "+30 pasó a todos" o de un turno vencido por tiempo
-  const [eventoVisible, setEventoVisible] = useState<{ tipo: 'paso_a_todos' | 'tiempo_agotado'; seat: number } | null>(null);
+  const [eventoVisible, setEventoVisible] = useState<
+    { tipo: 'paso_a_todos'; seat: number; noCaben: boolean } | { tipo: 'tiempo_agotado'; seat: number } | null
+  >(null);
   const eventoPrevRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -46,7 +48,7 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
     const firma = `${ev.tipo}:${ev.seat}:${partida.turnoEmpiezaEn}`;
     if (eventoPrevRef.current === firma) return;
     eventoPrevRef.current = firma;
-    setEventoVisible({ tipo: ev.tipo, seat: ev.seat });
+    setEventoVisible(ev);
     const id = setTimeout(() => setEventoVisible(null), 3000);
     return () => clearTimeout(id);
   }, [partida?.ultimoEvento, partida?.turnoEmpiezaEn]);
@@ -313,6 +315,8 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
         <div className="game-event-banner">
           {eventoVisible.tipo === 'tiempo_agotado'
             ? <>⏱ ¡Se acabó el tiempo de {nombreAsiento(eventoVisible.seat)}! Jugamos por {partida.miSeat === eventoVisible.seat ? 'ti' : 'él/ella'}.</>
+            : eventoVisible.noCaben
+            ? <>🔒 ¡{nombreAsiento(eventoVisible.seat)} pasó a todos, pero no caben! No suma, sigue la partida.</>
             : <>⚡ +30 · ¡{nombreAsiento(eventoVisible.seat)} pasó a todos!</>}
         </div>
       )}

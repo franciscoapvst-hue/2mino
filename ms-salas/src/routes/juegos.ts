@@ -142,7 +142,8 @@ async function guardarMovimientos(salaId: string, movimientos: (MovimientoInput 
 // puede llamarse varias veces con el mismo resultadoMano sin duplicar fila.
 async function guardarPuntos(salaId: string, partida: PartidaState) {
   const r = partida.resultadoMano;
-  const hayBonus = partida.ultimoEvento?.tipo === 'paso_a_todos';
+  const evento = partida.ultimoEvento;
+  const hayBonus = evento?.tipo === 'paso_a_todos';
   if (!r && !hayBonus) return;
 
   const { rows } = await pool.query(
@@ -163,14 +164,14 @@ async function guardarPuntos(salaId: string, partida: PartidaState) {
     );
   }
 
-  if (hayBonus && partida.ultimoEvento) {
-    const equipo = equipoDe(partida.ultimoEvento.seat);
+  if (evento?.tipo === 'paso_a_todos') {
+    const equipo = equipoDe(evento.seat);
     await pool.query(
       `INSERT INTO partida_puntos
          (sala_id, numero_mano, turno, tipo, equipo, puntos, no_caben, marcador_0, marcador_1)
-       VALUES ($1,$2,$3,'paso_a_todos',$4,$5,false,$6,$7)
+       VALUES ($1,$2,$3,'paso_a_todos',$4,$5,$6,$7,$8)
        ON CONFLICT (sala_id, turno, tipo) DO NOTHING`,
-      [salaId, partida.numeroMano, turno, equipo, PUNTOS_PASO_A_TODOS, partida.marcador[0], partida.marcador[1]],
+      [salaId, partida.numeroMano, turno, equipo, PUNTOS_PASO_A_TODOS, evento.noCaben, partida.marcador[0], partida.marcador[1]],
     );
   }
 }
