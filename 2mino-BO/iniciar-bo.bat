@@ -30,6 +30,11 @@ echo.
 echo Iniciando el servidor del Back Office en una ventana aparte...
 start "2mino BO - servidor (no cerrar)" cmd /k "npm run dev"
 
+echo.
+echo Abriendo el tunel SSH a produccion en otra ventana aparte...
+echo (Necesario para que el boton "Prod" del panel funcione. No cierres esa ventana.)
+start "2mino BO - Tunel a Produccion (no cerrar)" cmd /k "node scripts\tunnel-prod.cjs"
+
 echo Esperando a que el panel responda...
 :esperar_bo
 timeout /t 2 /nobreak >nul
@@ -42,5 +47,5 @@ echo Listo! Abriendo http://localhost:5174 ...
 start http://localhost:5174
 
 echo.
-echo Esta ventana se puede cerrar. NO cierres la ventana "2mino BO - servidor".
+echo Esta ventana se puede cerrar. NO cierres "2mino BO - servidor" ni "2mino BO - Tunel a Produccion".
 pause
