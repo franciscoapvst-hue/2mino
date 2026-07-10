@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import DominoPiece from './DominoPiece';
 import SnakeBoard from './SnakeBoard';
 import { puedeJugar, getExtremos } from '../../game/local-rules';
+import { sounds } from '../../game/sounds';
 import { api } from '../../api';
 import type { PartidaPublica, Pieza, Sala, AuthUser } from '../../api';
 import { BackIcon, PersonAddIcon } from '../icons';
@@ -47,9 +48,41 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
     if (eventoPrevRef.current === firma) return;
     eventoPrevRef.current = firma;
     setEventoVisible({ tipo: ev.tipo, seat: ev.seat });
+    if (ev.tipo === 'tiempo_agotado') sounds.tiempoAgotado();
     const id = setTimeout(() => setEventoVisible(null), 3000);
     return () => clearTimeout(id);
   }, [partida?.ultimoEvento, partida?.turnoEmpiezaEn]);
+
+  // ── Sonido al cerrar una mano (puntos, capicúa, o nada) ───
+  const manoSonadaRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!partida || partida.fase === 'jugando') return;
+    const r = partida.resultadoMano;
+    if (!r) return;
+    if (manoSonadaRef.current === partida.numeroMano) return;
+    manoSonadaRef.current = partida.numeroMano;
+
+    const miEq = partida.miEquipo ?? 0;
+    const equipoQueGano = r.tipo === 'tranca' ? r.equipoGanador : equipoDeSeat(r.ganadorSeat);
+    const sinPuntos = r.tipo === 'tranca' && (r.noCaben || equipoQueGano === null);
+
+    if (sinPuntos) sounds.sinPuntos();
+    else if (r.tipo === 'capicua') sounds.capicua();
+    else if (equipoQueGano === miEq) sounds.puntos(r.puntos);
+    else sounds.sinPuntos();
+  }, [partida?.resultadoMano, partida?.numeroMano, partida?.fase, partida?.miEquipo]);
+
+  // ── Sonido al terminar la partida (ganada/perdida) ────────
+  const partidaTerminadaRef = useRef(false);
+  useEffect(() => {
+    if (!partida) return;
+    if (partida.fase !== 'fin_partida') { partidaTerminadaRef.current = false; return; }
+    if (partidaTerminadaRef.current) return;
+    partidaTerminadaRef.current = true;
+    const miEq = partida.miEquipo ?? 0;
+    if (partida.equipoGanadorPartida === miEq) sounds.ganaste();
+    else sounds.perdiste();
+  }, [partida?.fase, partida?.equipoGanadorPartida, partida?.miEquipo]);
 
   // ── Countdown del tiempo límite por jugada ────
   // Se recalcula localmente cada segundo a partir de turnoEmpiezaEn/
@@ -76,6 +109,11 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
           const lado = p.ultimaJugada?.lado ?? 'der';
           setNuevaFichaIdx(lado === 'der' ? p.tablero.length - 1 : 0);
           setTimeout(() => setNuevaFichaIdx(null), 600);
+          // Solo dispara para fichas del rival/bot: una jugada propia ya
+          // actualiza `partida` (y ya sonó) en handleJugar antes de que
+          // corra el próximo poll, así que `prev` acá nunca queda atrás
+          // por una jugada propia — solo por algo que pasó sin que lo viéramos.
+          sounds.ficha();
         }
         return p;
       });
@@ -105,6 +143,7 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
       const ladoJugado = nueva.ultimaJugada?.lado ?? 'der';
       setNuevaFichaIdx(ladoJugado === 'der' ? nueva.tablero.length - 1 : 0);
       setTimeout(() => setNuevaFichaIdx(null), 600);
+      sounds.ficha();
       setPartida(nueva);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Jugada inválida');
@@ -153,7 +192,9 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
     setJugando(true);
     setSelectedPiece(null);
     try {
-      setPartida(await api.juego.pasar(sala.id));
+      const nueva = await api.juego.pasar(sala.id);
+      sounds.pasar();
+      setPartida(nueva);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'No puedes pasar');
       setTimeout(() => setError(null), 2500);
