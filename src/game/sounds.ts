@@ -33,8 +33,8 @@ function tono(freq: number, duracionMs: number, tipo: OscillatorType = 'sine', v
   osc.stop(t0 + duracionMs / 1000 + 0.02);
 }
 
-/** Ráfaga de ruido filtrado — la base percusiva del "clack" de la ficha. */
-function ruido(duracionMs: number, volumen = 0.2, delayMs = 0) {
+/** Ráfaga de ruido filtrado — la base percusiva de un "clack" seco. */
+function ruido(duracionMs: number, volumen = 0.2, delayMs = 0, freq = 1400) {
   const c = getCtx();
   if (!c) return;
   const t0 = c.currentTime + delayMs / 1000;
@@ -47,7 +47,7 @@ function ruido(duracionMs: number, volumen = 0.2, delayMs = 0) {
   source.buffer = buffer;
   const filtro = c.createBiquadFilter();
   filtro.type = 'bandpass';
-  filtro.frequency.value = 1400;
+  filtro.frequency.value = freq;
   const gain = c.createGain();
   gain.gain.setValueAtTime(volumen, t0);
   gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duracionMs / 1000);
@@ -57,10 +57,14 @@ function ruido(duracionMs: number, volumen = 0.2, delayMs = 0) {
 }
 
 export const sounds = {
-  /** Ficha colocada en el tablero (propia o del rival/bot). */
+  /** Ficha colocada en el tablero — "clack" seco tipo pieza de ajedrez sobre madera. */
   ficha() {
-    ruido(70, 0.28);
-    tono(130, 55, 'square', 0.09, 4);
+    ruido(15, 0.35, 0, 3200);  // golpe agudo (el "tic" del contacto)
+    ruido(55, 0.22, 3, 260);   // cuerpo grave corto (la "madera" resonando)
+  },
+  /** Click genérico al presionar cualquier botón. */
+  click() {
+    ruido(12, 0.1, 0, 3600);
   },
   /** Pase de turno. */
   pasar() {

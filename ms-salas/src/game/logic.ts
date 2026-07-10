@@ -80,12 +80,15 @@ export function equipoDe(seat: number): 0 | 1 {
 // ── Resultado de UNA mano ───────────────────────────────────────────
 export type ResultadoMano =
   | { tipo: 'normal';  ganadorSeat: number; puntos: number }
-  | { tipo: 'capicua'; ganadorSeat: number; puntos: number }
-  // equipoGanador null = tranca empatada (nadie suma). noCaben = true
-  // cuando los pips hubieran superado puntosObjetivo — no se suman (ver
-  // cerrarMano) y la partida sigue; `puntos` queda con el valor que
-  // HUBIERA sumado, solo informativo para la UI ("¡No caben!").
-  | { tipo: 'tranca';  equipoGanador: 0 | 1 | null; puntos: number; noCaben?: boolean };
+  // noCaben = true: el bono fijo de capicúa (puntosCapicua) se hubiera
+  // pasado del objetivo — no se aplica el bono, `puntos` trae en su lugar
+  // los pips reales del rival (como un cierre "normal"), que sí valen y
+  // pueden terminar la partida aunque el propio conteo la exceda.
+  | { tipo: 'capicua'; ganadorSeat: number; puntos: number; noCaben?: boolean }
+  // equipoGanador null = tranca empatada (nadie suma). `puntos` son los
+  // pips reales del rival y SIEMPRE se suman — no hay "no caben" para
+  // pips: solo los bonos fijos (capicúa, pasó a todos) pueden no entrar.
+  | { tipo: 'tranca';  equipoGanador: 0 | 1 | null; puntos: number };
 
 // ── Estado completo de una PARTIDA (lo que se guarda como TEXT) ─────
 export type Asiento = { usuario_id: string; username: string; posicion: number };
@@ -226,24 +229,14 @@ function cerrarMano(
     ? resultado.equipoGanador
     : equipoDe(resultado.ganadorSeat);
 
-  // "No caben": una tranca cuyos pips llevarían el marcador POR ENCIMA
-  // del objetivo no suma nada — la partida no puede cerrarse por una
-  // trancada de suerte, solo por dominó/capicúa exacta o una tranca que
-  // sí entre. El marcador queda igual, se reparte mano nueva y se sigue.
-  const excedeTranca = resultado.tipo === 'tranca'
-    && equipo !== null
-    && marcador[equipo] + resultado.puntos > partida.puntosObjetivo;
-
-  const resultadoFinal: ResultadoMano = excedeTranca
-    ? { ...resultado, noCaben: true }
-    : resultado;
-
-  if (equipo !== null && !excedeTranca) marcador[equipo] += resultado.puntos;
+  // Los pips (tranca, o el fallback de una capicúa que no entró — ver
+  // aplicarJugada) SIEMPRE se suman, incluso si superan puntosObjetivo:
+  // solo los bonos FIJOS (capicúa, pasó a todos) pueden quedar afuera por
+  // "no caben"; eso ya se decidió antes de llegar acá.
+  if (equipo !== null) marcador[equipo] += resultado.puntos;
 
   // Contadores acumulados de toda la partida (partida_resultados en el
   // historial/leaderboard). Un "normal" no suma a ninguno de los dos.
-  // La tranca cuenta para el contador aunque "no quepa" (sí ocurrió),
-  // solo el puntaje queda sin aplicar.
   const capicuasPorEquipo: [number, number] = [...partida.capicuasPorEquipo];
   const trancasPorEquipo:  [number, number] = [...partida.trancasPorEquipo];
   if (resultado.tipo === 'capicua') capicuasPorEquipo[equipoDe(resultado.ganadorSeat)]++;
@@ -260,7 +253,7 @@ function cerrarMano(
     marcador,
     capicuasPorEquipo,
     trancasPorEquipo,
-    resultadoMano: resultadoFinal,
+    resultadoMano: resultado,
     salida: proximaSalida,
     fase: ganadorPartida !== null ? 'fin_partida' : 'entre_manos',
     equipoGanadorPartida: ganadorPartida,
@@ -355,14 +348,22 @@ export function aplicarJugada(
   // ¿Dominó? (mano vacía) → cierra la mano; el ganador sale la próxima
   if (nuevasManos[seat].length === 0) {
     const extFinal = getExtremos(nuevoTablero)!;
-    const resultado: ResultadoMano = esCapicua(pieza, extFinal)
-      ? { tipo: 'capicua', ganadorSeat: seat, puntos: partida.puntosCapicua }
-      : {
-          tipo: 'normal',
-          ganadorSeat: seat,
-          puntos: nuevasManos.reduce(
-            (s, h, i) => equipoDe(i) !== equipoDe(seat) ? s + sumaPips(h) : s, 0),
-        };
+    const equipoGanador = equipoDe(seat);
+    const pipsRivales = nuevasManos.reduce(
+      (s, h, i) => equipoDe(i) !== equipoGanador ? s + sumaPips(h) : s, 0);
+
+    let resultado: ResultadoMano;
+    if (esCapicua(pieza, extFinal)) {
+      // Bono fijo de capicúa: si se pasaría del objetivo, no se aplica —
+      // en su lugar valen los pips reales del rival (como un cierre
+      // "normal"), que sí pueden terminar la partida aunque se pasen.
+      const excedeCapicua = siguiente.marcador[equipoGanador] + partida.puntosCapicua > partida.puntosObjetivo;
+      resultado = excedeCapicua
+        ? { tipo: 'capicua', ganadorSeat: seat, puntos: pipsRivales, noCaben: true }
+        : { tipo: 'capicua', ganadorSeat: seat, puntos: partida.puntosCapicua };
+    } else {
+      resultado = { tipo: 'normal', ganadorSeat: seat, puntos: pipsRivales };
+    }
     return { ok: true, partida: cerrarMano(siguiente, resultado, seat) };
   }
 
@@ -394,11 +395,11 @@ export function aplicarPase(partida: PartidaState, usuarioId: string): Resultado
     const pips0 = pipsEquipo(0);
     const pips1 = pipsEquipo(1);
 
-    // Gana el equipo con menos pips y suma los pips de la pareja rival.
+    // Gana el equipo con menos pips y suma TODOS los pips que quedaron
+    // sobre la mesa — los de ambos equipos, no solo los del rival.
     // Empate → nadie suma.
     const equipoGanador = pips0 < pips1 ? 0 : pips1 < pips0 ? 1 : null;
-    const puntos = equipoGanador === null ? 0
-                 : equipoGanador === 0 ? pips1 : pips0;
+    const puntos = equipoGanador === null ? 0 : pips0 + pips1;
 
     // Salida próxima: si ganó quien trancó sale él; si no, el siguiente.
     const quienTranco = partida.ultimoQueJugo ?? partida.salida;

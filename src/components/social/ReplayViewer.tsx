@@ -31,10 +31,13 @@ function textoResultadoMano(r: ResultadoMano, nombreDeEquipo: (eq: 0 | 1) => str
     return `¡Bono "pasó a todos"! +${r.puntos} para el equipo de ${equipoTxt} — así cerró la partida`;
   }
   if (r.tipo === 'tranca') {
-    if (r.noCaben) return 'Tranca — ¡No caben! (se pasaría de objetivo, no suma)';
-    return r.equipo === null ? 'Tranca — empate, nadie suma' : `Tranca — gana el equipo de ${nombreDeEquipo(r.equipo)}`;
+    return r.equipo === null ? 'Tranca — empate, nadie suma' : `Tranca — gana el equipo de ${nombreDeEquipo(r.equipo)} (+${r.puntos} pips)`;
   }
-  return r.tipo === 'capicua' ? `¡Capicúa! Gana el equipo de ${equipoTxt}` : `Mano ganada por el equipo de ${equipoTxt}`;
+  if (r.tipo === 'capicua') {
+    if (r.noCaben) return `¡Capicúa! Pero los 30 no caben — suman los ${r.puntos} pips del rival para el equipo de ${equipoTxt}`;
+    return `¡Capicúa! Gana el equipo de ${equipoTxt}`;
+  }
+  return `Mano ganada por el equipo de ${equipoTxt}`;
 }
 
 export default function ReplayViewer({ dark, salaId, onBack }: Props) {

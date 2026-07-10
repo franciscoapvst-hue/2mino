@@ -19,6 +19,7 @@ import TutorialGame from './components/tutorial/TutorialGame';
 import { api, tokenStore, type AuthUser, type UserConfig, type Sala } from './api';
 import { DominoTile, SunIcon, MoonIcon } from './components/icons';
 import { useSocialSocket } from './hooks/useSocialSocket';
+import { sounds } from './game/sounds';
 
 export type View = 'login' | 'register' | 'forgot';
 type AppView = View | 'dashboard' | 'salas' | 'ranked' | 'casual' | 'piece-demo' | 'game'
@@ -78,6 +79,18 @@ export default function App() {
     document.documentElement.classList.toggle('light', !dark);
     localStorage.setItem('2mino-theme', dark ? 'dark' : 'light');
   }, [dark]);
+
+  // Click genérico en cualquier botón de la app (delegación: un solo
+  // listener para toda la vida de la app, en vez de tocar cada botón).
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const boton = target.closest('button, [role="button"]') as HTMLButtonElement | null;
+      if (boton && !boton.disabled) sounds.click();
+    };
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+  }, []);
 
   // Restore session from stored token
   useEffect(() => {

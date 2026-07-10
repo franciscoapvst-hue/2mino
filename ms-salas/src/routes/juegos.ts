@@ -154,7 +154,7 @@ async function guardarPuntos(salaId: string, partida: PartidaState) {
 
   if (r) {
     const equipo = r.tipo === 'tranca' ? r.equipoGanador : equipoDe(r.ganadorSeat);
-    const noCaben = r.tipo === 'tranca' && !!r.noCaben;
+    const noCaben = r.tipo === 'capicua' && !!r.noCaben;
     await pool.query(
       `INSERT INTO partida_puntos
          (sala_id, numero_mano, turno, tipo, equipo, puntos, no_caben, marcador_0, marcador_1)

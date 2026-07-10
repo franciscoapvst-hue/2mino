@@ -32,6 +32,17 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
   const [boardWidth, boardRef] = useMeasuredWidth();
   const [handWidth,  handRef]  = useMeasuredWidth();
 
+  // Orden manual de la mano (el jugador puede arrastrar sus fichas para
+  // reordenarlas) — vive en el cliente, no en el servidor: se reinicia al
+  // repartir una mano nueva y se va filtrando a medida que se juegan fichas.
+  const sigPieza = (p: Pieza) => `${p.a}-${p.b}`;
+  const [ordenMano, setOrdenMano] = useState<string[]>([]);
+  const manoDeOrdenRef = useRef<number | null>(null);
+  const dragReorderIdx = useRef<number | null>(null);
+  // Posición (0..n) donde caería la ficha arrastrada si se soltara ahora —
+  // se usa para dibujar el hueco visual de "va a caer acá".
+  const [dragOverGap, setDragOverGap] = useState<number | null>(null);
+
   // Aviso efímero del bonus "+30 pasó a todos" o de un turno vencido por tiempo
   const [eventoVisible, setEventoVisible] = useState<
     { tipo: 'paso_a_todos'; seat: number; noCaben: boolean } | { tipo: 'tiempo_agotado'; seat: number } | null
@@ -55,6 +66,15 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
     return () => clearTimeout(id);
   }, [partida?.ultimoEvento, partida?.turnoEmpiezaEn]);
 
+  // ── Reordenar mano: reiniciar el orden manual cuando se reparte una mano nueva ───
+  useEffect(() => {
+    if (!partida) return;
+    if (manoDeOrdenRef.current !== partida.numeroMano) {
+      manoDeOrdenRef.current = partida.numeroMano;
+      setOrdenMano(partida.miMano.map(sigPieza));
+    }
+  }, [partida?.numeroMano, partida?.miMano]);
+
   // ── Sonido al cerrar una mano (puntos, capicúa, o nada) ───
   const manoSonadaRef = useRef<number | null>(null);
   useEffect(() => {
@@ -66,7 +86,7 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
 
     const miEq = partida.miEquipo ?? 0;
     const equipoQueGano = r.tipo === 'tranca' ? r.equipoGanador : equipoDeSeat(r.ganadorSeat);
-    const sinPuntos = r.tipo === 'tranca' && (r.noCaben || equipoQueGano === null);
+    const sinPuntos = r.tipo === 'tranca' && equipoQueGano === null;
 
     if (sinPuntos) sounds.sinPuntos();
     else if (r.tipo === 'capicua') sounds.capicua();
@@ -280,6 +300,46 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
   function onDragEnd() {
     setArrastrando(null);
     setSobreZona(null);
+    dragReorderIdx.current = null;
+    setDragOverGap(null);
+  }
+
+  // ── Reordenar mano (arrastrar una ficha sobre otra de la propia mano) ──
+  function onHandDragStart(e: React.DragEvent<HTMLDivElement>, idx: number, pieza: Pieza, canPlay: boolean) {
+    dragReorderIdx.current = idx;
+    if (canPlay) onDragStart(e, pieza);
+    else {
+      e.dataTransfer.setData('pieza', JSON.stringify(pieza));
+      e.dataTransfer.effectAllowed = 'move';
+    }
+  }
+
+  // El "hueco" (0..n) es la posición donde caería la ficha si soltás ahora:
+  // mitad izquierda de la ficha sobre la que pasás el mouse → antes de ella,
+  // mitad derecha → después. Así el punto de inserción sigue al cursor en
+  // vez de siempre insertar "después del objetivo" sin importar dónde soltó.
+  function onHandDragOver(e: React.DragEvent<HTMLDivElement>, idx: number) {
+    if (dragReorderIdx.current === null) return;
+    e.preventDefault();
+    const rect  = e.currentTarget.getBoundingClientRect();
+    const mitad = rect.left + rect.width / 2;
+    const gap   = e.clientX < mitad ? idx : idx + 1;
+    setDragOverGap(prev => (prev === gap ? prev : gap));
+  }
+
+  function onHandDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    const from = dragReorderIdx.current;
+    const gap  = dragOverGap;
+    dragReorderIdx.current = null;
+    setDragOverGap(null);
+    if (from === null || gap === null || gap === from || gap === from + 1) return;
+    setOrdenMano(prev => {
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(gap > from ? gap - 1 : gap, 0, moved);
+      return next;
+    });
   }
 
   // ── Guards de carga ───────────────────────────
@@ -335,6 +395,13 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
     : 1;
   const pieceW = Math.floor(HAND_VW * handScale);
   const pieceH = Math.floor(HAND_VH * handScale);
+
+  // Mano en el orden manual del jugador — fichas que aún no entraron al
+  // orden (recién repartidas, antes de que corra el efecto) van al final.
+  const manoOrdenada = ordenMano
+    .map(s => partida.miMano.find(p => sigPieza(p) === s))
+    .filter((p): p is Pieza => !!p);
+  partida.miMano.forEach(p => { if (!ordenMano.includes(sigPieza(p))) manoOrdenada.push(p); });
 
   const nombreAsiento = (seat: number) => partida.asientos[seat]
     ? `@${partida.asientos[seat].username}` : '—';
@@ -447,24 +514,33 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
       {/* ── Mi mano ──────────────────────────────── */}
       <div className="my-hand-zone">
         <div className="my-hand" ref={handRef}>
-          {partida.miMano.map((p, i) => {
+          {manoOrdenada.map((p, i) => {
             const ops     = ext ? puedeJugar(p, ext) : { izq: true, der: true };
             const jugable = (ops.izq || ops.der) && esForzada(p);
             const isSel   = selectedPiece?.a === p.a && selectedPiece?.b === p.b;
             const canPlay = esMiTurno && jugable && !jugando;
+            const huecoAntes   = dragOverGap === i;
+            const huecoDespues = i === manoOrdenada.length - 1 && dragOverGap === i + 1;
             return (
               <DominoPiece
-                key={i}
+                key={sigPieza(p)}
                 a={p.a} b={p.b}
                 orient="v"
                 selected={isSel}
                 playable={canPlay && !isSel}
                 disabled={!canPlay}
-                draggable={canPlay}
-                onDragStart={canPlay ? e => onDragStart(e, p) : undefined}
+                draggable
+                onDragStart={e => onHandDragStart(e, i, p, canPlay)}
+                onDragOver={e => onHandDragOver(e, i)}
+                onDrop={onHandDrop}
                 onDragEnd={onDragEnd}
                 onClick={canPlay ? () => onTapPieza(p) : undefined}
-                style={{ width: pieceW, height: pieceH }}
+                style={{
+                  width: pieceW, height: pieceH,
+                  marginLeft:  huecoAntes   ? 18 : undefined,
+                  marginRight: huecoDespues ? 18 : undefined,
+                  transition: 'margin .12s ease',
+                }}
               />
             );
           })}
@@ -587,12 +663,6 @@ function tituloResultado(
 ): { titulo: string; detalle: string } {
   const miEq = partida.miEquipo ?? 0;
   if (r.tipo === 'tranca') {
-    if (r.noCaben) {
-      return {
-        titulo: '🔒 ¡No caben!',
-        detalle: `Esos ${r.puntos} pts se pasarían de ${partida.puntosObjetivo} — no suman. Sigue la partida.`,
-      };
-    }
     return {
       titulo: '🔒 Tranca',
       detalle: r.equipoGanador === null ? 'Empate: nadie suma'
@@ -601,6 +671,12 @@ function tituloResultado(
     };
   }
   const gane = equipoDeSeat(r.ganadorSeat) === miEq;
+  if (r.tipo === 'capicua' && r.noCaben) {
+    return {
+      titulo: '⚡ ¡Capicúa!',
+      detalle: `Los 30 del bono se pasarían de ${partida.puntosObjetivo} — no caben. Solo cuentan los ${r.puntos} pips del rival.`,
+    };
+  }
   return {
     titulo:  r.tipo === 'capicua' ? '⚡ ¡Capicúa!' : gane ? '🏆 Mano ganada' : '😓 Mano perdida',
     detalle: gane ? '¡Bien jugado!' : `Cerró ${nombreAsiento(r.ganadorSeat)}`,
@@ -628,11 +704,7 @@ function ManoOverlay({ partida, nombreAsiento, onListo, confirmando }: {
     <div className="game-result-overlay">
       <div className="game-result-card">
         <h2>{titulo}</h2>
-        {r.tipo === 'tranca' && r.noCaben ? (
-          <p className="result-points result-points-no-caben">+0 pts</p>
-        ) : (
-          <p className="result-points">+{r.puntos} pts</p>
-        )}
+        <p className="result-points">+{r.puntos} pts</p>
         <p className="result-detail">{detalle}</p>
         <MarcadorResumen partida={partida} />
         {partida.manosReveladas && (

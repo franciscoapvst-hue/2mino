@@ -60,6 +60,9 @@ export type DominoPieceProps = {
   ghost?:      boolean;
   onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
   onDragEnd?:  () => void;
+  /** Reordenar la mano: la propia ficha es también zona de drop de otra ficha arrastrada. */
+  onDragOver?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDrop?:     (e: React.DragEvent<HTMLDivElement>) => void;
   onClick?:    () => void;
   className?:  string;
   style?:      CSSProperties;
@@ -77,6 +80,8 @@ export default function DominoPiece({
   ghost     = false,
   onDragStart,
   onDragEnd,
+  onDragOver,
+  onDrop,
   onClick,
   className = '',
   style,
@@ -191,6 +196,8 @@ export default function DominoPiece({
         draggable
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
       >
         {svgNode}
       </div>
