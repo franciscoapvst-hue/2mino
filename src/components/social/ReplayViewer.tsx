@@ -25,15 +25,19 @@ function describirMovimiento(m: Movimiento, nombre: string): string {
 function textoResultadoMano(r: ResultadoMano, nombreDeEquipo: (eq: 0 | 1) => string): string {
   const equipoTxt = r.equipo !== null ? nombreDeEquipo(r.equipo) : '—';
   if (r.tipo === 'paso_a_todos') {
+    if (r.noCaben) return `¡Bono "pasó a todos"! Pero no caben — no suma, sigue la partida`;
     // La mano no tuvo cierre formal: el bono empujó el marcador al
     // objetivo a mitad de mano y ahí terminó la partida.
     return `¡Bono "pasó a todos"! +${r.puntos} para el equipo de ${equipoTxt} — así cerró la partida`;
   }
   if (r.tipo === 'tranca') {
-    if (r.noCaben) return 'Tranca — ¡No caben! (se pasaría de objetivo, no suma)';
-    return r.equipo === null ? 'Tranca — empate, nadie suma' : `Tranca — gana el equipo de ${nombreDeEquipo(r.equipo)}`;
+    return r.equipo === null ? 'Tranca — empate, nadie suma' : `Tranca — gana el equipo de ${nombreDeEquipo(r.equipo)} (+${r.puntos} pips)`;
   }
-  return r.tipo === 'capicua' ? `¡Capicúa! Gana el equipo de ${equipoTxt}` : `Mano ganada por el equipo de ${equipoTxt}`;
+  if (r.tipo === 'capicua') {
+    if (r.noCaben) return `¡Capicúa! Pero los 30 no caben — suman los ${r.puntos} pips del rival para el equipo de ${equipoTxt}`;
+    return `¡Capicúa! Gana el equipo de ${equipoTxt}`;
+  }
+  return `Mano ganada por el equipo de ${equipoTxt}`;
 }
 
 export default function ReplayViewer({ dark, salaId, onBack }: Props) {

@@ -38,9 +38,11 @@ export type Asiento = { usuario_id: string; username: string; posicion: number }
 
 export type ResultadoMano =
   | { tipo: 'normal';  ganadorSeat: number; puntos: number }
-  | { tipo: 'capicua'; ganadorSeat: number; puntos: number }
-  // noCaben = true: los pips hubieran superado el objetivo, no se sumaron.
-  | { tipo: 'tranca';  equipoGanador: 0 | 1 | null; puntos: number; noCaben?: boolean };
+  // noCaben = true: el bono fijo de capicúa no entró, `puntos` son los
+  // pips reales del rival en su lugar (y sí pueden terminar la partida).
+  | { tipo: 'capicua'; ganadorSeat: number; puntos: number; noCaben?: boolean }
+  // Los pips de una tranca siempre se suman, incluso si superan el objetivo.
+  | { tipo: 'tranca';  equipoGanador: 0 | 1 | null; puntos: number };
 
 export type Fase = 'jugando' | 'entre_manos' | 'fin_partida';
 
@@ -68,12 +70,14 @@ export type PartidaPublica = {
   salidaForzada:  Pieza | null;
   resultadoMano:  ResultadoMano | null;
   equipoGanadorPartida: 0 | 1 | null;
-  ultimoEvento:   { tipo: 'paso_a_todos'; seat: number } | { tipo: 'tiempo_agotado'; seat: number } | null;
+  ultimoEvento:   { tipo: 'paso_a_todos'; seat: number; noCaben: boolean } | { tipo: 'tiempo_agotado'; seat: number } | null;
   abandonadoPorSeat: number | null;
   estado:         'jugando' | 'entre_manos' | 'terminado';
   // Tiempo límite por jugada (docs/PENDIENTES_JUEGO.md §2) — null = sin límite.
   limiteJugadaMs: number | null;
   turnoEmpiezaEn: number;
+  // Espera (ms) configurable desde el BO antes de mostrar la pantalla de fin de mano.
+  delayFinManoMs: number;
 };
 
 export type AuthUser = {

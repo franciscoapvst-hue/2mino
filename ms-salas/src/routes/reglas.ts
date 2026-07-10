@@ -20,6 +20,7 @@ const FORMA_POR_CLAVE: Record<string, FormaValor> = {
   paso_escalon_ms:         'numero',
   umbral_relleno_ms:       'numero',
   tiempo_limite_jugada_ms: 'limite_por_tipo',
+  delay_fin_mano_ms:       'numero',
 };
 
 function validarForma(clave: string, valor: unknown): string | null {

@@ -42,6 +42,7 @@ function partida(over: Partial<PartidaState> = {}): PartidaState {
     abandonadoPorSeat: null,
     limiteJugadaMs: null,
     turnoEmpiezaEn: 0,
+    delayFinManoMs: 0,
     ...over,
   };
 }
@@ -91,6 +92,16 @@ describe('crearPartida', () => {
     const holder = p.manos.findIndex(m => m.some(x => x.a === 6 && x.b === 6));
     expect(p.salida).toBe(holder);
     expect(p.turno).toBe(holder);
+  });
+
+  it('delayFinManoMs por defecto es 0 (sin límite explícito, no rompe partidas viejas)', () => {
+    const p = crearPartida(asientos(2));
+    expect(p.delayFinManoMs).toBe(0);
+  });
+
+  it('acepta un delayFinManoMs explícito (configurado desde reglas_juego)', () => {
+    const p = crearPartida(asientos(2), 100, PUNTOS_CAPICUA, null, 2500);
+    expect(p.delayFinManoMs).toBe(2500);
   });
 });
 
@@ -171,6 +182,37 @@ describe('dominó (mano vacía)', () => {
     expect(s.trancasPorEquipo).toEqual([0, 0]);
   });
 
+  it('"no caben": si el bono fijo de capicúa se pasaría del objetivo, valen los pips del rival en su lugar', () => {
+    // Equipo 0 tiene 80/100. El bono fijo de capicúa (+30) daría 110 — no
+    // entra. En su lugar valen los pips reales del rival (1+1=2), que sí
+    // se suman y (al no llegar a 100) la partida sigue.
+    const p = partida({
+      marcador: [80, 0],
+      manos: [[pz(2, 4)], [pz(1, 1)]],
+      tablero: [abrirTablero(pz(4, 2))],
+      turno: 0,
+    });
+    const s = ok(aplicarJugada(p, 'u0', pz(2, 4)));
+    expect(s.resultadoMano).toMatchObject({ tipo: 'capicua', puntos: 2, noCaben: true });
+    expect(s.marcador).toEqual([82, 0]);
+    expect(s.fase).toBe('entre_manos');
+    expect(s.capicuasPorEquipo).toEqual([1, 0]); // sí cuenta como capicúa para las stats
+  });
+
+  it('"no caben" en capicúa: si hasta los pips del rival superan el objetivo, la partida igual termina', () => {
+    const p = partida({
+      marcador: [80, 0],
+      manos: [[pz(2, 4)], [pz(6, 6), pz(5, 5)]], // rival: 12+10=22 pips
+      tablero: [abrirTablero(pz(4, 2))],
+      turno: 0,
+    });
+    const s = ok(aplicarJugada(p, 'u0', pz(2, 4)));
+    expect(s.resultadoMano).toMatchObject({ tipo: 'capicua', puntos: 22, noCaben: true });
+    expect(s.marcador).toEqual([102, 0]);
+    expect(s.fase).toBe('fin_partida');
+    expect(s.equipoGanadorPartida).toBe(0);
+  });
+
   it('una victoria "normal" (sin capicúa) no incrementa capicuasPorEquipo', () => {
     const p = partida({
       maxJugadores: 4,
@@ -215,7 +257,7 @@ describe('bonus pasó a todos (+30)', () => {
     });
     const s = ok(aplicarJugada(p, 'u0', pz(3, 4), 'der'));
     expect(s.marcador).toEqual([30, 0]);
-    expect(s.ultimoEvento).toEqual({ tipo: 'paso_a_todos', seat: 0 });
+    expect(s.ultimoEvento).toEqual({ tipo: 'paso_a_todos', seat: 0, noCaben: false });
     expect(s.fase).toBe('jugando'); // la mano sigue
   });
 
@@ -246,7 +288,26 @@ describe('bonus pasó a todos (+30)', () => {
     expect(s.ultimoEvento).toBeNull();
   });
 
-  it('el bonus puede cerrar la partida', () => {
+  it('el bonus cierra la partida si cae EXACTO en el objetivo', () => {
+    const p = partida({
+      marcador: [70, 0],
+      manos: [[pz(3, 4), pz(1, 1)], [pz(6, 6)]],
+      tablero: [abrirTablero(pz(2, 3))],
+      turno: 0,
+      pasadas: 1,
+      ultimoQueJugo: 0,
+    });
+    const s = ok(aplicarJugada(p, 'u0', pz(3, 4), 'der'));
+    expect(s.marcador[0]).toBe(100);
+    expect(s.fase).toBe('fin_partida');
+    expect(s.equipoGanadorPartida).toBe(0);
+    expect(s.ultimoEvento).toEqual({ tipo: 'paso_a_todos', seat: 0, noCaben: false });
+  });
+
+  it('"no caben": el bonus que se pasaría del objetivo NO se aplica y la partida sigue', () => {
+    // Bug real: 80 + 30 = 110, por encima de los 100 del objetivo — no
+    // puede ganarse la partida de pura suerte por el bono, igual que una
+    // tranca cuyos pips se pasarían del objetivo tampoco cierra la partida.
     const p = partida({
       marcador: [80, 0],
       manos: [[pz(3, 4), pz(1, 1)], [pz(6, 6)]],
@@ -256,9 +317,10 @@ describe('bonus pasó a todos (+30)', () => {
       ultimoQueJugo: 0,
     });
     const s = ok(aplicarJugada(p, 'u0', pz(3, 4), 'der'));
-    expect(s.marcador[0]).toBe(110);
-    expect(s.fase).toBe('fin_partida');
-    expect(s.equipoGanadorPartida).toBe(0);
+    expect(s.marcador).toEqual([80, 0]); // sin cambios, el bono no entró
+    expect(s.fase).toBe('jugando');
+    expect(s.equipoGanadorPartida).toBeNull();
+    expect(s.ultimoEvento).toEqual({ tipo: 'paso_a_todos', seat: 0, noCaben: true });
   });
 });
 
@@ -282,8 +344,9 @@ describe('aplicarPase', () => {
     expect(s.marcador).toEqual([0, 0]); // el bonus se paga al JUGAR, no al pasar
   });
 
-  it('tranca: gana el equipo con menos pips y suma los del rival, sin bonus', () => {
+  it('tranca: gana el equipo con menos pips y suma TODOS los pips de la mesa, sin bonus', () => {
     // 4P: pasadas llega a 4. Equipo 0 (seats 0,2) pips 4+4=8; equipo 1 (1,3) 12+11=23.
+    // Gana equipo 0 (menos pips) y suma el TOTAL de la mesa: 8+23=31.
     const p = partida({
       maxJugadores: 4,
       asientos: asientos(4),
@@ -292,8 +355,8 @@ describe('aplicarPase', () => {
       turno: 3, pasadas: 3, ultimoQueJugo: 1,
     });
     const s = ok(aplicarPase(p, 'u3'));
-    expect(s.resultadoMano).toMatchObject({ tipo: 'tranca', equipoGanador: 0, puntos: 23 });
-    expect(s.marcador).toEqual([23, 0]);
+    expect(s.resultadoMano).toMatchObject({ tipo: 'tranca', equipoGanador: 0, puntos: 31 });
+    expect(s.marcador).toEqual([31, 0]);
     expect(s.fase).toBe('entre_manos');
     expect(s.trancasPorEquipo).toEqual([1, 0]);
     // trancó seat 1 (equipo 1) y PERDIÓ → sale el siguiente (seat 2)
@@ -326,10 +389,10 @@ describe('aplicarPase', () => {
     expect(s.trancasPorEquipo).toEqual([0, 0]); // empate: no suma a nadie
   });
 
-  it('"no caben": tranca que superaría el objetivo no suma y la partida sigue', () => {
-    // Equipo 0 ya tiene 90/100. La tranca le daría 23 (pips del rival) →
-    // 90+23=113 > 100, "no caben": el marcador NO cambia y la mano
-    // simplemente cierra (se reparte de nuevo), sin terminar la partida.
+  it('los pips de una tranca SIEMPRE suman, incluso pasándose del objetivo, y terminan la partida', () => {
+    // Equipo 0 ya tiene 90/100. La tranca suma el TOTAL de pips de la mesa
+    // (8+23=31) → 90+31=121, por encima de 100 — pero a diferencia de un
+    // bono fijo, los pips reales siempre valen: la partida SÍ termina en 121.
     const p = partida({
       maxJugadores: 4,
       asientos: asientos(4),
@@ -339,26 +402,25 @@ describe('aplicarPase', () => {
       turno: 3, pasadas: 3, ultimoQueJugo: 1,
     });
     const s = ok(aplicarPase(p, 'u3'));
-    expect(s.resultadoMano).toMatchObject({ tipo: 'tranca', equipoGanador: 0, puntos: 23, noCaben: true });
-    expect(s.marcador).toEqual([90, 0]); // no cambia
-    expect(s.fase).toBe('entre_manos'); // NO termina la partida
-    expect(s.equipoGanadorPartida).toBe(null);
-    expect(s.trancasPorEquipo).toEqual([1, 0]); // la tranca sí cuenta para las stats
+    expect(s.resultadoMano).toMatchObject({ tipo: 'tranca', equipoGanador: 0, puntos: 31 });
+    expect(s.marcador).toEqual([121, 0]);
+    expect(s.fase).toBe('fin_partida');
+    expect(s.equipoGanadorPartida).toBe(0);
+    expect(s.trancasPorEquipo).toEqual([1, 0]);
   });
 
-  it('tranca que cae EXACTO en el objetivo sí suma y termina la partida', () => {
-    // Equipo 0 tiene 77/100, la tranca le da exactamente 23 → 100, cierra.
+  it('tranca que cae EXACTO en el objetivo suma y termina la partida', () => {
+    // Total de pips de la mesa: 8+23=31. Equipo 0 tiene 69/100 → 69+31=100, cierra.
     const p = partida({
       maxJugadores: 4,
       asientos: asientos(4),
-      marcador: [77, 0],
+      marcador: [69, 0],
       manos: [[pz(0, 4)], [pz(6, 6)], [pz(0, 4)], [pz(5, 6)]],
       tablero: [abrirTablero(pz(2, 3))],
       turno: 3, pasadas: 3, ultimoQueJugo: 1,
     });
     const s = ok(aplicarPase(p, 'u3'));
-    expect(s.resultadoMano).toMatchObject({ tipo: 'tranca', equipoGanador: 0, puntos: 23 });
-    expect(s.resultadoMano && 'noCaben' in s.resultadoMano ? s.resultadoMano.noCaben : undefined).toBeFalsy();
+    expect(s.resultadoMano).toMatchObject({ tipo: 'tranca', equipoGanador: 0, puntos: 31 });
     expect(s.marcador).toEqual([100, 0]);
     expect(s.fase).toBe('fin_partida');
     expect(s.equipoGanadorPartida).toBe(0);

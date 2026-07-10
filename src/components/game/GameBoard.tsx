@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import DominoPiece from './DominoPiece';
 import SnakeBoard from './SnakeBoard';
 import { puedeJugar, getExtremos } from '../../game/local-rules';
+import { sounds } from '../../game/sounds';
 import { api } from '../../api';
 import type { PartidaPublica, Pieza, Sala, AuthUser } from '../../api';
 import { BackIcon, PersonAddIcon } from '../icons';
@@ -31,8 +32,21 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
   const [boardWidth, boardRef] = useMeasuredWidth();
   const [handWidth,  handRef]  = useMeasuredWidth();
 
+  // Orden manual de la mano (el jugador puede arrastrar sus fichas para
+  // reordenarlas) — vive en el cliente, no en el servidor: se reinicia al
+  // repartir una mano nueva y se va filtrando a medida que se juegan fichas.
+  const sigPieza = (p: Pieza) => `${p.a}-${p.b}`;
+  const [ordenMano, setOrdenMano] = useState<string[]>([]);
+  const manoDeOrdenRef = useRef<number | null>(null);
+  const dragReorderIdx = useRef<number | null>(null);
+  // Posición (0..n) donde caería la ficha arrastrada si se soltara ahora —
+  // se usa para dibujar el hueco visual de "va a caer acá".
+  const [dragOverGap, setDragOverGap] = useState<number | null>(null);
+
   // Aviso efímero del bonus "+30 pasó a todos" o de un turno vencido por tiempo
-  const [eventoVisible, setEventoVisible] = useState<{ tipo: 'paso_a_todos' | 'tiempo_agotado'; seat: number } | null>(null);
+  const [eventoVisible, setEventoVisible] = useState<
+    { tipo: 'paso_a_todos'; seat: number; noCaben: boolean } | { tipo: 'tiempo_agotado'; seat: number } | null
+  >(null);
   const eventoPrevRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -46,10 +60,51 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
     const firma = `${ev.tipo}:${ev.seat}:${partida.turnoEmpiezaEn}`;
     if (eventoPrevRef.current === firma) return;
     eventoPrevRef.current = firma;
-    setEventoVisible({ tipo: ev.tipo, seat: ev.seat });
+    setEventoVisible(ev);
+    if (ev.tipo === 'tiempo_agotado') sounds.tiempoAgotado();
     const id = setTimeout(() => setEventoVisible(null), 3000);
     return () => clearTimeout(id);
   }, [partida?.ultimoEvento, partida?.turnoEmpiezaEn]);
+
+  // ── Reordenar mano: reiniciar el orden manual cuando se reparte una mano nueva ───
+  useEffect(() => {
+    if (!partida) return;
+    if (manoDeOrdenRef.current !== partida.numeroMano) {
+      manoDeOrdenRef.current = partida.numeroMano;
+      setOrdenMano(partida.miMano.map(sigPieza));
+    }
+  }, [partida?.numeroMano, partida?.miMano]);
+
+  // ── Sonido al cerrar una mano (puntos, capicúa, o nada) ───
+  const manoSonadaRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!partida || partida.fase === 'jugando') return;
+    const r = partida.resultadoMano;
+    if (!r) return;
+    if (manoSonadaRef.current === partida.numeroMano) return;
+    manoSonadaRef.current = partida.numeroMano;
+
+    const miEq = partida.miEquipo ?? 0;
+    const equipoQueGano = r.tipo === 'tranca' ? r.equipoGanador : equipoDeSeat(r.ganadorSeat);
+    const sinPuntos = r.tipo === 'tranca' && equipoQueGano === null;
+
+    if (sinPuntos) sounds.sinPuntos();
+    else if (r.tipo === 'capicua') sounds.capicua();
+    else if (equipoQueGano === miEq) sounds.puntos(r.puntos);
+    else sounds.sinPuntos();
+  }, [partida?.resultadoMano, partida?.numeroMano, partida?.fase, partida?.miEquipo]);
+
+  // ── Sonido al terminar la partida (ganada/perdida) ────────
+  const partidaTerminadaRef = useRef(false);
+  useEffect(() => {
+    if (!partida) return;
+    if (partida.fase !== 'fin_partida') { partidaTerminadaRef.current = false; return; }
+    if (partidaTerminadaRef.current) return;
+    partidaTerminadaRef.current = true;
+    const miEq = partida.miEquipo ?? 0;
+    if (partida.equipoGanadorPartida === miEq) sounds.ganaste();
+    else sounds.perdiste();
+  }, [partida?.fase, partida?.equipoGanadorPartida, partida?.miEquipo]);
 
   // ── Countdown del tiempo límite por jugada ────
   // Se recalcula localmente cada segundo a partir de turnoEmpiezaEn/
@@ -67,6 +122,29 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
     return () => clearInterval(id);
   }, [partida?.fase, partida?.limiteJugadaMs, partida?.turnoEmpiezaEn, partida?.turno]);
 
+  // ── Espera antes de mostrar la pantalla de fin de mano ────
+  // Configurable desde el BO (reglas_juego.delay_fin_mano_ms) — deja ver
+  // el tablero final un momento antes de que el overlay lo tape. Guard
+  // por numeroMano para no reprogramar el timer en cada poll mientras
+  // seguimos en 'entre_manos' esperando que todos confirmen "listo".
+  const [mostrarFinMano, setMostrarFinMano] = useState(false);
+  const finManoProgramadaRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!partida || partida.fase !== 'entre_manos') {
+      setMostrarFinMano(false);
+      finManoProgramadaRef.current = null;
+      return;
+    }
+    if (finManoProgramadaRef.current === partida.numeroMano) return;
+    finManoProgramadaRef.current = partida.numeroMano;
+
+    const delay = partida.delayFinManoMs || 0;
+    if (delay <= 0) { setMostrarFinMano(true); return; }
+    setMostrarFinMano(false);
+    const id = setTimeout(() => setMostrarFinMano(true), delay);
+    return () => clearTimeout(id);
+  }, [partida?.fase, partida?.numeroMano, partida?.delayFinManoMs]);
+
   // ── Carga y polling ────────────────────────────
   const fetchPartida = useCallback(async () => {
     try {
@@ -76,6 +154,11 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
           const lado = p.ultimaJugada?.lado ?? 'der';
           setNuevaFichaIdx(lado === 'der' ? p.tablero.length - 1 : 0);
           setTimeout(() => setNuevaFichaIdx(null), 600);
+          // Solo dispara para fichas del rival/bot: una jugada propia ya
+          // actualiza `partida` (y ya sonó) en handleJugar antes de que
+          // corra el próximo poll, así que `prev` acá nunca queda atrás
+          // por una jugada propia — solo por algo que pasó sin que lo viéramos.
+          sounds.ficha();
         }
         return p;
       });
@@ -105,6 +188,7 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
       const ladoJugado = nueva.ultimaJugada?.lado ?? 'der';
       setNuevaFichaIdx(ladoJugado === 'der' ? nueva.tablero.length - 1 : 0);
       setTimeout(() => setNuevaFichaIdx(null), 600);
+      sounds.ficha();
       setPartida(nueva);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Jugada inválida');
@@ -153,7 +237,9 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
     setJugando(true);
     setSelectedPiece(null);
     try {
-      setPartida(await api.juego.pasar(sala.id));
+      const nueva = await api.juego.pasar(sala.id);
+      sounds.pasar();
+      setPartida(nueva);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'No puedes pasar');
       setTimeout(() => setError(null), 2500);
@@ -214,6 +300,46 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
   function onDragEnd() {
     setArrastrando(null);
     setSobreZona(null);
+    dragReorderIdx.current = null;
+    setDragOverGap(null);
+  }
+
+  // ── Reordenar mano (arrastrar una ficha sobre otra de la propia mano) ──
+  function onHandDragStart(e: React.DragEvent<HTMLDivElement>, idx: number, pieza: Pieza, canPlay: boolean) {
+    dragReorderIdx.current = idx;
+    if (canPlay) onDragStart(e, pieza);
+    else {
+      e.dataTransfer.setData('pieza', JSON.stringify(pieza));
+      e.dataTransfer.effectAllowed = 'move';
+    }
+  }
+
+  // El "hueco" (0..n) es la posición donde caería la ficha si soltás ahora:
+  // mitad izquierda de la ficha sobre la que pasás el mouse → antes de ella,
+  // mitad derecha → después. Así el punto de inserción sigue al cursor en
+  // vez de siempre insertar "después del objetivo" sin importar dónde soltó.
+  function onHandDragOver(e: React.DragEvent<HTMLDivElement>, idx: number) {
+    if (dragReorderIdx.current === null) return;
+    e.preventDefault();
+    const rect  = e.currentTarget.getBoundingClientRect();
+    const mitad = rect.left + rect.width / 2;
+    const gap   = e.clientX < mitad ? idx : idx + 1;
+    setDragOverGap(prev => (prev === gap ? prev : gap));
+  }
+
+  function onHandDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    const from = dragReorderIdx.current;
+    const gap  = dragOverGap;
+    dragReorderIdx.current = null;
+    setDragOverGap(null);
+    if (from === null || gap === null || gap === from || gap === from + 1) return;
+    setOrdenMano(prev => {
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(gap > from ? gap - 1 : gap, 0, moved);
+      return next;
+    });
   }
 
   // ── Guards de carga ───────────────────────────
@@ -270,6 +396,13 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
   const pieceW = Math.floor(HAND_VW * handScale);
   const pieceH = Math.floor(HAND_VH * handScale);
 
+  // Mano en el orden manual del jugador — fichas que aún no entraron al
+  // orden (recién repartidas, antes de que corra el efecto) van al final.
+  const manoOrdenada = ordenMano
+    .map(s => partida.miMano.find(p => sigPieza(p) === s))
+    .filter((p): p is Pieza => !!p);
+  partida.miMano.forEach(p => { if (!ordenMano.includes(sigPieza(p))) manoOrdenada.push(p); });
+
   const nombreAsiento = (seat: number) => partida.asientos[seat]
     ? `@${partida.asientos[seat].username}` : '—';
 
@@ -313,6 +446,8 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
         <div className="game-event-banner">
           {eventoVisible.tipo === 'tiempo_agotado'
             ? <>⏱ ¡Se acabó el tiempo de {nombreAsiento(eventoVisible.seat)}! Jugamos por {partida.miSeat === eventoVisible.seat ? 'ti' : 'él/ella'}.</>
+            : eventoVisible.noCaben
+            ? <>🔒 ¡{nombreAsiento(eventoVisible.seat)} pasó a todos, pero no caben! No suma, sigue la partida.</>
             : <>⚡ +30 · ¡{nombreAsiento(eventoVisible.seat)} pasó a todos!</>}
         </div>
       )}
@@ -379,24 +514,33 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
       {/* ── Mi mano ──────────────────────────────── */}
       <div className="my-hand-zone">
         <div className="my-hand" ref={handRef}>
-          {partida.miMano.map((p, i) => {
+          {manoOrdenada.map((p, i) => {
             const ops     = ext ? puedeJugar(p, ext) : { izq: true, der: true };
             const jugable = (ops.izq || ops.der) && esForzada(p);
             const isSel   = selectedPiece?.a === p.a && selectedPiece?.b === p.b;
             const canPlay = esMiTurno && jugable && !jugando;
+            const huecoAntes   = dragOverGap === i;
+            const huecoDespues = i === manoOrdenada.length - 1 && dragOverGap === i + 1;
             return (
               <DominoPiece
-                key={i}
+                key={sigPieza(p)}
                 a={p.a} b={p.b}
                 orient="v"
                 selected={isSel}
                 playable={canPlay && !isSel}
                 disabled={!canPlay}
-                draggable={canPlay}
-                onDragStart={canPlay ? e => onDragStart(e, p) : undefined}
+                draggable
+                onDragStart={e => onHandDragStart(e, i, p, canPlay)}
+                onDragOver={e => onHandDragOver(e, i)}
+                onDrop={onHandDrop}
                 onDragEnd={onDragEnd}
                 onClick={canPlay ? () => onTapPieza(p) : undefined}
-                style={{ width: pieceW, height: pieceH }}
+                style={{
+                  width: pieceW, height: pieceH,
+                  marginLeft:  huecoAntes   ? 18 : undefined,
+                  marginRight: huecoDespues ? 18 : undefined,
+                  transition: 'margin .12s ease',
+                }}
               />
             );
           })}
@@ -414,7 +558,7 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
       </div>
 
       {/* ── Fin de mano: resultado + listos ──────── */}
-      {partida.fase === 'entre_manos' && (
+      {partida.fase === 'entre_manos' && mostrarFinMano && (
         <ManoOverlay
           partida={partida}
           nombreAsiento={nombreAsiento}
@@ -519,12 +663,6 @@ function tituloResultado(
 ): { titulo: string; detalle: string } {
   const miEq = partida.miEquipo ?? 0;
   if (r.tipo === 'tranca') {
-    if (r.noCaben) {
-      return {
-        titulo: '🔒 ¡No caben!',
-        detalle: `Esos ${r.puntos} pts se pasarían de ${partida.puntosObjetivo} — no suman. Sigue la partida.`,
-      };
-    }
     return {
       titulo: '🔒 Tranca',
       detalle: r.equipoGanador === null ? 'Empate: nadie suma'
@@ -533,6 +671,12 @@ function tituloResultado(
     };
   }
   const gane = equipoDeSeat(r.ganadorSeat) === miEq;
+  if (r.tipo === 'capicua' && r.noCaben) {
+    return {
+      titulo: '⚡ ¡Capicúa!',
+      detalle: `Los 30 del bono se pasarían de ${partida.puntosObjetivo} — no caben. Solo cuentan los ${r.puntos} pips del rival.`,
+    };
+  }
   return {
     titulo:  r.tipo === 'capicua' ? '⚡ ¡Capicúa!' : gane ? '🏆 Mano ganada' : '😓 Mano perdida',
     detalle: gane ? '¡Bien jugado!' : `Cerró ${nombreAsiento(r.ganadorSeat)}`,
@@ -560,11 +704,7 @@ function ManoOverlay({ partida, nombreAsiento, onListo, confirmando }: {
     <div className="game-result-overlay">
       <div className="game-result-card">
         <h2>{titulo}</h2>
-        {r.tipo === 'tranca' && r.noCaben ? (
-          <p className="result-points result-points-no-caben">+0 pts</p>
-        ) : (
-          <p className="result-points">+{r.puntos} pts</p>
-        )}
+        <p className="result-points">+{r.puntos} pts</p>
         <p className="result-detail">{detalle}</p>
         <MarcadorResumen partida={partida} />
         {partida.manosReveladas && (
