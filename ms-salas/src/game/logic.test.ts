@@ -226,7 +226,7 @@ describe('bonus pasó a todos (+30)', () => {
     });
     const s = ok(aplicarJugada(p, 'u0', pz(3, 4), 'der'));
     expect(s.marcador).toEqual([30, 0]);
-    expect(s.ultimoEvento).toEqual({ tipo: 'paso_a_todos', seat: 0 });
+    expect(s.ultimoEvento).toEqual({ tipo: 'paso_a_todos', seat: 0, noCaben: false });
     expect(s.fase).toBe('jugando'); // la mano sigue
   });
 
@@ -257,7 +257,26 @@ describe('bonus pasó a todos (+30)', () => {
     expect(s.ultimoEvento).toBeNull();
   });
 
-  it('el bonus puede cerrar la partida', () => {
+  it('el bonus cierra la partida si cae EXACTO en el objetivo', () => {
+    const p = partida({
+      marcador: [70, 0],
+      manos: [[pz(3, 4), pz(1, 1)], [pz(6, 6)]],
+      tablero: [abrirTablero(pz(2, 3))],
+      turno: 0,
+      pasadas: 1,
+      ultimoQueJugo: 0,
+    });
+    const s = ok(aplicarJugada(p, 'u0', pz(3, 4), 'der'));
+    expect(s.marcador[0]).toBe(100);
+    expect(s.fase).toBe('fin_partida');
+    expect(s.equipoGanadorPartida).toBe(0);
+    expect(s.ultimoEvento).toEqual({ tipo: 'paso_a_todos', seat: 0, noCaben: false });
+  });
+
+  it('"no caben": el bonus que se pasaría del objetivo NO se aplica y la partida sigue', () => {
+    // Bug real: 80 + 30 = 110, por encima de los 100 del objetivo — no
+    // puede ganarse la partida de pura suerte por el bono, igual que una
+    // tranca cuyos pips se pasarían del objetivo tampoco cierra la partida.
     const p = partida({
       marcador: [80, 0],
       manos: [[pz(3, 4), pz(1, 1)], [pz(6, 6)]],
@@ -267,9 +286,10 @@ describe('bonus pasó a todos (+30)', () => {
       ultimoQueJugo: 0,
     });
     const s = ok(aplicarJugada(p, 'u0', pz(3, 4), 'der'));
-    expect(s.marcador[0]).toBe(110);
-    expect(s.fase).toBe('fin_partida');
-    expect(s.equipoGanadorPartida).toBe(0);
+    expect(s.marcador).toEqual([80, 0]); // sin cambios, el bono no entró
+    expect(s.fase).toBe('jugando');
+    expect(s.equipoGanadorPartida).toBeNull();
+    expect(s.ultimoEvento).toEqual({ tipo: 'paso_a_todos', seat: 0, noCaben: true });
   });
 });
 
