@@ -30,7 +30,14 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
   const [sobreZona,     setSobreZona]     = useState<'izq' | 'der' | null>(null);
   const [nuevaFichaIdx, setNuevaFichaIdx] = useState<number | null>(null);
   const [boardWidth, boardRef] = useMeasuredWidth();
-  const [handWidth,  handRef]  = useMeasuredWidth();
+  const [handWidth,  handMeasureRef] = useMeasuredWidth();
+  // Además del ancho, el reorden necesita el elemento real de la mano
+  // (getBoundingClientRect para mapear clientX → hueco de inserción).
+  const handElRef = useRef<HTMLDivElement | null>(null);
+  const handRef = useCallback((el: HTMLDivElement | null) => {
+    handElRef.current = el;
+    handMeasureRef(el);
+  }, [handMeasureRef]);
 
   // Orden manual de la mano (el jugador puede arrastrar sus fichas para
   // reordenarlas) — vive en el cliente, no en el servidor: se reinicia al
@@ -304,7 +311,7 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
     setDragOverGap(null);
   }
 
-  // ── Reordenar mano (arrastrar una ficha sobre otra de la propia mano) ──
+  // ── Reordenar mano (arrastrar una ficha sobre la propia mano) ──
   function onHandDragStart(e: React.DragEvent<HTMLDivElement>, idx: number, pieza: Pieza, canPlay: boolean) {
     dragReorderIdx.current = idx;
     if (canPlay) onDragStart(e, pieza);
@@ -314,32 +321,82 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
     }
   }
 
-  // El "hueco" (0..n) es la posición donde caería la ficha si soltás ahora:
-  // mitad izquierda de la ficha sobre la que pasás el mouse → antes de ella,
-  // mitad derecha → después. Así el punto de inserción sigue al cursor en
-  // vez de siempre insertar "después del objetivo" sin importar dónde soltó.
-  function onHandDragOver(e: React.DragEvent<HTMLDivElement>, idx: number) {
-    if (dragReorderIdx.current === null) return;
-    e.preventDefault();
-    const rect  = e.currentTarget.getBoundingClientRect();
-    const mitad = rect.left + rect.width / 2;
-    const gap   = e.clientX < mitad ? idx : idx + 1;
-    setDragOverGap(prev => (prev === gap ? prev : gap));
+  // clientX → hueco de inserción (0..n), contra la GEOMETRÍA BASE de la
+  // fila (n fichas de pieceW + separación fija, centradas): no se miden
+  // las fichas ya desplazadas por el hueco abierto — medirlas realimentaba
+  // el cálculo (el hueco movía la ficha bajo el cursor y el hueco saltaba).
+  function gapDesdeX(clientX: number, n: number): number | null {
+    const el = handElRef.current;
+    if (!el || n === 0) return null;
+    const rect  = el.getBoundingClientRect();
+    const slotW = pieceW + HAND_GAP;
+    const baseW = n * pieceW + (n - 1) * HAND_GAP;
+    const startX = rect.left + (rect.width - baseW) / 2;
+    return Math.max(0, Math.min(n, Math.floor((clientX - startX + slotW / 2) / slotW)));
   }
 
-  function onHandDrop(e: React.DragEvent<HTMLDivElement>) {
+  // dragover/drop viven en el CONTENEDOR de la mano, no en cada ficha:
+  // antes, soltar sobre el hueco visual (que no era ficha) no disparaba
+  // ningún onDrop y el reorden prometido nunca ocurría.
+  function onHandZoneDragOver(e: React.DragEvent<HTMLDivElement>, n: number) {
+    if (dragReorderIdx.current === null) return;
     e.preventDefault();
+    const gap = gapDesdeX(e.clientX, n);
+    if (gap !== null) setDragOverGap(prev => (prev === gap ? prev : gap));
+  }
+
+  function onHandZoneDragLeave(e: React.DragEvent<HTMLDivElement>) {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setDragOverGap(null);
+  }
+
+  function commitReorder(manoActual: Pieza[]) {
     const from = dragReorderIdx.current;
     const gap  = dragOverGap;
     dragReorderIdx.current = null;
     setDragOverGap(null);
     if (from === null || gap === null || gap === from || gap === from + 1) return;
-    setOrdenMano(prev => {
-      const next = [...prev];
-      const [moved] = next.splice(from, 1);
-      next.splice(gap > from ? gap - 1 : gap, 0, moved);
-      return next;
-    });
+    // Reconstruir el orden desde la mano visible (no desde ordenMano crudo,
+    // que puede no incluir fichas recién repartidas todavía).
+    const next = manoActual.map(sigPieza);
+    const [moved] = next.splice(from, 1);
+    next.splice(gap > from ? gap - 1 : gap, 0, moved);
+    setOrdenMano(next);
+  }
+
+  // ── Reorden táctil (móvil: HTML5 drag no existe en touch) ──
+  // Umbral horizontal antes de activar: un tap sigue siendo tap (jugar la
+  // ficha), solo el desplazamiento lateral claro entra en modo reorden.
+  const touchDrag = useRef<{ idx: number; x0: number; y0: number; activo: boolean } | null>(null);
+  const [touchLift, setTouchLift] = useState<{ idx: number; dx: number } | null>(null);
+
+  function onPieceTouchStart(e: React.TouchEvent, idx: number) {
+    const t = e.touches[0];
+    touchDrag.current = { idx, x0: t.clientX, y0: t.clientY, activo: false };
+  }
+
+  function onPieceTouchMove(e: React.TouchEvent, n: number) {
+    const td = touchDrag.current;
+    if (!td) return;
+    const t  = e.touches[0];
+    const dx = t.clientX - td.x0;
+    const dy = t.clientY - td.y0;
+    if (!td.activo) {
+      if (Math.abs(dx) < 12 || Math.abs(dx) < Math.abs(dy)) return;
+      td.activo = true;
+      dragReorderIdx.current = td.idx;
+    }
+    setTouchLift({ idx: td.idx, dx });
+    const gap = gapDesdeX(t.clientX, n);
+    if (gap !== null) setDragOverGap(prev => (prev === gap ? prev : gap));
+  }
+
+  function onPieceTouchEnd(manoActual: Pieza[]) {
+    const td = touchDrag.current;
+    touchDrag.current = null;
+    setTouchLift(null);
+    if (td?.activo) commitReorder(manoActual);
+    else { dragReorderIdx.current = null; setDragOverGap(null); }
   }
 
   // ── Guards de carga ───────────────────────────
@@ -387,11 +444,13 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
   const canIzq = showZones && (opsActiva?.izq ?? false);
   const canDer = showZones && (opsActiva?.der ?? false);
 
-  // Escala de piezas en la mano: ajusta para que quepan todas en el ancho disponible
-  const HAND_VW = 54, HAND_VH = 100, HAND_GAP = 6;
+  // Escala de piezas en la mano: ajusta para que quepan todas en el ancho
+  // disponible. Se reserva además el ancho del hueco de reorden (GAP_REORDEN)
+  // para que abrirlo durante un drag no desborde la fila.
+  const HAND_VW = 54, HAND_VH = 100, HAND_GAP = 6, GAP_REORDEN = 18;
   const nPiezas = Math.max(1, partida.miMano.length);
   const handScale = handWidth > 0
-    ? Math.min(1, (handWidth - (nPiezas - 1) * HAND_GAP) / (nPiezas * HAND_VW))
+    ? Math.min(1, (handWidth - (nPiezas - 1) * HAND_GAP - GAP_REORDEN) / (nPiezas * HAND_VW))
     : 1;
   const pieceW = Math.floor(HAND_VW * handScale);
   const pieceH = Math.floor(HAND_VH * handScale);
@@ -503,8 +562,8 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
               sobreDer={sobreZona === 'der'}
               onPlayIzq={handlePlayIzq}
               onPlayDer={handlePlayDer}
-              onDragOverIzq={e => { e.preventDefault(); setSobreZona('izq'); }}
-              onDragOverDer={e => { e.preventDefault(); setSobreZona('der'); }}
+              onDragOverIzq={e => { e.preventDefault(); setSobreZona('izq'); setDragOverGap(null); }}
+              onDragOverDer={e => { e.preventDefault(); setSobreZona('der'); setDragOverGap(null); }}
               onDragLeave={() => setSobreZona(null)}
             />
           ) : null}
@@ -513,7 +572,13 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
 
       {/* ── Mi mano ──────────────────────────────── */}
       <div className="my-hand-zone">
-        <div className="my-hand" ref={handRef}>
+        <div
+          className="my-hand"
+          ref={handRef}
+          onDragOver={e => onHandZoneDragOver(e, manoOrdenada.length)}
+          onDrop={e => { e.preventDefault(); commitReorder(manoOrdenada); }}
+          onDragLeave={onHandZoneDragLeave}
+        >
           {manoOrdenada.map((p, i) => {
             const ops     = ext ? puedeJugar(p, ext) : { izq: true, der: true };
             const jugable = (ops.izq || ops.der) && esForzada(p);
@@ -521,6 +586,7 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
             const canPlay = esMiTurno && jugable && !jugando;
             const huecoAntes   = dragOverGap === i;
             const huecoDespues = i === manoOrdenada.length - 1 && dragOverGap === i + 1;
+            const lifted = touchLift?.idx === i;
             return (
               <DominoPiece
                 key={sigPieza(p)}
@@ -531,15 +597,18 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
                 disabled={!canPlay}
                 draggable
                 onDragStart={e => onHandDragStart(e, i, p, canPlay)}
-                onDragOver={e => onHandDragOver(e, i)}
-                onDrop={onHandDrop}
                 onDragEnd={onDragEnd}
+                onTouchStart={e => onPieceTouchStart(e, i)}
+                onTouchMove={e => onPieceTouchMove(e, manoOrdenada.length)}
+                onTouchEnd={() => onPieceTouchEnd(manoOrdenada)}
                 onClick={canPlay ? () => onTapPieza(p) : undefined}
                 style={{
                   width: pieceW, height: pieceH,
-                  marginLeft:  huecoAntes   ? 18 : undefined,
-                  marginRight: huecoDespues ? 18 : undefined,
-                  transition: 'margin .12s ease',
+                  marginLeft:  huecoAntes   ? GAP_REORDEN : undefined,
+                  marginRight: huecoDespues ? GAP_REORDEN : undefined,
+                  ...(lifted && touchLift
+                    ? { transform: `translate(${touchLift.dx}px, -10px) scale(1.07)`, zIndex: 3, transition: 'none' }
+                    : { transition: 'margin .12s ease' }),
                 }}
               />
             );

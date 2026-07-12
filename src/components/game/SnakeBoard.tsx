@@ -122,11 +122,78 @@ function computeLayout(
     ? Math.max(...pieces.map(p => p.y + p.h)) + 4
     : HH + 4;
 
-  // Posición X del contenido real (para las zonas de drop)
-  const contentMinX = Math.min(...pieces.map(p => p.x));
-  const contentMaxX = Math.max(...pieces.map(p => p.x + p.w));
+  // Estado final del cursor de la serpiente — permite calcular dónde caería
+  // UNA ficha más (el fantasma) sin recomputar un layout hipotético entero.
+  return {
+    pieces, boardW, boardH, VW, VH, HW, HH,
+    LEFT, RIGHT, YPAD, ROW_STEP, needsWrap,
+    endCursor: cursor, endRow: row, cornersLeft, turnX,
+  };
+}
 
-  return { pieces, boardW, boardH, VW, VH, HW, HH, contentMinX, contentMaxX };
+type Layout = ReturnType<typeof computeLayout>;
+type GhostPos = { x: number; y: number; w: number; h: number; orient: 'h' | 'v' };
+
+/** Dónde caería una ficha agregada al FINAL de la serpiente (lado derecho),
+ *  continuando el cursor real — mismas reglas de giro que computeLayout,
+ *  pero sin recalcular un tablero hipotético completo. Así el fantasma
+ *  queda SIEMPRE pegado a la punta visible: nunca mezcla coordenadas de
+ *  dos layouts con wrap/centrado distinto (el bug que lo dejaba fuera de
+ *  sitio cuando la jugada iba a provocar un reacomodo). */
+function ghostDerPos(L: Layout, esDobleG: boolean): GhostPos {
+  const { VW, VH, HW, HH, LEFT, RIGHT, YPAD, ROW_STEP, needsWrap, endCursor, endRow, cornersLeft, turnX, boardW } = L;
+
+  // La última ficha real fue la primera vertical de un giro a medias:
+  // la siguiente es la segunda vertical, justo debajo.
+  if (cornersLeft === 1) {
+    return { x: turnX, y: YPAD + endRow * ROW_STEP + VH, w: VW, h: VH, orient: 'v' };
+  }
+
+  const even   = endRow % 2 === 0;
+  const w      = esDobleG ? VW : HW;
+  const rowTop = YPAD + endRow * ROW_STEP;
+  const maxDer = needsWrap ? RIGHT : boardW;
+  const minIzq = needsWrap ? LEFT : 0;
+  const cabe   = even ? endCursor + w <= maxDer + 0.5 : endCursor - w >= minIzq - 0.5;
+
+  if (cabe) {
+    const x = even ? endCursor : endCursor - w;
+    return esDobleG
+      ? { x, y: rowTop - YPAD, w: VW, h: VH, orient: 'v' }
+      : { x, y: rowTop,        w: HW, h: HH, orient: 'h' };
+  }
+
+  if (!needsWrap) {
+    // Fila única centrada ya sin espacio: al jugar de verdad el tablero
+    // pasa a serpiente y se reacomoda entero — como preview, se pega el
+    // fantasma al borde (puede solaparse un poco: señal de "esto empuja").
+    const x = Math.max(0, Math.min(even ? endCursor : endCursor - w, boardW - w));
+    return esDobleG
+      ? { x, y: rowTop - YPAD, w: VW, h: VH, orient: 'v' }
+      : { x, y: rowTop,        w: HW, h: HH, orient: 'h' };
+  }
+
+  // No cabe en la fila → sería la primera vertical del giro en U
+  const x = even ? endCursor : endCursor - VW;
+  return { x, y: rowTop, w: VW, h: VH, orient: 'v' };
+}
+
+/** Dónde caería una ficha antepuesta a la CABEZA de la serpiente (lado
+ *  izquierdo). La cabeza vive siempre al inicio de la fila 0 (fluye a la
+ *  derecha), así que el fantasma va a su izquierda; si no hay espacio
+ *  horizontal, se muestra vertical en el margen (la jugada real
+ *  reacomodaría todo — el preview se mantiene pegado y visible). */
+function ghostIzqPos(L: Layout, esDobleG: boolean): GhostPos {
+  const { VW, VH, HW, HH, YPAD, pieces } = L;
+  const head = pieces[0];
+  const w = esDobleG ? VW : HW;
+  const xh = head.x - w;
+  if (xh >= -0.5) {
+    return esDobleG
+      ? { x: xh, y: 0,    w: VW, h: VH, orient: 'v' }
+      : { x: xh, y: YPAD, w: HW, h: HH, orient: 'h' };
+  }
+  return { x: Math.max(0, head.x - VW), y: 0, w: VW, h: VH, orient: 'v' };
 }
 
 export type SnakeBoardProps = {
@@ -175,50 +242,53 @@ export default function SnakeBoard({
   const izqVal = tablero[0].izqVal;
   const derVal = tablero[tablero.length - 1].derVal;
 
-  // Tablero hipotético (real + fantasma) por cada lado — el fantasma es
-  // siempre pieces[0] (se antepone) o el último (se agrega al final), y
-  // así hereda el giro/wrap de la serpiente en vez de una posición
-  // calculada aparte.
-  //
-  // OJO: el tablero real y el hipotético NO comparten sistema de
-  // coordenadas cuando la fila entra centrada (needsWrap = false) — el
-  // centrado depende del ancho TOTAL de las fichas de esa llamada
-  // puntual, y el hipotético tiene una ficha más (distinto ancho total,
-  // distinto centrado). Para que el fantasma caiga pegado a la fila real
-  // (sin superponerse), se compara una ficha de referencia presente en
-  // ambos cálculos y se corrige la diferencia horizontal.
-  const layoutIzq = piezaFantasma && canIzq
-    ? computeLayout([fichaFantasma(piezaFantasma, izqVal, 'izq'), ...tablero], containerWidth, null)
-    : null;
-  const layoutDer = piezaFantasma && canDer
-    ? computeLayout([...tablero, fichaFantasma(piezaFantasma, derVal, 'der')], containerWidth, null)
-    : null;
+  // Fantasmas anclados a la geometría REAL: se calculan continuando el
+  // cursor de la serpiente (der) o antecediendo la cabeza (izq) — un solo
+  // sistema de coordenadas, siempre pegados a la punta visible.
+  const fichaIzq = piezaFantasma && canIzq ? fichaFantasma(piezaFantasma, izqVal, 'izq') : null;
+  const fichaDer = piezaFantasma && canDer ? fichaFantasma(piezaFantasma, derVal, 'der') : null;
 
-  // pieces[1] del hipotético-izq es la misma ficha que real.pieces[0]
-  // (la primera real, corrida un lugar por el fantasma antepuesto).
-  const fantasmaIzq = layoutIzq && (() => {
-    const shiftX = real.pieces[0].x - layoutIzq.pieces[1].x;
-    const g = layoutIzq.pieces[0];
-    return { ...g, x: g.x + shiftX };
+  const fantasmaIzq = fichaIzq && (() => {
+    const pos = ghostIzqPos(real, fichaIzq.izqVal === fichaIzq.derVal);
+    // Fila 0 fluye a la derecha: cara "nueva" (izqVal) queda a la izquierda
+    return { ...pos, a: fichaIzq.izqVal, b: fichaIzq.derVal };
   })();
-  // pieces[length-2] del hipotético-der es la última ficha real (el
-  // fantasma quedó agregado después, en pieces[length-1]).
-  const fantasmaDer = layoutDer && (() => {
-    const ultimoReal = real.pieces[real.pieces.length - 1];
-    const equivalente = layoutDer.pieces[layoutDer.pieces.length - 2];
-    const shiftX = ultimoReal.x - equivalente.x;
-    const g = layoutDer.pieces[layoutDer.pieces.length - 1];
-    return { ...g, x: g.x + shiftX };
+
+  const fantasmaDer = fichaDer && (() => {
+    const pos = ghostDerPos(real, fichaDer.izqVal === fichaDer.derVal);
+    // Misma regla de caras que computeLayout: en filas impares (fluyen a
+    // la izquierda) las horizontales se dibujan invertidas; las verticales
+    // (dobles/giros) van siempre izqVal arriba.
+    const evenRow = real.endRow % 2 === 0;
+    const [a, b] = pos.orient === 'h' && !evenRow
+      ? [fichaDer.derVal, fichaDer.izqVal]
+      : [fichaDer.izqVal, fichaDer.derVal];
+    return { ...pos, a, b };
   })();
 
   // Por si el fantasma inicia una fila nueva que el tablero real todavía
   // no tiene: no lo recortamos, agrandamos el contenedor para mostrarlo.
-  const boardH = Math.max(real.boardH, layoutIzq?.boardH ?? 0, layoutDer?.boardH ?? 0);
+  const boardH = Math.max(
+    real.boardH,
+    fantasmaIzq ? fantasmaIzq.y + fantasmaIzq.h + 4 : 0,
+    fantasmaDer ? fantasmaDer.y + fantasmaDer.h + 4 : 0,
+  );
+
+  // El contenedor (.board-center) es un cuadrado de lado containerWidth:
+  // si la serpiente crece más alto que eso, se escala TODO el tablero para
+  // que quepa (mismo criterio que la mano con handScale) en vez de dejar
+  // que overflow:hidden lo recorte.
+  const fitScale = Math.min(1, containerWidth / boardH);
 
   return (
     <div
       className="snake-board-wrap"
-      style={{ width: real.boardW, height: boardH }}
+      style={{
+        width: real.boardW,
+        height: boardH,
+        transform: fitScale < 1 ? `scale(${fitScale})` : undefined,
+        transformOrigin: 'center center',
+      }}
     >
       {real.pieces.map((p, i) => (
         <DominoPiece

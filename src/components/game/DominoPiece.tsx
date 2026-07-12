@@ -63,6 +63,10 @@ export type DominoPieceProps = {
   /** Reordenar la mano: la propia ficha es también zona de drop de otra ficha arrastrada. */
   onDragOver?: (e: React.DragEvent<HTMLDivElement>) => void;
   onDrop?:     (e: React.DragEvent<HTMLDivElement>) => void;
+  /** Reorden táctil (móvil, donde el drag de HTML5 no existe). */
+  onTouchStart?: (e: React.TouchEvent<HTMLDivElement>) => void;
+  onTouchMove?:  (e: React.TouchEvent<HTMLDivElement>) => void;
+  onTouchEnd?:   (e: React.TouchEvent<HTMLDivElement>) => void;
   onClick?:    () => void;
   className?:  string;
   style?:      CSSProperties;
@@ -82,6 +86,9 @@ export default function DominoPiece({
   onDragEnd,
   onDragOver,
   onDrop,
+  onTouchStart,
+  onTouchMove,
+  onTouchEnd,
   onClick,
   className = '',
   style,
@@ -198,6 +205,9 @@ export default function DominoPiece({
         onDragEnd={onDragEnd}
         onDragOver={onDragOver}
         onDrop={onDrop}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
       >
         {svgNode}
       </div>

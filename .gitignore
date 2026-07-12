@@ -39,3 +39,8 @@ docker-compose.override.yml
 
 # SonarQube scanner cache local
 .scannerwork/
+
+# artefactos sueltos de compilar vite.config.ts con tsc directo
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
