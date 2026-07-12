@@ -1604,6 +1604,12 @@ button:active { transform: scale(0.97); }
   align-items: flex-end;
   width: 100%;
 }
+/* Reorden táctil: sin esto el navegador interpreta el arrastre horizontal
+   sobre una ficha como scroll y nunca llegan los touchmove. La pantalla
+   de partida no scrollea, no se pierde nada. */
+.my-hand .dp-draggable {
+  touch-action: none;
+}
 
 .btn-pasar {
   padding: 9px 22px;
@@ -1830,6 +1836,12 @@ button:active { transform: scale(0.97); }
 .snake-board-wrap {
   position: relative;
   flex-shrink: 0;
+  /* El tablero entero se escala (transform) cuando la serpiente crece más
+     alto que el cuadrado del contenedor — suavizar el salto de escala. */
+  transition: transform .18s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .snake-board-wrap { transition: none; }
 }
 
 /* Fichas en el tablero con posicionamiento absoluto (layout serpiente) */
