@@ -61,6 +61,10 @@ export default function App() {
   const [gameOrigin, setGameOrigin] = useState<'salas' | 'dashboard'>('salas');
   // Sala seleccionada para ver su repetición (MatchHistoryView → ReplayViewer).
   const [replaySalaId, setReplaySalaId] = useState<string | null>(null);
+  // Partida en_juego que el usuario ya tenía abierta al iniciar sesión —
+  // se ofrece reintegrarse desde un banner en el dashboard, en vez de
+  // forzar la navegación (por eso vive aparte de `gameSala`).
+  const [salaParaReintegrar, setSalaParaReintegrar] = useState<Sala | null>(null);
   // Invitación a party vía link (/party/ABCD). El inicializador de useState
   // corre síncrono en el primer render, ANTES que cualquier efecto —
   // evita que el .then() del restore de sesión capture un valor null por
@@ -109,6 +113,25 @@ export default function App() {
       .finally(() => setBooting(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Al iniciar sesión (login fresco o sesión restaurada), avisar si ya
+  // había una partida en curso — para que se pueda reintegrar en vez de
+  // quedar "perdida" (desconexión, cierre de pestaña, etc.). Keyed a
+  // user.id, no a `session` entero: no debe repetirse cada vez que algo
+  // más (ej. cambiar de avatar) actualiza el objeto de sesión.
+  useEffect(() => {
+    if (!session) return;
+    api.salas.activa().then(r => setSalaParaReintegrar(r.sala)).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user.id]);
+
+  function handleReintegrarSala() {
+    if (!salaParaReintegrar) return;
+    setGameSala(salaParaReintegrar);
+    setGameOrigin('dashboard');
+    setView('game');
+    setSalaParaReintegrar(null);
+  }
 
   function handleSuccess(user: AuthUser, config: UserConfig) {
     if (config.tema) setDark(config.tema === 'dark');
@@ -321,6 +344,9 @@ export default function App() {
         onGoToHistorial={() => setView('historial')}
         onUnirseSala={handleUnirseSala}
         notifVersion={notifVersion}
+        salaParaReintegrar={salaParaReintegrar}
+        onReintegrarSala={handleReintegrarSala}
+        onDescartarReintegro={() => setSalaParaReintegrar(null)}
       />
     );
   }

@@ -201,6 +201,37 @@ export async function salasRoutes(app: FastifyInstance) {
     return reply.send({ total: countRes.rows[0].total, salas: listRes.rows });
   });
 
+  // ── GET /salas/activa ─────────────────────────────
+  // Partida en curso del usuario, si tiene una — para ofrecerle
+  // reintegrarse al iniciar sesión (docs/ESCALABILIDAD.md no; esto es
+  // continuidad de sesión, no escalabilidad). 200 siempre, `sala: null`
+  // si no hay ninguna — no es un error, es una respuesta normal.
+  app.get<{ Querystring: { usuario_id: string } }>('/salas/activa', {
+    schema: {
+      tags: ['salas'], summary: 'Partida en_juego del usuario, si tiene una',
+      querystring: {
+        type: 'object', required: ['usuario_id'],
+        properties: { usuario_id: { type: 'string', format: 'uuid' } },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: { sala: { anyOf: [{ ...SalaSchema }, { type: 'null' }] } },
+        },
+      },
+    },
+  }, async (req, reply) => {
+    const { rows } = await pool.query(
+      `SELECT s.id FROM salas s
+       JOIN sala_jugadores sj ON sj.sala_id = s.id
+       WHERE sj.usuario_id = $1 AND s.estado = 'en_juego'
+       ORDER BY s.started_at DESC LIMIT 1`,
+      [req.query.usuario_id],
+    );
+    if (!rows.length) return reply.send({ sala: null });
+    return reply.send({ sala: await getSalaConJugadores(rows[0].id) });
+  });
+
   // ── POST /salas ──────────────────────────────────
   // Crear una sala nueva
   app.post<{

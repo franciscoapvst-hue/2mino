@@ -119,6 +119,28 @@ export async function salasGatewayRoutes(app: FastifyInstance) {
     return reply.code(status).send(data);
   });
 
+  // ── GET /salas/activa ─────────────────────────────
+  app.get('/salas/activa', {
+    schema: {
+      tags:     ['salas'],
+      summary:  'Partida en curso del usuario, si tiene una (para reintegrarse)',
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: {
+          type: 'object',
+          properties: { sala: { anyOf: [{ ...SalaResumenSchema }, { type: 'null' }] } },
+        },
+        401: { ...ErrorSchema },
+      },
+    },
+  }, async (req, reply) => {
+    const payload = verifyToken(req.headers.authorization);
+    if (!payload) return reply.code(401).send({ error: 'Token requerido' });
+
+    const { status, data } = await callSalas(`/salas/activa?usuario_id=${payload.sub}`, 'GET');
+    return reply.code(status).send(data);
+  });
+
   // ── GET /salas/mis-partidas ───────────────────────
   app.get<{ Querystring: { cursor?: string; limit?: number } }>('/salas/mis-partidas', {
     schema: {
