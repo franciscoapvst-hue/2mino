@@ -18,6 +18,11 @@ SPA en React + TypeScript servida por Vite. No usa React Router: la navegación 
 2. Si existe, llama a `api.me()` y `api.getPreferencias()`.
 3. Restaura tema (`dark` / `light`) desde preferencias o `localStorage` (`2mino-theme`).
 4. Logout limpia token y vuelve a login.
+5. Con la sesión ya seteada (login fresco o restaurada), si el feature
+   flag `reintegro_partida_activa_habilitado` está activo (`api.featureFlags()`),
+   consulta `api.salas.activa()` una sola vez — si hay una partida
+   `en_juego`, `Dashboard` muestra un banner para reintegrarse (ver
+   `docs/CASOS_DE_USO_SOCIAL.md` §11).
 
 ## Cliente API (`src/api.ts`)
 
@@ -45,10 +50,18 @@ Componentes principales en `src/components/game/`:
 ### GameBoard — comportamiento
 
 - Carga estado con `api.juego.estado(salaId)`.
-- **Polling** periódico para sincronizar con otros jugadores.
+- **Polling** periódico (2s) para sincronizar con otros jugadores, vía
+  `src/hooks/usePoll.ts` — con back-pressure: programa la siguiente
+  consulta recién cuando la anterior resolvió o falló, nunca en
+  paralelo. El mismo hook lo usan `MatchmakingView`, `SalasView` y
+  `Dashboard` para sus propios polls (cola/party, sala de espera,
+  notificaciones).
 - Validación local con `puedeJugar` / `getExtremos` de `src/game/types.ts`.
 - Acciones: jugar ficha (`api.juego.jugar`), pasar (`api.juego.pasar`).
 - `ResizeObserver` para adaptar el tablero al ancho del contenedor.
+- Reordenar la mano: arrastrar una ficha sobre otra la reordena (drag
+  HTML5 en desktop, gesto táctil con umbral en móvil) — orden puramente
+  del cliente, se reinicia al repartir una mano nueva.
 
 ### SnakeBoard
 
