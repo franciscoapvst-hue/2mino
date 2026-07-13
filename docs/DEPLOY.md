@@ -79,14 +79,14 @@ DOMAIN=2mino.online
 CORS_ORIGIN=https://2mino.online
 
 # Email de confirmación de cuenta — ya integrado (SMTP de IONOS), ver
-# docs/ARQUITECTURA.md. Poner en true + completar SMTP_USER/SMTP_PASS
-# cuando la casilla no-reply@2mino.online esté creada en el panel de IONOS.
+# docs/ARQUITECTURA.md. Poner en true + completar SMTP_PASS con la
+# contraseña de administration@2mino.online (casilla ya existente en IONOS).
 ENABLE_EMAIL=false
 SMTP_HOST=smtp.ionos.com
 SMTP_PORT=465
-SMTP_USER=no-reply@2mino.online
+SMTP_USER=administration@2mino.online
 SMTP_PASS=
-SMTP_FROM=2mino <no-reply@2mino.online>
+SMTP_FROM=2mino <administration@2mino.online>
 APP_URL=https://2mino.online
 ```
 

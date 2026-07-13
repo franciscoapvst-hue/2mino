@@ -35,7 +35,7 @@ services:
       SMTP_PORT:    ${SMTP_PORT:-465}
       SMTP_USER:    ${SMTP_USER:-}
       SMTP_PASS:    ${SMTP_PASS:-}
-      SMTP_FROM:    ${SMTP_FROM:-2mino <no-reply@2mino.online>}
+      SMTP_FROM:    ${SMTP_FROM:-2mino <administration@2mino.online>}
       APP_URL:      ${APP_URL:-https://2mino.online}
     depends_on:
       postgres:

@@ -23,7 +23,7 @@ function getTransporter(): nodemailer.Transporter {
   return transporter;
 }
 
-const FROM = () => process.env.SMTP_FROM ?? '2mino <no-reply@2mino.online>';
+const FROM = () => process.env.SMTP_FROM ?? '2mino <administration@2mino.online>';
 const APP_URL = () => (process.env.APP_URL ?? 'https://2mino.online').replace(/\/$/, '');
 
 async function enviar(to: string, subject: string, html: string, logCtx: Record<string, unknown>) {
