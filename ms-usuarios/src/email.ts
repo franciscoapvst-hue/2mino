@@ -1,29 +1,24 @@
-// ── Envío de emails transaccionales (SMTP de IONOS) ──────────────────
+// ── Envío de emails transaccionales (Resend) ──────────────────────────
 // Mismo criterio que ya usaba el flujo de reset-password: si ENABLE_EMAIL
 // no está en 'true', no se manda nada de verdad — solo se loguea. Así el
-// dev local sigue andando sin credenciales SMTP reales.
-import nodemailer from 'nodemailer';
+// dev local sigue andando sin API key real.
+//
+// Se eligió la API HTTP de Resend en vez de SMTP (lo que se probó primero,
+// contra IONOS) porque evita toda la categoría de problemas de puerto/
+// TLS/STARTTLS/auth que da SMTP — es un POST con la API key en el header,
+// sin handshake de protocolo de por medio.
+import { Resend } from 'resend';
 
 const habilitado = () => process.env.ENABLE_EMAIL === 'true';
 
-let transporter: nodemailer.Transporter | null = null;
+let resend: Resend | null = null;
 
-function getTransporter(): nodemailer.Transporter {
-  if (!transporter) {
-    transporter = nodemailer.createTransport({
-      host:   process.env.SMTP_HOST ?? 'smtp.ionos.com',
-      port:   Number(process.env.SMTP_PORT ?? 465),
-      secure: true, // puerto 465 = SSL/TLS directo
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
-  }
-  return transporter;
+function getClient(): Resend {
+  if (!resend) resend = new Resend(process.env.RESEND_API_KEY);
+  return resend;
 }
 
-const FROM = () => process.env.SMTP_FROM ?? '2mino <administration@2mino.online>';
+const FROM = () => process.env.EMAIL_FROM ?? '2mino <onboarding@resend.dev>';
 const APP_URL = () => (process.env.APP_URL ?? 'https://2mino.online').replace(/\/$/, '');
 
 async function enviar(to: string, subject: string, html: string, logCtx: Record<string, unknown>) {
@@ -32,10 +27,11 @@ async function enviar(to: string, subject: string, html: string, logCtx: Record<
     return;
   }
   try {
-    await getTransporter().sendMail({ from: FROM(), to, subject, html });
+    const { error } = await getClient().emails.send({ from: FROM(), to, subject, html });
+    if (error) console.error('[email] Resend devolvió un error:', error);
   } catch (err) {
-    // No tumbar el registro/login por un problema de SMTP — el usuario
-    // puede pedir que se lo reenvíen. Se loguea para poder diagnosticarlo.
+    // No tumbar el registro/login por un problema del proveedor — el
+    // usuario puede pedir que se lo reenvíen. Se loguea para diagnosticar.
     console.error('[email] Error enviando:', err);
   }
 }

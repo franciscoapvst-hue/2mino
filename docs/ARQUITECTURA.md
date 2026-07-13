@@ -50,8 +50,8 @@ Las migraciones se ejecutan al arrancar el servicio (`runMigrations()`).
 **Confirmación de cuenta por email** (2026-07): el registro
 (`POST /usuarios`) ya no loguea directo — crea la cuenta con
 `email_verificado=false`, genera un token y manda un email con
-`enviarEmailVerificacion()` (`ms-usuarios/src/email.ts`, nodemailer sobre
-SMTP de IONOS). `POST /usuarios/verificar` (login) rechaza con `403` y
+`enviarEmailVerificacion()` (`ms-usuarios/src/email.ts`, API HTTP de
+Resend). `POST /usuarios/verificar` (login) rechaza con `403` y
 `code: 'EMAIL_NO_VERIFICADO'` si la cuenta no está confirmada. El link del
 email (`/verificar-email/:token` en el frontend) llama a
 `POST /auth/verificar-email` en el gateway, que firma sesión directo si el
@@ -60,9 +60,16 @@ nuevo. Cuentas que ya existían antes de este cambio quedaron
 `email_verificado=true` por default (nunca recibieron el mail, exigírselas
 las hubiera dejado afuera).
 
-Variables de entorno nuevas (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`,
-`SMTP_PASS`, `SMTP_FROM`, `APP_URL`) — con `ENABLE_EMAIL=false` (default)
-no se manda nada real, solo se loguea (dev local sin credenciales SMTP).
+Se probó primero con SMTP directo contra IONOS (nodemailer) y se
+descartó: más superficie de fallo (puerto/TLS/STARTTLS/auth) para
+depurar sin visibilidad real de qué pasa del otro lado. Resend es un
+POST HTTP con la API key en el header, sin protocolo de por medio.
+
+Variables de entorno nuevas (`RESEND_API_KEY`, `EMAIL_FROM`, `APP_URL`)
+— con `ENABLE_EMAIL=false` (default) no se manda nada real, solo se
+loguea (dev local sin API key real). `EMAIL_FROM` con un dominio propio
+(en vez de `onboarding@resend.dev`) requiere verificar ese dominio en
+Resend (Domains → agregar registros DNS).
 
 ### ms-frontend-landing (puerto 5000, interno)
 

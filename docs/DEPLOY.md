@@ -78,15 +78,12 @@ DOMAIN=2mino.online
 # CORS — con dominio propio, poner el origen exacto (con https)
 CORS_ORIGIN=https://2mino.online
 
-# Email de confirmación de cuenta — ya integrado (SMTP de IONOS), ver
-# docs/ARQUITECTURA.md. Poner en true + completar SMTP_PASS con la
-# contraseña de administration@2mino.online (casilla ya existente en IONOS).
+# Email de confirmación de cuenta — ya integrado (Resend), ver
+# docs/ARQUITECTURA.md. Poner en true + completar RESEND_API_KEY cuando
+# el dominio 2mino.online esté verificado en Resend.
 ENABLE_EMAIL=false
-SMTP_HOST=smtp.ionos.com
-SMTP_PORT=465
-SMTP_USER=administration@2mino.online
-SMTP_PASS=
-SMTP_FROM=2mino <administration@2mino.online>
+RESEND_API_KEY=
+EMAIL_FROM=2mino <onboarding@resend.dev>
 APP_URL=https://2mino.online
 ```
 
