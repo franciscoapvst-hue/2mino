@@ -582,3 +582,57 @@ de lógica pura + verificación e2e manual antes de mergear):
 6. **Historial + replay viewer** (sección 5.5/5.6).
 7. **Chat de partida** (sección 8) al final: es el más aislado (su propio WS,
    su propia tabla), no bloquea ni es bloqueado por nada de lo anterior.
+
+---
+
+## 11. Reintegrarse a una partida activa al iniciar sesión
+
+Implementado 2026-07 (PR #48, fix de feature flag en #50). Problema real:
+cerrar la pestaña, perder conexión o que el navegador se cierre solo en
+medio de una partida no dejaba forma de saber que quedó una en curso —
+había que adivinar el código de sala o se perdía.
+
+### 11.1 Endpoint nuevo (`ms-salas`, vía gateway)
+
+| Ruta | Método | Descripción |
+|---|---|---|
+| `/salas/activa` | GET | Devuelve la sala `en_juego` del usuario autenticado (`usuario_id` sale del JWT en el gateway), o `{ sala: null }` si no tiene ninguna. 200 siempre — no tener una partida activa no es un error. |
+
+Query en `ms-salas` (`routes/salas.ts`):
+
+```sql
+SELECT s.id FROM salas s
+JOIN sala_jugadores sj ON sj.sala_id = s.id
+WHERE sj.usuario_id = $1 AND s.estado = 'en_juego'
+ORDER BY s.started_at DESC LIMIT 1
+```
+
+### 11.2 Cuándo se consulta
+
+Una sola vez por sesión, en `App.tsx`, con un `useEffect` keyed a
+`session?.user.id` (no a `session` entero — no debe repetirse cada vez
+que otra cosa, como cambiar de avatar, actualiza el objeto de sesión).
+Cubre tanto el login fresco como la sesión restaurada por token guardado
+al recargar la página.
+
+### 11.3 Feature flag
+
+Detrás de `reintegro_partida_activa_habilitado` en `landing_config` (BO
+→ Feature flags, genérico — no hizo falta código nuevo en el panel, la
+vista ya lista/togglea cualquier fila de esa tabla). Apagado desde el
+BO, ni siquiera se llega a pedir `/salas/activa` — pensado para poder
+cortar la feature sin redeploy si diera problemas.
+
+### 11.4 Frontend
+
+- `src/api.ts`: `api.salas.activa()` y `api.featureFlags()` (lee
+  `/frontend/config`, público).
+- `App.tsx`: estado `salaParaReintegrar`, pasado como prop a
+  `Dashboard.tsx` junto con `onReintegrarSala`/`onDescartarReintegro`.
+- `Dashboard.tsx` + `dashboard.css` (`.rejoin-banner`): banner ámbar bajo
+  el nav con el código de sala y un botón "Reintegrarme" — no fuerza la
+  navegación, es un aviso descartable. Reintegrarse simplemente hace
+  `setGameSala(sala); setView('game')`, reusando el mismo mecanismo que
+  ya usan `SalasView`/`MatchmakingView` al arrancar una partida — el
+  estado del tablero vive en el servidor, no hace falta nada especial
+  para "retomar" donde quedó.
