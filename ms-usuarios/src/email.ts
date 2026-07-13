@@ -23,34 +23,67 @@ const APP_URL = () => (process.env.APP_URL ?? 'https://2mino.online').replace(/\
 
 // ── Plantilla visual ──────────────────────────────────────────────────
 // Misma identidad que la pantalla de login/registro (src/login.css):
-// mesa de fieltro oscuro + acento ámbar. Todo con estilos inline y sin
-// gradientes — los clientes de correo (sobre todo Outlook) no los
-// soportan de forma confiable; una tabla con colores sólidos es lo único
-// que se ve igual en todos lados. El logo SÍ va como SVG inline (no
-// imagen externa: nada que bloquear/no cargar) — mismo dibujo que
-// <Bone a={6} b={6}/> en src/components/DominoStage.tsx.
+// mesa de fieltro oscuro verde + acento ámbar + toque teal. Todo con
+// estilos y colores sólidos inline — los clientes de correo (sobre todo
+// Outlook) no soportan gradientes de forma confiable, y GMAIL ELIMINA los
+// <svg> inline: por eso la ficha (el motivo de marca, "la ficha es el
+// héroe") se construye con TABLAS + celdas de color, no SVG — así se ve
+// igual en Gmail, Outlook y Apple Mail, sin depender de imágenes externas
+// que el cliente pueda bloquear.
 const COLOR = {
-  bg:      '#050d0a', // fondo exterior — mismo tono base que .lg-scene
-  panel:   '#0f1a15', // tarjeta
-  border:  'rgba(242, 237, 227, 0.12)',
-  ink:     '#f2ede3', // texto principal (--pl-ink)
-  muted:   '#b6beb4', // texto secundario (--pl-muted)
-  amber:   '#ef9f2e', // acento de marca (--amber)
-  amberInk:'#201400', // texto sobre botón ámbar (--amber-ink)
+  bg:        '#050d0a', // fondo exterior — tono base de .lg-scene
+  felt:      '#0f221c', // verde fieltro cálido — centro de .lg-scene (cabecera)
+  panel:     '#101a15', // tarjeta del cuerpo
+  panelSoft: '#0b1511', // bloque interior (meta de expiración)
+  border:    'rgba(242, 237, 227, 0.12)',
+  hair:      'rgba(242, 237, 227, 0.08)',
+  ink:       '#f2ede3', // texto principal (--pl-ink)
+  muted:     '#b6beb4', // texto secundario (--pl-muted)
+  amber:     '#ef9f2e', // acento de marca (--amber)
+  amberInk:  '#201400', // texto sobre botón ámbar (--amber-ink)
+  teal:      '#34d3b4', // acento frío (--pl-link)
+  bone:      '#f1e8d6', // hueso de la ficha
+  pip:       '#20180f', // pintas
 };
 
-// Ficha 6-6 — misma geometría que el componente Bone/Half (viewBox 100×200,
-// grilla de pips en [22,50,78]). Se hardcodea acá en vez de importar React:
-// este archivo corre en ms-usuarios (backend), no tiene acceso a src/.
-const LOGO_SVG = `
-  <svg width="26" height="52" viewBox="0 0 100 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Ficha de dominó 6-6">
-    <rect x="3" y="3" width="94" height="194" rx="14" fill="#f1e8d6" stroke="rgba(0,0,0,0.10)" stroke-width="1.5" />
-    <line x1="14" y1="100" x2="86" y2="100" stroke="rgba(30,22,12,0.22)" stroke-width="3" stroke-linecap="round" />
-    ${[22, 78].flatMap(cx => [22, 50, 78].map(cy => `<circle cx="${cx}" cy="${cy}" r="8.5" fill="#20180f" />`)).join('')}
-    ${[22, 78].flatMap(cx => [122, 150, 178].map(cy => `<circle cx="${cx}" cy="${cy}" r="8.5" fill="#20180f" />`)).join('')}
-  </svg>`;
+// ── La ficha 6-6, en tablas (bulletproof, visible en Gmail) ────────────
+// Una pinta: círculo oscuro. Outlook ignora border-radius → cuadradito,
+// pero a ese tamaño sigue leyéndose como pinta. font-size/line-height 0
+// evitan que el &nbsp; agregue alto fantasma.
+function pip(size: number): string {
+  return `<div style="width:${size}px; height:${size}px; background:${COLOR.pip}; border-radius:50%; font-size:0; line-height:0; margin:0 auto;">&nbsp;</div>`;
+}
+// Cara de un 6: dos columnas × tres filas de pintas.
+function cara6(pipSize: number, padY: number): string {
+  const celda = `<td align="center" width="50%" style="padding:${padY}px 0;">${pip(pipSize)}</td>`;
+  const fila  = `<tr>${celda}${celda}</tr>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${fila}${fila}${fila}</table>`;
+}
+// Ficha vertical 6-6 completa (hueso + divisor + dos caras).
+function ficha66(tileW: number): string {
+  const padX    = Math.round(tileW * 0.16);
+  const pipSize = Math.round(tileW * 0.15);
+  const padY    = Math.round(tileW * 0.055);
+  const radio   = Math.round(tileW * 0.17);
+  return `
+  <table role="presentation" cellpadding="0" cellspacing="0" style="width:${tileW}px; background:${COLOR.bone}; border-radius:${radio}px; box-shadow:0 8px 22px rgba(0,0,0,0.4);">
+    <tr><td style="padding:${padY + 5}px ${padX}px ${padY}px;">${cara6(pipSize, padY)}</td></tr>
+    <tr><td style="padding:0 ${padX}px;"><div style="height:2px; background:rgba(30,22,12,0.22); font-size:0; line-height:0;">&nbsp;</div></td></tr>
+    <tr><td style="padding:${padY}px ${padX}px ${padY + 5}px;">${cara6(pipSize, padY)}</td></tr>
+  </table>`;
+}
 
-function emailLayout(tituloInterno: string, bodyHtml: string): string {
+// Separador con motivo de ficha: tres pintas ámbar centradas — usa el
+// material de marca como divisor, en vez de una línea genérica.
+function separadorPintas(): string {
+  const dot = `<td style="padding:0 5px;"><div style="width:5px; height:5px; border-radius:50%; background:${COLOR.amber}; opacity:0.85; font-size:0; line-height:0;">&nbsp;</div></td>`;
+  return `
+  <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+    <tr>${dot}${dot}${dot}</tr>
+  </table>`;
+}
+
+function emailLayout(tituloInterno: string, preheader: string, bodyHtml: string): string {
   return `
 <!doctype html>
 <html lang="es">
@@ -62,36 +95,42 @@ function emailLayout(tituloInterno: string, bodyHtml: string): string {
     <title>${tituloInterno}</title>
   </head>
   <body style="margin:0; padding:0; background:${COLOR.bg}; font-family:'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+    <!-- Preheader: texto de vista previa en la bandeja, oculto en el cuerpo -->
+    <div style="display:none; max-height:0; overflow:hidden; opacity:0; color:${COLOR.bg}; font-size:1px; line-height:1px;">${preheader}</div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${COLOR.bg};">
       <tr>
         <td align="center" style="padding:40px 16px;">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:460px;">
-            <!-- Marca -->
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:472px; border-radius:20px; overflow:hidden; border:1px solid ${COLOR.border};">
+            <!-- Cabecera: mesa de fieltro con la ficha como héroe -->
             <tr>
-              <td align="center" style="padding-bottom:24px;">
-                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
-                  <tr>
-                    <td style="padding-right:10px; vertical-align:middle;">${LOGO_SVG}</td>
-                    <td style="vertical-align:middle;">
-                      <span style="font-size:22px; font-weight:800; letter-spacing:-0.02em; color:${COLOR.ink};">
-                        <span style="color:${COLOR.amber};">2</span>mino
-                      </span>
-                    </td>
-                  </tr>
-                </table>
+              <td align="center" bgcolor="${COLOR.felt}" style="background:${COLOR.felt}; padding:40px 32px 32px;">
+                ${ficha66(72)}
+                <div style="height:18px; line-height:18px; font-size:0;">&nbsp;</div>
+                <div style="font-size:26px; font-weight:800; letter-spacing:-0.02em; color:${COLOR.ink};">
+                  <span style="color:${COLOR.amber};">2</span>mino
+                </div>
+                <div style="height:8px; line-height:8px; font-size:0;">&nbsp;</div>
+                <div style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:${COLOR.teal};">
+                  Juega · Compite · Domina
+                </div>
               </td>
             </tr>
-            <!-- Tarjeta -->
+            <!-- Borde de la mesa: hairline ámbar -->
+            <tr><td style="height:3px; background:${COLOR.amber}; font-size:0; line-height:0;">&nbsp;</td></tr>
+            <!-- Cuerpo -->
             <tr>
-              <td style="background:${COLOR.panel}; border:1px solid ${COLOR.border}; border-radius:16px; padding:36px 32px;">
+              <td bgcolor="${COLOR.panel}" style="background:${COLOR.panel}; padding:36px 32px 32px;">
                 ${bodyHtml}
               </td>
             </tr>
-            <!-- Pie -->
+          </table>
+          <!-- Pie -->
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:472px;">
             <tr>
-              <td align="center" style="padding-top:24px;">
-                <span style="font-size:12px; color:${COLOR.muted};">
-                  2mino · Juega. Compite. Domina.
+              <td align="center" style="padding:22px 16px 0;">
+                <span style="font-size:12px; line-height:1.6; color:${COLOR.muted};">
+                  Recibiste este correo porque alguien usó tu dirección para registrarse en 2mino.<br />
+                  Si no fuiste tú, podés ignorarlo sin problema.
                 </span>
               </td>
             </tr>
@@ -118,45 +157,63 @@ async function enviar(to: string, subject: string, html: string, logCtx: Record<
   }
 }
 
-export async function enviarEmailVerificacion(email: string, username: string, token: string) {
-  const link = `${APP_URL()}/verificar-email/${token}`;
+// Builder puro (sin envío) — exportado para poder previsualizar/testear el
+// HTML sin credenciales ni proveedor.
+export function construirEmailVerificacion(username: string, link: string): { asunto: string; html: string } {
   const asunto = 'Confirma tu cuenta de 2mino';
   const html = emailLayout(
     asunto,
+    `Estás a un clic de sentarte a la mesa, ${username}. Confirma tu cuenta para empezar a jugar.`,
     `
-      <h1 style="margin:0 0 12px; font-size:20px; font-weight:700; color:${COLOR.ink};">
-        ¡Hola, ${username}!
+      <h1 style="margin:0 0 14px; font-size:22px; font-weight:800; letter-spacing:-0.01em; line-height:1.25; color:${COLOR.ink};">
+        ¡Bienvenido a la mesa, ${username}!
       </h1>
-      <p style="margin:0 0 24px; font-size:15px; line-height:1.6; color:${COLOR.muted};">
-        Gracias por sumarte a 2mino. Confirma tu cuenta para poder sentarte
-        a la mesa:
+      <p style="margin:0 0 28px; font-size:15px; line-height:1.65; color:${COLOR.muted};">
+        Ya casi estás dentro. Confirma tu cuenta con el botón de abajo y
+        empezá a competir: matchmaking por ELO, partidas en pareja y tu
+        rango subiendo del bronce al diamante.
       </p>
-      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+
+      <!-- CTA -->
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 26px;">
         <tr>
-          <td style="border-radius:10px; background:${COLOR.amber};">
+          <td align="center" bgcolor="${COLOR.amber}" style="border-radius:12px; background:${COLOR.amber};">
             <a href="${link}"
-               style="display:inline-block; padding:13px 28px; font-size:15px; font-weight:700;
-                      color:${COLOR.amberInk}; text-decoration:none; border-radius:10px;">
-              Confirmar mi cuenta
+               style="display:inline-block; padding:15px 34px; font-size:15px; font-weight:800;
+                      letter-spacing:0.01em; color:${COLOR.amberInk}; text-decoration:none; border-radius:12px;">
+              Confirmar mi cuenta &rarr;
             </a>
           </td>
         </tr>
       </table>
-      <p style="margin:0 0 8px; font-size:13px; line-height:1.5; color:${COLOR.muted};">
-        Si el botón no funciona, copia este link y pégalo en el navegador:
-      </p>
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+
+      <!-- Separador con motivo de ficha -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 22px;">
         <tr>
-          <td style="background:${COLOR.bg}; border:1px solid ${COLOR.border}; border-radius:8px; padding:12px 14px;">
-            <code style="font-family:'Courier New', monospace; font-size:13px; word-break:break-all; color:${COLOR.amber};">${link}</code>
+          <td style="border-top:1px solid ${COLOR.hair};"></td>
+          <td width="1" style="padding:0 14px;">${separadorPintas()}</td>
+          <td style="border-top:1px solid ${COLOR.hair};"></td>
+        </tr>
+      </table>
+
+      <!-- Meta: expiración -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td bgcolor="${COLOR.panelSoft}" style="background:${COLOR.panelSoft}; border-radius:10px; padding:14px 16px;">
+            <span style="font-size:13px; line-height:1.55; color:${COLOR.muted};">
+              El enlace vence en <strong style="color:${COLOR.ink};">24&nbsp;horas</strong>.
+              Si expira, pedí uno nuevo desde la pantalla de inicio de sesión.
+            </span>
           </td>
         </tr>
       </table>
-      <p style="margin:0; font-size:13px; line-height:1.5; color:${COLOR.muted};">
-        El link vence en 24 horas. Si no creaste esta cuenta, puedes ignorar
-        este correo sin problema.
-      </p>
     `,
   );
+  return { asunto, html };
+}
+
+export async function enviarEmailVerificacion(email: string, username: string, token: string) {
+  const link = `${APP_URL()}/verificar-email/${token}`;
+  const { asunto, html } = construirEmailVerificacion(username, link);
   await enviar(email, asunto, html, { email, username });
 }
