@@ -1,3 +1,8 @@
 {$DOMAIN}, www.{$DOMAIN} {
+	# Comprime todo lo que pasa por acá (el bundle JS/CSS del frontend y
+	# las respuestas JSON del gateway vía /api/) — hoy no había compresión
+	# en ningún punto de la cadena. zstd primero (mejor ratio si el
+	# cliente lo soporta), gzip como fallback universal.
+	encode zstd gzip
 	reverse_proxy frontend:80
 }
