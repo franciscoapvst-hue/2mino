@@ -37,7 +37,9 @@ const SCHEMA = `
     ('tema_default',         '"dark"',                                        'Tema visual por defecto para nuevos usuarios'),
     ('idiomas_disponibles',  '["es","en"]',                                   'Idiomas disponibles en la app'),
     ('secciones_landing',    '["hero","caracteristicas","como_jugar","tabla_clasificacion"]',
-                                                                              'Secciones del landing habilitadas')
+                                                                              'Secciones del landing habilitadas'),
+    ('reintegro_partida_activa_habilitado', 'true',
+       'Avisar en el dashboard si el usuario tiene una partida en curso, con botón para reintegrarse. Apagar si da problemas.')
   ON CONFLICT (clave) DO NOTHING;
 `;
 

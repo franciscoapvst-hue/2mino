@@ -259,6 +259,11 @@ export const api = {
 
   getPreferencias: () => req<UserConfig>('/frontend/preferencias'),
 
+  // Feature flags de landing_config, editables desde el BO sin redeploy
+  // (2mino-BO → "Feature flags"). Solo trae las habilitadas — una clave
+  // ausente en la respuesta significa deshabilitada.
+  featureFlags: () => req<Record<string, unknown>>('/frontend/config'),
+
   putPreferencias: (body: Partial<Pick<UserConfig, 'tema' | 'idioma' | 'opciones'>>) =>
     req<UserConfig>('/frontend/preferencias', { method: 'PUT', body: JSON.stringify(body) }),
 

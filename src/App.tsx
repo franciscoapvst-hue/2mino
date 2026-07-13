@@ -119,9 +119,18 @@ export default function App() {
   // quedar "perdida" (desconexión, cierre de pestaña, etc.). Keyed a
   // user.id, no a `session` entero: no debe repetirse cada vez que algo
   // más (ej. cambiar de avatar) actualiza el objeto de sesión.
+  //
+  // Detrás de un feature flag (reintegro_partida_activa_habilitado, BO →
+  // Feature flags): si diera problemas, se apaga sin redeploy — ni
+  // siquiera se llega a pedir /salas/activa.
   useEffect(() => {
     if (!session) return;
-    api.salas.activa().then(r => setSalaParaReintegrar(r.sala)).catch(() => {});
+    api.featureFlags()
+      .then(flags => {
+        if (!flags.reintegro_partida_activa_habilitado) return;
+        return api.salas.activa().then(r => setSalaParaReintegrar(r.sala));
+      })
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user.id]);
 
