@@ -41,10 +41,28 @@ Gestiona identidad y credenciales.
 **Tablas:**
 
 - `segmentos` — Agrupa configuración por tipo de usuario (ej. `tester` con todas las features).
-- `usuarios` — Cuentas con `password_hash` (bcrypt).
+- `usuarios` — Cuentas con `password_hash` (bcrypt), `email_verificado` (bool).
 - `reset_tokens` — Tokens de recuperación de contraseña.
+- `email_verificacion_tokens` — Tokens de confirmación de cuenta (mismo patrón que `reset_tokens`, 24hs de validez).
 
 Las migraciones se ejecutan al arrancar el servicio (`runMigrations()`).
+
+**Confirmación de cuenta por email** (2026-07): el registro
+(`POST /usuarios`) ya no loguea directo — crea la cuenta con
+`email_verificado=false`, genera un token y manda un email con
+`enviarEmailVerificacion()` (`ms-usuarios/src/email.ts`, nodemailer sobre
+SMTP de IONOS). `POST /usuarios/verificar` (login) rechaza con `403` y
+`code: 'EMAIL_NO_VERIFICADO'` si la cuenta no está confirmada. El link del
+email (`/verificar-email/:token` en el frontend) llama a
+`POST /auth/verificar-email` en el gateway, que firma sesión directo si el
+token es válido — clickear el link ya loguea, sin pedir contraseña de
+nuevo. Cuentas que ya existían antes de este cambio quedaron
+`email_verificado=true` por default (nunca recibieron el mail, exigírselas
+las hubiera dejado afuera).
+
+Variables de entorno nuevas (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`,
+`SMTP_PASS`, `SMTP_FROM`, `APP_URL`) — con `ENABLE_EMAIL=false` (default)
+no se manda nada real, solo se loguea (dev local sin credenciales SMTP).
 
 ### ms-frontend-landing (puerto 5000, interno)
 

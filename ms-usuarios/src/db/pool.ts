@@ -65,6 +65,14 @@ const SCHEMA = `
   -- el login si activo=false.
   ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT true;
 
+  -- Verificación de email obligatoria para poder loguear (POST
+  -- /usuarios/verificar la exige). DEFAULT true para no trabar a cuentas
+  -- que ya existían antes de este flag — nunca recibieron el mail, así
+  -- que exigírselas ahora las dejaría afuera. El registro nuevo
+  -- (POST /usuarios) inserta email_verificado=false explícito, pisando
+  -- este default solo para cuentas creadas de acá en adelante.
+  ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS email_verificado BOOLEAN NOT NULL DEFAULT true;
+
   -- Asigna segmento tester a usuarios sin segmento
   UPDATE usuarios
   SET segmento_id = (SELECT id FROM segmentos WHERE nombre = 'tester')
@@ -81,6 +89,19 @@ const SCHEMA = `
 
   CREATE INDEX IF NOT EXISTS idx_reset_tokens_token    ON reset_tokens(token);
   CREATE INDEX IF NOT EXISTS idx_reset_tokens_usuario  ON reset_tokens(usuario_id);
+
+  -- Mismo patrón que reset_tokens, para el link de confirmación de cuenta.
+  CREATE TABLE IF NOT EXISTS email_verificacion_tokens (
+    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    usuario_id  UUID        NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    token       VARCHAR(64) UNIQUE NOT NULL,
+    expires_at  TIMESTAMPTZ NOT NULL,
+    used        BOOLEAN     NOT NULL DEFAULT FALSE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_email_verif_token    ON email_verificacion_tokens(token);
+  CREATE INDEX IF NOT EXISTS idx_email_verif_usuario  ON email_verificacion_tokens(usuario_id);
 
   -- Back Office §3 "ver detalle": perfil + segmento + ELO en una sola
   -- consulta. ranked_ratings es propiedad de ms-salas (otro servicio,

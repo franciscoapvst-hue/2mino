@@ -31,6 +31,12 @@ services:
       PORT:         4000
       DB_URL:       postgres://2mino:${POSTGRES_PASSWORD}@postgres:5432/2mino
       ENABLE_EMAIL: ${ENABLE_EMAIL:-false}
+      SMTP_HOST:    ${SMTP_HOST:-smtp.ionos.com}
+      SMTP_PORT:    ${SMTP_PORT:-465}
+      SMTP_USER:    ${SMTP_USER:-}
+      SMTP_PASS:    ${SMTP_PASS:-}
+      SMTP_FROM:    ${SMTP_FROM:-2mino <no-reply@2mino.online>}
+      APP_URL:      ${APP_URL:-https://2mino.online}
     depends_on:
       postgres:
         condition: service_healthy

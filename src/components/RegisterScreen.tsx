@@ -1,6 +1,6 @@
 import { useState, FormEvent } from 'react';
 import type { View } from '../App';
-import { api, tokenStore, type AuthUser, type UserConfig } from '../api';
+import { api, type AuthUser, type UserConfig } from '../api';
 import { SunIcon, MoonIcon } from './icons';
 import { Bone, DominoStage } from './DominoStage';
 
@@ -29,6 +29,7 @@ export default function RegisterScreen({ onSwitch, onSuccess, dark, onToggleThem
   const [submitted, setSubmitted] = useState(false);
   const [loading,   setLoading]   = useState(false);
   const [apiError,  setApiError]  = useState<string | null>(null);
+  const [registrado, setRegistrado] = useState(false);
 
   const usernameErr = !username
     ? 'El nombre de usuario es requerido'
@@ -69,10 +70,8 @@ export default function RegisterScreen({ onSwitch, onSuccess, dark, onToggleThem
     setLoading(true);
     setApiError(null);
     try {
-      const authRes = await api.register({ username, email, password });
-      tokenStore.set(authRes.token, false);
-      const config = await api.getPreferencias();
-      onSuccess(authRes.user, config);
+      await api.register({ username, email, password });
+      setRegistrado(true);
     } catch (err: unknown) {
       setApiError(err instanceof Error ? err.message : 'Error al crear la cuenta');
     } finally {
@@ -93,6 +92,19 @@ export default function RegisterScreen({ onSwitch, onSuccess, dark, onToggleThem
       <DominoStage blurb="Crea tu cuenta, elige tu ficha y sube de rango. La mesa te espera." />
 
       <section className="lg-panel">
+        {registrado ? (
+          <div className="lg-form lg-sent">
+            <span className="lg-sent-icon" aria-hidden="true">✉</span>
+            <h2>¡Cuenta creada!</h2>
+            <p className="lg-sent-sub">
+              Te mandamos un correo a <strong>{email}</strong> para confirmar tu
+              cuenta. Revisa también tu carpeta de spam.
+            </p>
+            <button type="button" className="lg-submit" onClick={() => onSwitch('login')}>
+              Volver al inicio de sesión
+            </button>
+          </div>
+        ) : (
         <form className="lg-form" onSubmit={handleSubmit} noValidate>
           <header className="lg-form-head">
             <span className="lg-mini-mark" aria-hidden="true">
@@ -190,6 +202,7 @@ export default function RegisterScreen({ onSwitch, onSuccess, dark, onToggleThem
             </button>
           </p>
         </form>
+        )}
       </section>
     </div>
   );

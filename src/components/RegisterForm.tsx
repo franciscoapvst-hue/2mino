@@ -1,6 +1,6 @@
 import { useState, FormEvent } from 'react';
 import type { View } from '../App';
-import { api, tokenStore, type AuthUser, type UserConfig } from '../api';
+import { api, type AuthUser, type UserConfig } from '../api';
 
 type Props = {
   onSwitch:  (v: View) => void;
@@ -26,6 +26,9 @@ export default function RegisterForm({ onSwitch, onSuccess }: Props) {
   const [submitted, setSubmitted] = useState(false);
   const [loading,   setLoading]   = useState(false);
   const [apiError,  setApiError]  = useState<string | null>(null);
+  // Ya no loguea directo: el registro manda un email de confirmación y
+  // hay que clickearlo antes de poder iniciar sesión.
+  const [registrado, setRegistrado] = useState(false);
 
   const usernameErr = !username
     ? 'El nombre de usuario es requerido'
@@ -66,15 +69,31 @@ export default function RegisterForm({ onSwitch, onSuccess }: Props) {
     setLoading(true);
     setApiError(null);
     try {
-      const authRes = await api.register({ username, email, password });
-      tokenStore.set(authRes.token, false);
-      const config = await api.getPreferencias();
-      onSuccess(authRes.user, config);
+      await api.register({ username, email, password });
+      setRegistrado(true);
     } catch (err: unknown) {
       setApiError(err instanceof Error ? err.message : 'Error al crear la cuenta');
     } finally {
       setLoading(false);
     }
+  }
+
+  if (registrado) {
+    return (
+      <div className="form">
+        <div className="success-box">
+          <div className="success-icon">✉️</div>
+          <p className="success-msg">¡Cuenta creada!</p>
+          <p className="success-sub">
+            Te mandamos un correo a <strong>{email}</strong> para confirmar tu cuenta.
+            <br />Revisá también tu carpeta de spam.
+          </p>
+        </div>
+        <button type="button" className="btn-primary" onClick={() => onSwitch('login')}>
+          Volver al inicio de sesión
+        </button>
+      </div>
+    );
   }
 
   return (

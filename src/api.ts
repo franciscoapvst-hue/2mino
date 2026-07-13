@@ -219,6 +219,16 @@ export const tokenStore = {
 };
 
 // ── HTTP helper ───────────────────────────────────
+// `code` (si el backend lo manda, ej. EMAIL_NO_VERIFICADO) permite que la
+// UI reaccione a un error específico sin parsear el texto del mensaje.
+export class ApiError extends Error {
+  code?: string;
+  constructor(message: string, code?: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const token = tokenStore.get();
   const res = await fetch(`${BASE}${path}`, {
@@ -230,15 +240,23 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   });
   const data = await res.json();
   if (!res.ok) {
-    throw new Error((data as { error?: string }).error ?? 'Error inesperado');
+    const body = data as { error?: string; code?: string };
+    throw new ApiError(body.error ?? 'Error inesperado', body.code);
   }
   return data as T;
 }
 
 // ── API ───────────────────────────────────────────
 export const api = {
+  // Ya no devuelve token — hay que confirmar el email antes de loguear.
   register: (body: { username: string; email: string; password: string }) =>
-    req<AuthResponse>('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
+    req<{ message: string }>('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
+
+  verificarEmail: (token: string) =>
+    req<AuthResponse>('/auth/verificar-email', { method: 'POST', body: JSON.stringify({ token }) }),
+
+  reenviarVerificacion: (email: string) =>
+    req<{ message: string }>('/auth/reenviar-verificacion', { method: 'POST', body: JSON.stringify({ email }) }),
 
   login: (body: { email: string; password: string }) =>
     req<AuthResponse>('/auth/login', { method: 'POST', body: JSON.stringify(body) }),

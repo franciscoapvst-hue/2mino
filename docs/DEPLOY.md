@@ -78,8 +78,16 @@ DOMAIN=2mino.online
 # CORS — con dominio propio, poner el origen exacto (con https)
 CORS_ORIGIN=https://2mino.online
 
-# Email — true solo cuando se integre un proveedor (SendGrid/Resend/SES)
+# Email de confirmación de cuenta — ya integrado (SMTP de IONOS), ver
+# docs/ARQUITECTURA.md. Poner en true + completar SMTP_USER/SMTP_PASS
+# cuando la casilla no-reply@2mino.online esté creada en el panel de IONOS.
 ENABLE_EMAIL=false
+SMTP_HOST=smtp.ionos.com
+SMTP_PORT=465
+SMTP_USER=no-reply@2mino.online
+SMTP_PASS=
+SMTP_FROM=2mino <no-reply@2mino.online>
+APP_URL=https://2mino.online
 ```
 
 `.env` está en `.gitignore`; nunca se commitea.

@@ -54,7 +54,7 @@ export async function authRoutes(app: FastifyInstance) {
       schema: {
         tags:        ['auth'],
         summary:     'Registrar nuevo usuario',
-        description: 'Crea una cuenta nueva y devuelve un JWT listo para usar.',
+        description: 'Crea una cuenta nueva. NO devuelve token — hay que confirmar el email antes de poder loguear.',
         body: {
           type: 'object',
           required: ['username', 'email', 'password'],
@@ -65,7 +65,7 @@ export async function authRoutes(app: FastifyInstance) {
           },
         },
         response: {
-          201: { description: 'Usuario creado',           ...TokenUserSchema },
+          201: { description: 'Cuenta creada, pendiente de confirmar por email', ...MessageSchema },
           409: { description: 'Usuario o email ya existe', ...ErrorSchema },
           400: { description: 'Datos inválidos',           ...ErrorSchema },
         },
@@ -73,11 +73,60 @@ export async function authRoutes(app: FastifyInstance) {
     },
     async (req, reply) => {
       const { status, data } = await callMs('/usuarios', 'POST', req.body);
-      if (status !== 201) return reply.code(status).send(data);
+      return reply.code(status).send(data);
+    },
+  );
+
+  // ── POST /auth/verificar-email ──────────────────
+  // Confirma la cuenta con el token del link del email. Si es válido,
+  // firma sesión directo — clickear el link ya deja logueado, sin tener
+  // que volver a escribir la contraseña.
+  app.post<{ Body: { token: string } }>(
+    '/auth/verificar-email',
+    {
+      schema: {
+        tags:        ['auth'],
+        summary:     'Confirmar cuenta con el token del email',
+        body: {
+          type: 'object',
+          required: ['token'],
+          properties: { token: { type: 'string' } },
+        },
+        response: {
+          200: { description: 'Cuenta confirmada, sesión iniciada', ...TokenUserSchema },
+          400: { description: 'Link inválido o vencido', ...ErrorSchema },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { status, data } = await callMs('/usuarios/verificar-email', 'POST', req.body);
+      if (status !== 200) return reply.code(status).send(data);
 
       const user = data as { id: string; username: string; segmento: string };
       const token = signToken(user);
-      return reply.code(201).send({ token, user });
+      return reply.send({ token, user });
+    },
+  );
+
+  // ── POST /auth/reenviar-verificacion ────────────
+  app.post<{ Body: { email: string } }>(
+    '/auth/reenviar-verificacion',
+    {
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+      schema: {
+        tags:        ['auth'],
+        summary:     'Reenviar el email de confirmación de cuenta',
+        body: {
+          type: 'object',
+          required: ['email'],
+          properties: { email: { type: 'string', format: 'email' } },
+        },
+        response: { 200: { description: 'Solicitud procesada', ...MessageSchema } },
+      },
+    },
+    async (req, reply) => {
+      const { data } = await callMs('/usuarios/reenviar-verificacion', 'POST', req.body);
+      return reply.send(data);
     },
   );
 
@@ -102,6 +151,11 @@ export async function authRoutes(app: FastifyInstance) {
         response: {
           200: { description: 'Login exitoso',        ...TokenUserSchema },
           401: { description: 'Credenciales inválidas', ...ErrorSchema },
+          403: {
+            description: 'Cuenta sin confirmar (email_verificado=false)',
+            type: 'object',
+            properties: { error: { type: 'string' }, code: { type: 'string' } },
+          },
         },
       },
     },
