@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { api, type AuthUser, type UserConfig } from '../api';
+import { api, type AuthUser, type UserConfig, type Sala } from '../api';
 import { SunIcon, MoonIcon, CasualIcon, RankedIcon, SalasIcon, BellIcon, PeopleIcon, TrophyIcon, HistoryIcon } from './icons';
 import { Bone } from './DominoStage';
 import { avatarUrl } from '../avatars';
@@ -27,6 +27,10 @@ type Props = {
   onUnirseSala:      (codigo: string) => void;
   /** Sube cada vez que llega `notificacion_nueva` por el WS de sociales. */
   notifVersion?: number;
+  /** Partida en_juego detectada al iniciar sesión — null si no hay ninguna. */
+  salaParaReintegrar?:   Sala | null;
+  onReintegrarSala?:     () => void;
+  onDescartarReintegro?: () => void;
 };
 
 // ── Tarjeta de modo secundario (casual / salas) ────
@@ -50,6 +54,7 @@ function PlayCard({ icon, title, desc, action, accent, onClick }: {
 export default function Dashboard({
   user, config, dark, onToggleTheme, onLogout, onGoToSalas, onGoToRanked, onGoToCasual, onPieceDemo, onAvatarChange,
   onGoToAmigos, onGoToLeaderboard, onGoToHistorial, onUnirseSala, notifVersion,
+  salaParaReintegrar, onReintegrarSala, onDescartarReintegro,
 }: Props) {
   const [elo, setElo] = useState<number | null>(null);
   const [avatarAbierto, setAvatarAbierto] = useState(false);
@@ -135,6 +140,25 @@ export default function Dashboard({
           <InboxPopover onClose={() => setInboxAbierto(false)} onUnirseSala={onUnirseSala} />
         )}
       </nav>
+
+      {salaParaReintegrar && (
+        <div className="rejoin-banner">
+          <span className="rejoin-banner-text">
+            <strong>Tenés una partida en curso.</strong> Sala {salaParaReintegrar.codigo}
+          </span>
+          <div className="rejoin-banner-actions">
+            <button className="rejoin-banner-cta" onClick={onReintegrarSala}>Reintegrarme</button>
+            <button
+              className="rejoin-banner-dismiss"
+              onClick={onDescartarReintegro}
+              aria-label="Descartar aviso"
+              title="Descartar"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Body ─────────────────────────────────── */}
       <main className="dash-body">

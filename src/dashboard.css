@@ -135,6 +135,48 @@
   padding: 44px 24px 64px;
 }
 
+/* ── Banner: partida en curso al iniciar sesión ───── */
+.rejoin-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 24px;
+  background: color-mix(in srgb, var(--amber) 14%, var(--d-surface));
+  border-bottom: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
+}
+.rejoin-banner-text { color: var(--d-ink); font-size: 0.92rem; }
+.rejoin-banner-text strong { color: var(--amber-hi); }
+.rejoin-banner-actions { display: flex; align-items: center; gap: 8px; }
+.rejoin-banner-cta {
+  padding: 7px 18px;
+  border-radius: 8px;
+  border: none;
+  background: var(--amber);
+  color: var(--amber-ink);
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+.rejoin-banner-cta:hover { background: var(--amber-hi); }
+.rejoin-banner-dismiss {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--d-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.rejoin-banner-dismiss:hover { background: var(--d-border-hi); color: var(--d-ink); }
+
 /* ── Hero: saludo + rango ────────────────────────── */
 .dash-hero {
   display: flex;

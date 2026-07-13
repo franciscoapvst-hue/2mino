@@ -284,6 +284,8 @@ export const api = {
       req<Sala>(`/salas/${id}/salir`, { method: 'POST', body: '{}' }),
     cambiarEstado: (id: string, estado: Sala['estado']) =>
       req<Sala>(`/salas/${id}/estado`, { method: 'PATCH', body: JSON.stringify({ estado }) }),
+    activa: () =>
+      req<{ sala: Sala | null }>('/salas/activa'),
   },
 
   juego: {
