@@ -49,6 +49,8 @@ export async function authRoutes(app: FastifyInstance) {
   app.post<{ Body: { username: string; email: string; password: string } }>(
     '/auth/register',
     {
+      // Endpoint sensible a fuerza bruta / abuso de creación de cuentas.
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
       schema: {
         tags:        ['auth'],
         summary:     'Registrar nuevo usuario',
@@ -83,6 +85,8 @@ export async function authRoutes(app: FastifyInstance) {
   app.post<{ Body: { email: string; password: string } }>(
     '/auth/login',
     {
+      // Endpoint sensible a fuerza bruta de contraseñas.
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
       schema: {
         tags:        ['auth'],
         summary:     'Iniciar sesión',
@@ -115,6 +119,8 @@ export async function authRoutes(app: FastifyInstance) {
   app.post<{ Body: { email: string } }>(
     '/auth/forgot-password',
     {
+      // Evita usar este endpoint para enumerar emails registrados a fuerza bruta.
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
       schema: {
         tags:        ['auth'],
         summary:     'Solicitar recuperación de contraseña',
@@ -148,6 +154,8 @@ export async function authRoutes(app: FastifyInstance) {
   app.post<{ Body: { token: string; newPassword: string } }>(
     '/auth/reset-password',
     {
+      // Evita fuerza bruta sobre el token de reset.
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
       schema: {
         tags:        ['auth'],
         summary:     'Restablecer contraseña',
@@ -176,6 +184,7 @@ export async function authRoutes(app: FastifyInstance) {
   app.post<{ Body: { code: string } }>(
     '/auth/google',
     {
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
       schema: {
         tags:        ['auth'],
         summary:     'Iniciar sesión con Google',

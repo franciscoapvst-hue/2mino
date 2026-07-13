@@ -1,7 +1,9 @@
 import { Pool } from 'pg';
 
+// max explícito — ver ms-salas/src/db/pool.ts para el motivo.
 export const pool = new Pool({
   connectionString: process.env.DB_URL,
+  max: 15,
 });
 
 const SCHEMA = `
