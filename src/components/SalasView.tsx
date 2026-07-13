@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, FormEvent } from 'react';
 import { api, type Sala, type SalaJugador, type AuthUser } from '../api';
 import { BackIcon, RefreshIcon, CopyIcon, SearchIcon } from './icons';
 import { Bone } from './DominoStage';
+import { usePoll } from '../hooks/usePoll';
 
 type Props = {
   user:         AuthUser;
@@ -290,20 +291,15 @@ export default function SalasView({ user, dark, onBack, onGameStart }: Props) {
   useEffect(() => { loadSalas(); }, [loadSalas]);
 
   // Poll sala de espera cada 4 segundos
-  useEffect(() => {
+  usePoll(async () => {
     if (!sala) return;
-    const id = setInterval(async () => {
-      try {
-        const actualizada = await api.salas.detalle(sala.id);
-        if (actualizada.estado === 'en_juego') {
-          onGameStart(actualizada);
-          return;
-        }
-        setSala(actualizada);
-      } catch { /* silencioso */ }
-    }, 4000);
-    return () => clearInterval(id);
-  }, [sala?.id]);
+    const actualizada = await api.salas.detalle(sala.id);
+    if (actualizada.estado === 'en_juego') {
+      onGameStart(actualizada);
+      return;
+    }
+    setSala(actualizada);
+  }, 4000, !!sala);
 
   async function handleJoin(salaId: string) {
     setJoining(salaId);

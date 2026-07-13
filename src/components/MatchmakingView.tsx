@@ -4,6 +4,7 @@ import { BackIcon, CasualIcon, RankedIcon } from './icons';
 import { Bone } from './DominoStage';
 import { rangoDeElo } from '../ranks';
 import AdSlot from './AdSlot';
+import { usePoll } from '../hooks/usePoll';
 
 type Props = {
   user: AuthUser;
@@ -200,48 +201,30 @@ export default function MatchmakingView({ user, tipo, dark, onBack, onGameStart,
   // propia pantalla de lobby, nunca se entera de que el creador ya
   // arrancó la búsqueda ni de que la partida ya emparejó (se queda
   // esperando ahí para siempre aunque el creador ya esté jugando).
-  useEffect(() => {
-    if (pantalla !== 'cola' && pantalla !== 'party') return;
-    let cancelado = false;
-    const tick = async () => {
-      try {
-        const st = await api.ranked.estadoCola();
-        if (cancelado) return;
-        if (st.en_cola) { setCola(st); setPantalla('cola'); return; }
-        if (st.matched) {
-          const sala = await api.salas.detalle(st.sala_id);
-          onGameStart(sala);
-          return;
-        }
-        // Sin ticket: en 'cola' significa que se salió por otra vía
-        // (cancelado desde otra pestaña) — volver al menú. En 'party' es
-        // el estado normal antes de que el creador arranque la búsqueda,
-        // no tocar nada.
-        if (pantalla === 'cola') setPantalla('menu');
-      } catch { /* silencioso, reintenta en el próximo tick */ }
-    };
-    tick();
-    const id = setInterval(tick, 2000);
-    return () => { cancelado = true; clearInterval(id); };
-  }, [pantalla, onGameStart]);
+  usePoll(async () => {
+    const st = await api.ranked.estadoCola();
+    if (st.en_cola) { setCola(st); setPantalla('cola'); return; }
+    if (st.matched) {
+      const sala = await api.salas.detalle(st.sala_id);
+      onGameStart(sala);
+      return;
+    }
+    // Sin ticket: en 'cola' significa que se salió por otra vía
+    // (cancelado desde otra pestaña) — volver al menú. En 'party' es
+    // el estado normal antes de que el creador arranque la búsqueda,
+    // no tocar nada.
+    if (pantalla === 'cola') setPantalla('menu');
+  }, 2000, pantalla === 'cola' || pantalla === 'party');
 
   // Refresca la party mientras esperamos en el lobby: sin esto, el
   // creador se queda con el `party` local congelado en el momento en que
   // la creó (un solo miembro) y nunca se entera de que el compañero ya
   // se unió — el botón "Buscar partida (2v2)" nunca se habilita.
-  useEffect(() => {
-    if (pantalla !== 'party' || !party) return;
-    let cancelado = false;
-    const codigo = party.codigo;
-    const tick = async () => {
-      try {
-        const p = await api.ranked.party(codigo);
-        if (!cancelado) setParty(p);
-      } catch { /* silencioso, reintenta en el próximo tick */ }
-    };
-    const id = setInterval(tick, 2000);
-    return () => { cancelado = true; clearInterval(id); };
-  }, [pantalla, party?.codigo]);
+  usePoll(async () => {
+    if (!party) return;
+    const p = await api.ranked.party(party.codigo);
+    setParty(p);
+  }, 2000, pantalla === 'party' && !!party);
 
   const buscarSolo = useCallback(async (modo: 2 | 4) => {
     setBusy(true); setError(null);
