@@ -7,6 +7,7 @@ import { api } from '../../api';
 import type { PartidaPublica, Pieza, Sala, AuthUser } from '../../api';
 import { BackIcon, PersonAddIcon } from '../icons';
 import { useMeasuredWidth } from '../../hooks/useMeasuredWidth';
+import { usePoll } from '../../hooks/usePoll';
 import ChatPanel from '../social/ChatPanel';
 import AdSlot from '../AdSlot';
 
@@ -177,11 +178,7 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
     }
   }, [sala.id]);
 
-  useEffect(() => {
-    fetchPartida();
-    const id = setInterval(fetchPartida, 2000);
-    return () => clearInterval(id);
-  }, [fetchPartida]);
+  usePoll(fetchPartida, 2000);
 
   // ── Jugar ficha (API) ─────────────────────────
   async function handleJugar(pieza: Pieza, lado?: 'izq' | 'der') {

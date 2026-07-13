@@ -8,6 +8,7 @@ import { rangoDeElo, progresoRango } from '../ranks';
 import AvatarPicker from './AvatarPicker';
 import InboxPopover from './social/InboxPopover';
 import AdSlot from './AdSlot';
+import { usePoll } from '../hooks/usePoll';
 
 type Props = {
   user:          AuthUser;
@@ -68,12 +69,10 @@ export default function Dashboard({
 
   // Poll de 30s como red de seguridad si el WS se cayó — el WS es la vía
   // rápida (ver useSocialSocket), esto no debería disparar en el camino feliz.
-  useEffect(() => {
-    const id = setInterval(() => {
-      api.social.noLeidasCount().then(r => setNoLeidas(r.count)).catch(() => {});
-    }, 30_000);
-    return () => clearInterval(id);
-  }, []);
+  usePoll(async () => {
+    const r = await api.social.noLeidasCount();
+    setNoLeidas(r.count);
+  }, 30_000);
 
   const rango = elo !== null ? rangoDeElo(elo) : null;
   const prog  = elo !== null ? progresoRango(elo) : null;
