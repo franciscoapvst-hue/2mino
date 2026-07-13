@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { authRoutes } from './routes/auth';
@@ -26,6 +27,16 @@ const corsOrigin = process.env.CORS_ORIGIN ?? '*';
 app.register(cors, {
   origin:  corsOrigin === '*' ? '*' : corsOrigin.split(',').map(o => o.trim()),
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+});
+
+// ── Rate limit ───────────────────────────────────
+// Red de seguridad global por IP: 300 req/min alcanza sobrado para uso
+// normal (el polling más agresivo del frontend es GET /juego cada 2s,
+// ~30 req/min) pero frena a un cliente/bot que martille cualquier ruta.
+// /auth/* tiene además un límite más estricto propio (ver routes/auth.ts).
+app.register(rateLimit, {
+  max:        300,
+  timeWindow: '1 minute',
 });
 
 // ── OpenAPI / Swagger ─────────────────────────────

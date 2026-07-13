@@ -1,7 +1,12 @@
 import { Pool } from 'pg';
 
+// max explícito: sin esto, pg usa 10 por defecto y los 4 servicios juntos
+// (cada uno con su propio pool) ya reservaban ~40 de los 100 connections
+// que trae Postgres por defecto, en reposo. Ver max_connections en
+// docker-compose.yml (subido a 200 para dar margen).
 export const pool = new Pool({
   connectionString: process.env.DB_URL,
+  max: 15,
 });
 
 const SCHEMA = `

@@ -4,6 +4,10 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    # max_connections subido de 100 (default) a 200: los 4 servicios que
+    # tienen su propio pool (max:15 c/u) ya reservan 60 en reposo, y el
+    # default dejaba poco margen para BO/herramientas/picos.
+    command: ["postgres", "-c", "max_connections=200"]
     environment:
       POSTGRES_DB:       2mino
       POSTGRES_USER:     2mino
@@ -30,6 +34,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test:     ["CMD", "node", "-e", "fetch('http://localhost:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout:  5s
+      retries:  5
+      start_period: 10s
     # Solo accesible dentro de la red Docker (sin puerto externo)
 
   # ── Microservicio frontend/landing ───────────────
@@ -43,6 +53,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test:     ["CMD", "node", "-e", "fetch('http://localhost:5000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout:  5s
+      retries:  5
+      start_period: 10s
 
   # ── Microservicio de salas ───────────────────────
   ms-salas:
@@ -54,6 +70,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test:     ["CMD", "node", "-e", "fetch('http://localhost:6001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout:  5s
+      retries:  5
+      start_period: 10s
 
   # ── Microservicio social (amigos, chat, notificaciones) ──
   ms-social:
@@ -68,6 +90,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test:     ["CMD", "node", "-e", "fetch('http://localhost:6200/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout:  5s
+      retries:  5
+      start_period: 10s
     # Sin puerto externo: nginx proxea /ws/ directo acá (ver nginx.conf)
 
   # ── API de integración (pública) ─────────────────
@@ -85,7 +113,14 @@ services:
       GOOGLE_CLIENT_ID:     ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
     depends_on:
-      - ms-usuarios
+      ms-usuarios:
+        condition: service_healthy
+    healthcheck:
+      test:     ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout:  5s
+      retries:  5
+      start_period: 10s
     # El frontend lo alcanza vía la red Docker (proxy /api de nginx) — no
     # hace falta puerto para eso. Se publica igual en 127.0.0.1:3000 (solo
     # loopback, nunca la interfaz pública) para que el Back Office pueda
@@ -106,7 +141,14 @@ services:
         VITE_ADSENSE_SLOT_MANO:         ${ADSENSE_SLOT_MANO:-}
     restart: unless-stopped
     depends_on:
-      - api-integracion
+      api-integracion:
+        condition: service_healthy
+    healthcheck:
+      test:     ["CMD", "wget", "-qO-", "http://localhost:80/"]
+      interval: 10s
+      timeout:  5s
+      retries:  5
+      start_period: 10s
     # Sin puerto externo: Caddy es la única puerta pública (ver servicio `caddy`)
 
   # ── Reverse proxy con TLS automático (Let's Encrypt) ─
@@ -123,7 +165,8 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      - frontend
+      frontend:
+        condition: service_healthy
 
 volumes:
   postgres_data:
