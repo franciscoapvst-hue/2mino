@@ -41,10 +41,35 @@ Gestiona identidad y credenciales.
 **Tablas:**
 
 - `segmentos` — Agrupa configuración por tipo de usuario (ej. `tester` con todas las features).
-- `usuarios` — Cuentas con `password_hash` (bcrypt).
+- `usuarios` — Cuentas con `password_hash` (bcrypt), `email_verificado` (bool).
 - `reset_tokens` — Tokens de recuperación de contraseña.
+- `email_verificacion_tokens` — Tokens de confirmación de cuenta (mismo patrón que `reset_tokens`, 24hs de validez).
 
 Las migraciones se ejecutan al arrancar el servicio (`runMigrations()`).
+
+**Confirmación de cuenta por email** (2026-07): el registro
+(`POST /usuarios`) ya no loguea directo — crea la cuenta con
+`email_verificado=false`, genera un token y manda un email con
+`enviarEmailVerificacion()` (`ms-usuarios/src/email.ts`, API HTTP de
+Resend). `POST /usuarios/verificar` (login) rechaza con `403` y
+`code: 'EMAIL_NO_VERIFICADO'` si la cuenta no está confirmada. El link del
+email (`/verificar-email/:token` en el frontend) llama a
+`POST /auth/verificar-email` en el gateway, que firma sesión directo si el
+token es válido — clickear el link ya loguea, sin pedir contraseña de
+nuevo. Cuentas que ya existían antes de este cambio quedaron
+`email_verificado=true` por default (nunca recibieron el mail, exigírselas
+las hubiera dejado afuera).
+
+Se probó primero con SMTP directo contra IONOS (nodemailer) y se
+descartó: más superficie de fallo (puerto/TLS/STARTTLS/auth) para
+depurar sin visibilidad real de qué pasa del otro lado. Resend es un
+POST HTTP con la API key en el header, sin protocolo de por medio.
+
+Variables de entorno nuevas (`RESEND_API_KEY`, `EMAIL_FROM`, `APP_URL`)
+— con `ENABLE_EMAIL=false` (default) no se manda nada real, solo se
+loguea (dev local sin API key real). `EMAIL_FROM` con un dominio propio
+(en vez de `onboarding@resend.dev`) requiere verificar ese dominio en
+Resend (Domains → agregar registros DNS).
 
 ### ms-frontend-landing (puerto 5000, interno)
 

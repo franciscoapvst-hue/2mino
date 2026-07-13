@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import { pool } from '../db/pool';
+import { enviarEmailVerificacion } from '../email';
 
 const ROUNDS = 12;
 
@@ -30,6 +31,7 @@ const UserSchema = {
     segmento_config: { type: 'object', additionalProperties: true },
     avatar:          { type: 'string', nullable: true },
     activo:          { type: 'boolean' },
+    email_verificado: { type: 'boolean' },
     created_at:      { type: 'string', format: 'date-time' },
     updated_at:      { type: 'string', format: 'date-time' },
   },
@@ -257,7 +259,11 @@ export async function usuariosRoutes(app: FastifyInstance) {
           },
         },
         response: {
-          201: { description: 'Usuario creado',           ...UserSchema },
+          201: {
+            description: 'Usuario creado — requiere confirmar el email antes de poder loguear',
+            type: 'object',
+            properties: { message: { type: 'string' } },
+          },
           409: { description: 'Username o email en uso',  ...ErrorSchema },
           400: { description: 'Datos inválidos',           ...ErrorSchema },
         },
@@ -278,12 +284,26 @@ export async function usuariosRoutes(app: FastifyInstance) {
 
       try {
         const { rows } = await pool.query(
-          `INSERT INTO usuarios (username, email, password_hash, segmento_id)
-           VALUES ($1, $2, $3, $4)
-           RETURNING id, username, email, segmento_id, created_at`,
+          `INSERT INTO usuarios (username, email, password_hash, segmento_id, email_verificado)
+           VALUES ($1, $2, $3, $4, false)
+           RETURNING id, username, email`,
           [username, email, passwordHash, segmentoId],
         );
-        return reply.code(201).send({ ...rows[0], segmento });
+        const usuario = rows[0];
+
+        const token     = crypto.randomBytes(32).toString('hex');
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        await pool.query(
+          `INSERT INTO email_verificacion_tokens (usuario_id, token, expires_at) VALUES ($1, $2, $3)`,
+          [usuario.id, token, expiresAt],
+        );
+        await enviarEmailVerificacion(usuario.email, usuario.username, token);
+        app.log.info({ email: usuario.email, token }, 'Token de verificación de email generado');
+
+        return reply.code(201).send({
+          message: 'Cuenta creada. Revisá tu correo para confirmarla antes de iniciar sesión.',
+          ...(process.env.NODE_ENV !== 'production' && { _dev_token: token }),
+        });
       } catch (err: any) {
         if (err.code === '23505') {
           const field = err.detail?.includes('username') ? 'username' : 'email';
@@ -291,6 +311,98 @@ export async function usuariosRoutes(app: FastifyInstance) {
         }
         throw err;
       }
+    },
+  );
+
+  // ── POST /usuarios/verificar-email ──────────────
+  // Confirma la cuenta a partir del token del link del email. Devuelve el
+  // usuario completo (mismo shape que /usuarios/verificar) para que el
+  // gateway pueda firmar sesión directo — clickear el link ya loguea.
+  app.post<{ Body: { token: string } }>(
+    '/usuarios/verificar-email',
+    {
+      schema: {
+        tags:        ['usuarios'],
+        summary:     'Confirmar cuenta con el token del email',
+        body: {
+          type: 'object',
+          required: ['token'],
+          properties: { token: { type: 'string' } },
+        },
+        response: {
+          200: { description: 'Cuenta confirmada', ...UserSchema },
+          400: { description: 'Token inválido, vencido o ya usado', ...ErrorSchema },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { rows } = await pool.query(
+        `SELECT * FROM email_verificacion_tokens
+         WHERE token = $1 AND used = FALSE AND expires_at > NOW()`,
+        [req.body.token],
+      );
+      if (!rows.length) return reply.code(400).send({ error: 'Link inválido o vencido' });
+
+      const { usuario_id } = rows[0];
+      await pool.query('UPDATE usuarios SET email_verificado = true WHERE id = $1', [usuario_id]);
+      await pool.query('UPDATE email_verificacion_tokens SET used = TRUE WHERE token = $1', [req.body.token]);
+
+      const { rows: userRows } = await pool.query(
+        `SELECT u.*, s.nombre as segmento, s.config as segmento_config
+         FROM usuarios u LEFT JOIN segmentos s ON s.id = u.segmento_id
+         WHERE u.id = $1`,
+        [usuario_id],
+      );
+      const { password_hash, ...safeUser } = userRows[0];
+      return reply.send(safeUser);
+    },
+  );
+
+  // ── POST /usuarios/reenviar-verificacion ────────
+  app.post<{ Body: { email: string } }>(
+    '/usuarios/reenviar-verificacion',
+    {
+      schema: {
+        tags:        ['usuarios'],
+        summary:     'Reenviar el email de confirmación de cuenta',
+        body: {
+          type: 'object',
+          required: ['email'],
+          properties: { email: { type: 'string', format: 'email' } },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: { message: { type: 'string' }, _dev_token: { type: 'string' } },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const msg = 'Si el correo existe y no está confirmado, te reenviamos el link';
+      const { rows } = await pool.query(
+        'SELECT id, username, email, email_verificado FROM usuarios WHERE email = $1',
+        [req.body.email],
+      );
+      if (!rows.length || rows[0].email_verificado) return reply.send({ message: msg });
+
+      const usuario = rows[0];
+      await pool.query(
+        `UPDATE email_verificacion_tokens SET used = TRUE WHERE usuario_id = $1 AND used = FALSE`,
+        [usuario.id],
+      );
+      const token     = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await pool.query(
+        `INSERT INTO email_verificacion_tokens (usuario_id, token, expires_at) VALUES ($1, $2, $3)`,
+        [usuario.id, token, expiresAt],
+      );
+      await enviarEmailVerificacion(usuario.email, usuario.username, token);
+
+      return reply.send({
+        message: msg,
+        ...(process.env.NODE_ENV !== 'production' && { _dev_token: token }),
+      });
     },
   );
 
@@ -313,6 +425,11 @@ export async function usuariosRoutes(app: FastifyInstance) {
         response: {
           200: { description: 'Credenciales válidas', ...UserSchema },
           401: { description: 'Credenciales inválidas', ...ErrorSchema },
+          403: {
+            description: 'Cuenta sin confirmar',
+            type: 'object',
+            properties: { error: { type: 'string' }, code: { type: 'string' } },
+          },
         },
       },
     },
@@ -335,6 +452,12 @@ export async function usuariosRoutes(app: FastifyInstance) {
       const valid = await bcrypt.compare(password, user.password_hash);
       if (!valid) return reply.code(401).send({ error: 'Credenciales inválidas' });
       if (user.activo === false) return reply.code(401).send({ error: 'Cuenta desactivada' });
+      if (user.email_verificado === false) {
+        return reply.code(403).send({
+          error: 'Confirmá tu cuenta desde el email que te mandamos antes de iniciar sesión',
+          code:  'EMAIL_NO_VERIFICADO',
+        });
+      }
 
       const { password_hash, ...safeUser } = user;
       return reply.send(safeUser);

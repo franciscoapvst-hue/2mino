@@ -52,6 +52,15 @@ const CODIGO_PARTY_DE_URL: string | null = (() => {
   return m[1];
 })();
 
+// Link de confirmación de cuenta: /verificar-email/:token (mismo patrón
+// que el de arriba — se lee y se limpia la URL una sola vez al cargar).
+const TOKEN_VERIFICACION_DE_URL: string | null = (() => {
+  const m = window.location.pathname.match(/^\/verificar-email\/([A-Za-z0-9]+)/);
+  if (!m) return null;
+  window.history.replaceState(null, '', '/');
+  return m[1];
+})();
+
 export default function App() {
   const [view,     setView]     = useState<AppView>('login');
   const [session,  setSession]  = useState<Session | null>(null);
@@ -65,6 +74,9 @@ export default function App() {
   // se ofrece reintegrarse desde un banner en el dashboard, en vez de
   // forzar la navegación (por eso vive aparte de `gameSala`).
   const [salaParaReintegrar, setSalaParaReintegrar] = useState<Sala | null>(null);
+  // Link de confirmación de cuenta inválido/vencido — se muestra un aviso
+  // en vez de dejar caer silenciosamente a login sin explicar por qué.
+  const [verificacionFallo, setVerificacionFallo] = useState(false);
   // Invitación a party vía link (/party/ABCD). El inicializador de useState
   // corre síncrono en el primer render, ANTES que cualquier efecto —
   // evita que el .then() del restore de sesión capture un valor null por
@@ -96,8 +108,27 @@ export default function App() {
     return () => document.removeEventListener('click', onClick, true);
   }, []);
 
+  // Confirmar cuenta desde el link del email: gana sobre restaurar sesión
+  // (si ya había una sesión vieja en este navegador, el link igual debe
+  // loguear con la cuenta recién confirmada). Al confirmar, el backend ya
+  // devuelve token+user — no hace falta un login aparte.
+  useEffect(() => {
+    if (!TOKEN_VERIFICACION_DE_URL) return;
+    api.verificarEmail(TOKEN_VERIFICACION_DE_URL)
+      .then(async (authRes) => {
+        tokenStore.set(authRes.token, true);
+        const config = await api.getPreferencias();
+        handleSuccess(authRes.user, config);
+      })
+      .catch(() => setVerificacionFallo(true))
+      .finally(() => setBooting(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Restore session from stored token
   useEffect(() => {
+    if (TOKEN_VERIFICACION_DE_URL) return; // el efecto de arriba ya se encarga
+
     const token = tokenStore.get();
     if (!token) { setBooting(false); return; }
 
@@ -220,6 +251,31 @@ export default function App() {
     return (
       <div className="app-shell">
         <div className="boot-spinner" aria-label="Cargando…" />
+      </div>
+    );
+  }
+
+  if (verificacionFallo && !session) {
+    return (
+      <div className={`login-screen${dark ? '' : ' is-light'}`}>
+        <section className="lg-panel">
+          <div className="lg-form lg-sent">
+            <span className="lg-sent-icon" aria-hidden="true">⚠</span>
+            <h2>El link no es válido o venció</h2>
+            <p className="lg-sent-sub">
+              Los links de confirmación duran 24 horas. Iniciá sesión con tu
+              correo y contraseña — si tu cuenta todavía no está confirmada,
+              ahí vas a poder pedir que te reenviemos el link.
+            </p>
+            <button
+              type="button"
+              className="lg-submit"
+              onClick={() => { setVerificacionFallo(false); setView('login'); }}
+            >
+              Ir a iniciar sesión
+            </button>
+          </div>
+        </section>
       </div>
     );
   }

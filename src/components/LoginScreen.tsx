@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, FormEvent } from 'react';
 import type { View } from '../App';
-import { api, tokenStore, type AuthUser, type UserConfig } from '../api';
+import { api, tokenStore, ApiError, type AuthUser, type UserConfig } from '../api';
 import { GoogleIcon, SunIcon, MoonIcon } from './icons';
 import { Bone, DominoStage } from './DominoStage';
 
@@ -47,6 +47,12 @@ export default function LoginScreen({ onSwitch, onSuccess, dark, onToggleTheme }
   const [submitted, setSubmitted] = useState(false);
   const [loading,   setLoading]   = useState(false);
   const [apiError,  setApiError]  = useState<string | null>(null);
+  // Cuenta sin confirmar: en vez del error genérico, ofrecer reenviar el
+  // link — es el único caso en que el usuario tiene una acción real que
+  // tomar acá mismo, sin ir a otra pantalla.
+  const [sinVerificar, setSinVerificar] = useState(false);
+  const [reenviando,   setReenviando]   = useState(false);
+  const [reenviado,    setReenviado]    = useState(false);
 
   const emailErr = !email
     ? 'El correo es requerido'
@@ -70,15 +76,34 @@ export default function LoginScreen({ onSwitch, onSuccess, dark, onToggleTheme }
 
     setLoading(true);
     setApiError(null);
+    setSinVerificar(false);
+    setReenviado(false);
     try {
       const authRes = await api.login({ email, password });
       tokenStore.set(authRes.token, remember);
       const config = await api.getPreferencias();
       onSuccess(authRes.user, config);
     } catch (err: unknown) {
-      setApiError(err instanceof Error ? err.message : 'Error al iniciar sesión');
+      if (err instanceof ApiError && err.code === 'EMAIL_NO_VERIFICADO') {
+        setSinVerificar(true);
+      } else {
+        setApiError(err instanceof Error ? err.message : 'Error al iniciar sesión');
+      }
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleReenviar() {
+    setReenviando(true);
+    try {
+      await api.reenviarVerificacion(email);
+      setReenviado(true);
+    } catch {
+      // best-effort — el endpoint no distingue "no existe" de "ya falló el envío"
+      setReenviado(true);
+    } finally {
+      setReenviando(false);
     }
   }
 
@@ -145,6 +170,27 @@ export default function LoginScreen({ onSwitch, onSuccess, dark, onToggleTheme }
           </header>
 
           {apiError && <div className="lg-alert" role="alert">⚠ {apiError}</div>}
+
+          {sinVerificar && (
+            <div className="lg-alert" role="alert">
+              {reenviado ? (
+                <>✉ Te reenviamos el link de confirmación a <strong>{email}</strong>.</>
+              ) : (
+                <>
+                  ⚠ Confirmá tu cuenta desde el email que te mandamos antes de iniciar sesión.{' '}
+                  <button
+                    type="button"
+                    className="lg-link"
+                    onClick={handleReenviar}
+                    disabled={reenviando}
+                    style={{ display: 'inline', padding: 0 }}
+                  >
+                    {reenviando ? 'Reenviando…' : 'Reenviar email'}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
 
           <div className="lg-field">
             <label htmlFor="lg-email">Correo electrónico</label>

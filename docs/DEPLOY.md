@@ -78,8 +78,13 @@ DOMAIN=2mino.online
 # CORS — con dominio propio, poner el origen exacto (con https)
 CORS_ORIGIN=https://2mino.online
 
-# Email — true solo cuando se integre un proveedor (SendGrid/Resend/SES)
+# Email de confirmación de cuenta — ya integrado (Resend), ver
+# docs/ARQUITECTURA.md. Poner en true + completar RESEND_API_KEY cuando
+# el dominio 2mino.online esté verificado en Resend.
 ENABLE_EMAIL=false
+RESEND_API_KEY=
+EMAIL_FROM=2mino <onboarding@resend.dev>
+APP_URL=https://2mino.online
 ```
 
 `.env` está en `.gitignore`; nunca se commitea.

@@ -1,6 +1,6 @@
 import { useState, FormEvent } from 'react';
 import type { View } from '../App';
-import { api, tokenStore, type AuthUser, type UserConfig } from '../api';
+import { api, tokenStore, ApiError, type AuthUser, type UserConfig } from '../api';
 import { GoogleIcon } from './icons';
 
 type Props = {
@@ -16,6 +16,9 @@ export default function LoginForm({ onSwitch, onSuccess }: Props) {
   const [submitted, setSubmitted] = useState(false);
   const [loading,   setLoading]   = useState(false);
   const [apiError,  setApiError]  = useState<string | null>(null);
+  const [sinVerificar, setSinVerificar] = useState(false);
+  const [reenviando,   setReenviando]   = useState(false);
+  const [reenviado,    setReenviado]    = useState(false);
 
   const emailErr = !email
     ? 'El correo es requerido'
@@ -39,15 +42,31 @@ export default function LoginForm({ onSwitch, onSuccess }: Props) {
 
     setLoading(true);
     setApiError(null);
+    setSinVerificar(false);
+    setReenviado(false);
     try {
       const authRes = await api.login({ email, password });
       tokenStore.set(authRes.token, remember);
       const config = await api.getPreferencias();
       onSuccess(authRes.user, config);
     } catch (err: unknown) {
-      setApiError(err instanceof Error ? err.message : 'Error al iniciar sesión');
+      if (err instanceof ApiError && err.code === 'EMAIL_NO_VERIFICADO') {
+        setSinVerificar(true);
+      } else {
+        setApiError(err instanceof Error ? err.message : 'Error al iniciar sesión');
+      }
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleReenviar() {
+    setReenviando(true);
+    try {
+      await api.reenviarVerificacion(email);
+    } finally {
+      setReenviado(true);
+      setReenviando(false);
     }
   }
 
@@ -59,6 +78,27 @@ export default function LoginForm({ onSwitch, onSuccess }: Props) {
       </div>
 
       {apiError && <div className="api-error">⚠ {apiError}</div>}
+
+      {sinVerificar && (
+        <div className="api-error">
+          {reenviado ? (
+            <>✉ Te reenviamos el link de confirmación a <strong>{email}</strong>.</>
+          ) : (
+            <>
+              ⚠ Confirmá tu cuenta desde el email que te mandamos antes de iniciar sesión.{' '}
+              <button
+                type="button"
+                className="link-btn"
+                onClick={handleReenviar}
+                disabled={reenviando}
+                style={{ display: 'inline', padding: 0 }}
+              >
+                {reenviando ? 'Reenviando…' : 'Reenviar email'}
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="field">
         <span className="field-label">Correo electrónico</span>
