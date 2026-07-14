@@ -1,0 +1,19 @@
+# Prometheus vive en tu PC (no en el VPS) — scrapea los exportadores del
+# VPS a través de un túnel SSH que vos abrís a mano (ver docs/DEPLOY.md):
+#
+#   ssh -N -L 8080:127.0.0.1:8080 -L 9100:127.0.0.1:9100 root@vps-2mino
+#
+# Con el túnel arriba, "localhost:8080/9100" de tu PC son en realidad
+# cadvisor/node-exporter del VPS. host.docker.internal es cómo un
+# contenedor de tu PC le habla al localhost de tu PC (no del VPS).
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'vps-cadvisor'
+    static_configs:
+      - targets: ['host.docker.internal:8080']
+
+  - job_name: 'vps-node-exporter'
+    static_configs:
+      - targets: ['host.docker.internal:9100']

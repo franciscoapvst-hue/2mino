@@ -31,10 +31,44 @@ puertos al exterior (80 y 443); todo lo demás vive detrás de la red Docker:
 | `ms-salas`            | 6001           | —        | Salas, juego, ELO, matchmaking                  |
 | `ms-social`           | 6200           | —        | Amigos, notificaciones, chat (WS)               |
 | `postgres`            | 5432           | 5432 *   | Base de datos                                   |
+| `cadvisor`             | 8080           | 127.0.0.1 † | Exportador de métricas por contenedor (Prometheus) |
+| `node-exporter`        | 9100           | 127.0.0.1 † | Exportador de métricas del host (RAM/disco/CPU) |
 
 \* Postgres se expone en el compose para debug local. **En producción comenta ese
 bloque `ports:` de postgres** — los microservicios lo alcanzan por la red interna;
 no hace falta abrirlo a internet.
+
+† `cadvisor` y `node-exporter`, igual que `api-integracion`, se publican
+**solo en loopback** — nunca a la interfaz pública. No son el dashboard en
+sí: solo leen y exponen métricas en formato Prometheus (`/metrics`). El
+dashboard (Prometheus + Grafana) corre **en tu PC**, no en el VPS — mismo
+criterio que `ci/` (Jenkins/SonarQube en local, nunca compitiendo con el
+tráfico real del VPS). Ver `monitoring/docker-compose.yml`.
+
+### Monitoreo (dashboard local con Grafana)
+
+1. Abrí el túnel SSH hacia el VPS (mismo mecanismo que ya usa el Back
+   Office, ver `docs/CASOS_DE_USO_BACKOFFICE.md` §10.1, local — no
+   versionado):
+   ```bash
+   ssh -N -L 8080:127.0.0.1:8080 -L 9100:127.0.0.1:9100 root@vps-2mino
+   ```
+2. En tu PC, levantá el stack de monitoreo (separado del de la app, igual
+   que `ci/`):
+   ```bash
+   cd monitoring
+   cp .env.example .env   # completar GRAFANA_ADMIN_PASSWORD
+   docker compose up -d
+   ```
+3. Abrí `http://localhost:3001` (usuario `admin`, la contraseña del
+   `.env`) — el datasource de Prometheus y el dashboard "Docker and Host
+   Monitoring w/ Prometheus" (cAdvisor + node-exporter) ya vienen
+   provisionados solos, sin configurar nada a mano.
+
+Todo el peso de guardar/consultar el histórico de métricas (Prometheus +
+Grafana) queda en tu máquina — la VPS solo corre los dos exportadores
+livianos (`cadvisor` + `node-exporter`), que ni guardan histórico ni
+grafican nada.
 
 El navegador habla con `https://DOMAIN` (Caddy). Caddy termina TLS y reenvía todo
 a `frontend:80` (nginx), que sirve el HTML estático y reenvía `/api/` y `/ws/` a
@@ -252,30 +286,34 @@ Auditoría de escalabilidad hecha 2026-07-13 (detalle completo en
 `docs/ESCALABILIDAD.md`, local — no versionado). Resumen de lo ya hecho
 y lo que falta:
 
-**Ya hecho** (PRs #46, #47, #49):
+**Ya hecho** (PRs #46, #47, #49, #53):
 - Timeout de 10s en las llamadas del gateway a los microservicios.
 - `max` explícito en los pools de Postgres de los 4 servicios + `max_connections=200`.
 - Rate limiting (global y en `/auth/*`).
 - Healthchecks en los 6 contenedores de aplicación.
 - Polling del frontend con back-pressure (no apila requests contra un backend lento).
 - Compresión (gzip/zstd) en Caddy.
+- **Polling del estado de partida aliviado con WS "aviso + fetch"** (PR #53):
+  `ms-salas` avisa a `ms-social` tras cada jugada, que empuja
+  `partida_actualizada` por el WS de chat de la sala ya abierto; el poll de
+  respaldo bajó de 2s a 20s.
+- **Monitoreo**: `cadvisor` + `node-exporter` en el VPS (livianos, solo
+  exponen métricas) + Prometheus/Grafana en tu PC (`monitoring/`,
+  separado del stack de la app, mismo espíritu que `ci/`) — ver más
+  arriba cómo levantarlo.
 
 **Pendiente**:
-- **Monitoreo**: `docker compose logs` sirve de arranque, pero no hay
-  forma de enterarse de un problema sin que un jugador se queje. Falta un
-  cron con `docker stats`/`df -h` + alerta por webhook, y/o un uptime
-  checker externo (UptimeRobot u otro) apuntando a `/api/health`.
-- **CI en el VPS**: Jenkins en sí corre local (PC del dev), pero el paso
-  final del pipeline (`Jenkinsfile`, stage "Deploy a VPS") hace
-  `docker compose up -d --build` por SSH DIRECTO en el VPS de
-  producción — cada imagen se recompila ahí mismo, compitiendo por
-  CPU/RAM con el tráfico real. Falta decidir cómo resolverlo (build
-  local + push de imagen ya armada, o un runner de CI aparte).
-- **Polling del estado de partida**: sigue siendo HTTP cada 2s (con
-  back-pressure, pero sigue siendo polling). El siguiente paso natural es
-  un WebSocket "aviso + fetch" reusando la infraestructura que ya tiene
-  `ms-social` para el chat de partida — scoping ya hecho, ver
-  `docs/ESCALABILIDAD.md`.
+- **CI en el VPS**: fuera de alcance por ahora (Jenkins corre local, en la
+  PC del dev — bien). El paso final del pipeline (`Jenkinsfile`, stage
+  "Deploy a VPS") sigue haciendo `docker compose up -d --build` por SSH
+  DIRECTO en el VPS de producción — cada imagen se recompila ahí mismo,
+  compitiendo por CPU/RAM con el tráfico real. Si en algún momento se
+  retoma: decidir entre build local + push de imagen ya armada, o un
+  runner de CI aparte.
+- **Alertas basadas en umbral externo** (Telegram/Discord/email cuando
+  algo cruza un límite): Grafana soporta reglas de alerta + canales de
+  notificación, pero no vienen configuradas — hoy el dashboard cubre
+  "puedo revisar cuando quiera", no "me avisan solo". No urgente.
 - **Redis / réplicas**: no urgente hoy — solo hace falta el día que
   algún servicio necesite correr en más de una instancia (hoy el caché
   de `reglas_juego`, el mutex de bots de `ms-salas` y la presencia de

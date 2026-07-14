@@ -172,6 +172,51 @@ services:
       frontend:
         condition: service_healthy
 
+  # ── Exportadores de métricas (VPS) ───────────────
+  # Solo esto corre acá — lo pesado (Prometheus + Grafana, el dashboard en
+  # sí) vive en tu PC, ver monitoring/docker-compose.yml y docs/DEPLOY.md.
+  # Mismo espíritu que ci/ (Jenkins/SonarQube en local, nunca en el VPS que
+  # sirve tráfico real): estos dos contenedores solo LEEN y EXPONEN
+  # métricas, no las guardan ni las grafican — eso es trabajo de Grafana
+  # corriendo en tu máquina. docs/ESCALABILIDAD.md — cierra el gap de "no
+  # hay forma de enterarse de un problema sin que un jugador se queje".
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    restart: unless-stopped
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - /dev/kmsg
+    # Métricas por contenedor (CPU/RAM/IO), formato Prometheus en /metrics.
+    # Solo loopback — se llega por túnel SSH desde tu PC (ver
+    # docs/DEPLOY.md), nunca expuesto a internet, mismo criterio que
+    # api-integracion.
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    # Métricas del HOST (RAM/disco/CPU de la VPS entera, no por contenedor)
+    # — cAdvisor no ve esto, y es justo lo que hace falta para detectar "se
+    # llenó el disco" antes de que un jugador se queje. Mismo criterio de
+    # solo-loopback que cadvisor.
+    ports:
+      - "127.0.0.1:9100:9100"
+
 volumes:
   postgres_data:
   caddy_data:
