@@ -50,7 +50,11 @@ Componentes principales en `src/components/game/`:
 ### GameBoard — comportamiento
 
 - Carga estado con `api.juego.estado(salaId)`.
-- **Polling** periódico (2s) para sincronizar con otros jugadores, vía
+- **WS "aviso + fetch"**: `useSalaChat` (compartido con `ChatPanel`, ver
+  abajo) recibe `partida_actualizada` por el mismo socket del chat de la
+  sala y dispara un refetch inmediato — sin esto, cada jugada de otro
+  jugador o de un bot tardaría hasta el siguiente tick de poll en verse.
+- **Polling** de respaldo (20s) por si el WS se cayó, vía
   `src/hooks/usePoll.ts` — con back-pressure: programa la siguiente
   consulta recién cuando la anterior resolvió o falló, nunca en
   paralelo. El mismo hook lo usan `MatchmakingView`, `SalasView` y

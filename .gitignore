@@ -28,6 +28,7 @@ docs/BUGS.md
 docs/CASOS_DE_USO_BACKOFFICE.md
 docs/CASOS_DE_USO_BACKOFFICE.docx
 docs/PENDIENTES_JUEGO.md
+docs/ESCALABILIDAD.md
 
 # build outputs
 ms-usuarios/dist/

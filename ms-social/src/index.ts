@@ -7,6 +7,7 @@ import { amigosRoutes } from './routes/amigos';
 import { notificacionesRoutes } from './routes/notificaciones';
 import { chatRoutes } from './routes/chat';
 import { wsRoutes } from './routes/ws';
+import { internoRoutes } from './routes/interno';
 
 const app = Fastify({
   logger: true,
@@ -36,6 +37,7 @@ app.register(amigosRoutes);
 app.register(notificacionesRoutes);
 app.register(chatRoutes);
 app.register(wsRoutes);
+app.register(internoRoutes);
 
 app.get('/health', {
   schema: {

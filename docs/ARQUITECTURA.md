@@ -159,6 +159,17 @@ programa recién cuando la anterior resolvió o falló, nunca en paralelo,
 para no apilar requests si el backend está lento. El mismo hook cubre
 los demás polls de la app (matchmaking, sala de espera, notificaciones).
 
+El poll ya no es la única vía: tras cada jugada persistida (`guardarPartida`
+en `ms-salas/src/routes/juegos.ts`), un aviso HTTP fire-and-forget
+(`ms-salas/src/http.ts`) le pide a `ms-social` que haga `broadcastSala`
+(`POST /interno/salas/:salaId/avisar-partida`, ruta interna no expuesta por
+el gateway) por el mismo WebSocket de chat de la sala que `GameBoard` ya
+mantiene abierto todo el partido — el cliente recibe `partida_actualizada`
+y dispara un `fetchPartida()` inmediato. El aviso no lleva el estado (cada
+jugador sigue pidiendo su propia vista enmascarada), solo dice "hay algo
+nuevo". El polling de `usePoll` bajó de 2s a **20s** y quedó como red de
+seguridad si el WS se cae, mismo patrón que ya usa `Dashboard`.
+
 ## Seguridad
 
 - Los microservicios **no publican puertos** en Docker Compose (solo `api-integracion` y `postgres` para debug).

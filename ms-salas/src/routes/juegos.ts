@@ -9,6 +9,7 @@ import { aplicarEloRanked } from './ranked';
 import { resolverTurnosBotConDelay } from '../game/bots';
 import type { MovimientoBot } from '../game/bots';
 import { getRegla, limiteJugadaMsDe } from '../game/reglas';
+import { avisarPartidaActualizada } from '../http';
 
 const ErrorSchema = {
   type: 'object',
@@ -68,6 +69,10 @@ async function guardarPartida(juegoId: string, salaId: string, partida: PartidaS
       console.error('Error guardando partida_resultados:', e);
     }
   }
+  // Un solo punto de aviso para todo lo que persiste un cambio de estado
+  // (jugar/pasar/listo/abandonar y cada paso de bot resuelto en segundo
+  // plano) — todos pasan por acá, no hace falta repetir la llamada en cada ruta.
+  avisarPartidaActualizada(salaId);
 }
 
 // ── Historial: resultado agregado por jugador (docs §5.1/§5.4) ──────

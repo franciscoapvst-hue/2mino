@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ChatIcon, SendIcon, SmileIcon, XIcon } from '../icons';
-import { useSalaChat } from '../../hooks/useSalaChat';
+import type { ChatMensaje } from '../../api';
 
 type Props = {
-  salaId: string;
+  mensajes: ChatMensaje[];
+  enviar: (mensaje: string) => void;
   miUsuarioId: string;
-  miUsername: string;
 };
 
 // Set curado de emoji Unicode nativos (sin librería externa — ver
@@ -17,13 +17,12 @@ function formatHora(iso: string): string {
   return new Date(iso).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
 }
 
-export default function ChatPanel({ salaId, miUsuarioId, miUsername }: Props) {
+export default function ChatPanel({ mensajes, enviar: enviarWs, miUsuarioId }: Props) {
   const [abierto, setAbierto] = useState(false);
   const [texto, setTexto] = useState('');
   const [emojiAbierto, setEmojiAbierto] = useState(false);
   const [noLeidos, setNoLeidos] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
-  const { mensajes, enviar: enviarWs } = useSalaChat(salaId, miUsername);
   // El primer cambio de `mensajes` es la carga del historial (no son
   // mensajes "nuevos" sin leer) — se salta con este ref.
   const historialCargado = useRef(false);
