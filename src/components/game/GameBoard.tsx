@@ -8,6 +8,7 @@ import type { PartidaPublica, Pieza, Sala, AuthUser } from '../../api';
 import { BackIcon, PersonAddIcon } from '../icons';
 import { useMeasuredWidth } from '../../hooks/useMeasuredWidth';
 import { usePoll } from '../../hooks/usePoll';
+import { useSalaChat } from '../../hooks/useSalaChat';
 import ChatPanel from '../social/ChatPanel';
 import AdSlot from '../AdSlot';
 
@@ -178,7 +179,13 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
     }
   }, [sala.id]);
 
-  usePoll(fetchPartida, 2000);
+  // WS "aviso + fetch" (docs/ESCALABILIDAD.md): ms-social empuja
+  // `partida_actualizada` por el mismo socket del chat de la sala (ya
+  // abierto todo el partido) apenas ms-salas persiste una jugada — dispara
+  // un refetch inmediato. El poll de abajo sigue como red de seguridad más
+  // lenta por si el WS se cayó, mismo patrón que ya usa Dashboard.
+  const { mensajes: chatMensajes, enviar: enviarChat } = useSalaChat(sala.id, user.username, fetchPartida);
+  usePoll(fetchPartida, 20000);
 
   // ── Jugar ficha (API) ─────────────────────────
   async function handleJugar(pieza: Pieza, lado?: 'izq' | 'der') {
@@ -662,7 +669,7 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
         </div>
       )}
 
-      <ChatPanel salaId={sala.id} miUsuarioId={user.id} miUsername={user.username} />
+      <ChatPanel mensajes={chatMensajes} enviar={enviarChat} miUsuarioId={user.id} />
     </div>
   );
 }

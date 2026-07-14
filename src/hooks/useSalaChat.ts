@@ -1,6 +1,12 @@
 // ── WS de chat de una sala (docs/CASOS_DE_USO_SOCIAL.md §8.2) ───────
 // Distinto de useSocialSocket: este es por-sala, no por-usuario/global.
 // Carga el historial por REST y después escucha (y manda) mensajes por WS.
+//
+// Este mismo socket, ya abierto todo el tiempo que dura la partida (lo usa
+// GameBoard, esté el chat abierto o no), se reusa para el aviso "poke" de
+// docs/ESCALABILIDAD.md: cuando ms-salas persiste una jugada, avisa a
+// ms-social y esta hace broadcast `partida_actualizada` a todos los
+// conectados a la sala — evita abrir un segundo WS solo para eso.
 import { useEffect, useRef, useState } from 'react';
 import { api, tokenStore, type ChatMensaje } from '../api';
 
@@ -9,7 +15,11 @@ function wsUrl(path: string, token: string): string {
   return `${proto}://${window.location.host}${path}?token=${encodeURIComponent(token)}`;
 }
 
-export function useSalaChat(salaId: string, miUsername: string): {
+export function useSalaChat(
+  salaId: string,
+  miUsername: string,
+  onPartidaActualizada?: () => void,
+): {
   mensajes: ChatMensaje[];
   enviar: (mensaje: string) => void;
 } {
@@ -20,6 +30,10 @@ export function useSalaChat(salaId: string, miUsername: string): {
   // socket, si no el primer mensaje puede llegar antes de que termine de
   // validar y se pierde.
   const listoRef = useRef(false);
+  // Ref para no reabrir el socket cada vez que el caller pasa un callback
+  // con identidad nueva (ej. fetchPartida recreado por un useCallback).
+  const onPartidaActualizadaRef = useRef(onPartidaActualizada);
+  onPartidaActualizadaRef.current = onPartidaActualizada;
 
   useEffect(() => {
     api.social.chatHistorial(salaId, miUsername).then(setMensajes).catch(() => {});
@@ -42,6 +56,8 @@ export function useSalaChat(salaId: string, miUsername: string): {
         listoRef.current = true;
       } else if (msg.tipo === 'mensaje_nuevo' && msg.mensaje) {
         setMensajes(prev => [...prev, msg.mensaje!]);
+      } else if (msg.tipo === 'partida_actualizada') {
+        onPartidaActualizadaRef.current?.();
       }
     };
 
