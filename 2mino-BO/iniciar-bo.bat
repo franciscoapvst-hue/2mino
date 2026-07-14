@@ -35,6 +35,11 @@ echo Abriendo el tunel SSH a produccion en otra ventana aparte...
 echo (Necesario para que el boton "Prod" del panel funcione. No cierres esa ventana.)
 start "2mino BO - Tunel a Produccion (no cerrar)" cmd /k "node scripts\tunnel-prod.cjs"
 
+echo.
+echo Iniciando el lanzador de Grafana en otra ventana aparte...
+echo (Necesario para que el boton "Grafana" del panel funcione. No cierres esa ventana.)
+start "2mino BO - Lanzador de Grafana (no cerrar)" cmd /k "node scripts\grafana-launcher.cjs"
+
 echo Esperando a que el panel responda...
 :esperar_bo
 timeout /t 2 /nobreak >nul
