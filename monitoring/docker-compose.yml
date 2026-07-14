@@ -27,8 +27,11 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
       - prometheus
+    # 3001 está tomado por el túnel del Back Office a producción
+    # (2mino-BO/scripts/tunnel-prod.cjs, LOCAL_PORT=3001) — 3030 para que
+    # los dos puedan correr juntos sin chocar.
     ports:
-      - "127.0.0.1:3001:3000"
+      - "127.0.0.1:3030:3000"
 
 volumes:
   prometheus_data:

@@ -9,7 +9,8 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "serve:pwa": "node scripts/serve-pwa.cjs",
-    "tunnel:prod": "node scripts/tunnel-prod.cjs"
+    "tunnel:prod": "node scripts/tunnel-prod.cjs",
+    "grafana:launcher": "node scripts/grafana-launcher.cjs"
   },
   "dependencies": {
     "react": "^19.2.7",

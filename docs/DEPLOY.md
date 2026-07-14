@@ -62,10 +62,14 @@ tráfico real del VPS). Ver `monitoring/docker-compose.yml`.
    cp .env.example .env   # completar GRAFANA_ADMIN_PASSWORD
    docker compose up -d
    ```
-3. Abrí `http://localhost:3001` (usuario `admin`, la contraseña del
+3. Abrí `http://localhost:3030` (usuario `admin`, la contraseña del
    `.env`) — el datasource de Prometheus y el dashboard "Docker and Host
    Monitoring w/ Prometheus" (cAdvisor + node-exporter) ya vienen
-   provisionados solos, sin configurar nada a mano.
+   provisionados solos, sin configurar nada a mano. También hay un botón
+   directo "Grafana ↗" en el nav del Back Office (`2mino-BO`), que además
+   levanta el túnel y el stack solo si hace falta.
+   3001 quedó libre a propósito — lo usa el túnel del BO a producción
+   (`2mino-BO/scripts/tunnel-prod.cjs`).
 
 Todo el peso de guardar/consultar el histórico de métricas (Prometheus +
 Grafana) queda en tu máquina — la VPS solo corre los dos exportadores
