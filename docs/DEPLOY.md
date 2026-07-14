@@ -31,10 +31,26 @@ puertos al exterior (80 y 443); todo lo demás vive detrás de la red Docker:
 | `ms-salas`            | 6001           | —        | Salas, juego, ELO, matchmaking                  |
 | `ms-social`           | 6200           | —        | Amigos, notificaciones, chat (WS)               |
 | `postgres`            | 5432           | 5432 *   | Base de datos                                   |
+| `netdata`             | 19999          | 127.0.0.1 † | Dashboard de monitoreo (CPU/RAM/disco por contenedor) |
 
 \* Postgres se expone en el compose para debug local. **En producción comenta ese
 bloque `ports:` de postgres** — los microservicios lo alcanzan por la red interna;
 no hace falta abrirlo a internet.
+
+† Netdata, igual que `api-integracion` (ver más abajo), se publica **solo en
+loopback** (`127.0.0.1:19999`) — nunca a la interfaz pública. Se revisa por
+túnel SSH, mismo mecanismo que ya usa el Back Office (ver
+`docs/CASOS_DE_USO_BACKOFFICE.md` §10.1, local — no versionado):
+
+```bash
+ssh -N -L 19999:127.0.0.1:19999 root@vps-2mino
+```
+
+y abrís `http://localhost:19999` en tu navegador — dashboard en vivo de
+CPU/RAM/disco/red por contenedor, 100% local y open source (sin Netdata
+Cloud, sin cuenta de terceros: el agente solo lee `/var/run/docker.sock` +
+`/proc`/`/sys` del host, nunca manda nada afuera). Trae ~130 reglas de
+alerta por defecto (disco, RAM, carga) sin configurar nada extra.
 
 El navegador habla con `https://DOMAIN` (Caddy). Caddy termina TLS y reenvía todo
 a `frontend:80` (nginx), que sirve el HTML estático y reenvía `/api/` y `/ws/` a
@@ -252,30 +268,34 @@ Auditoría de escalabilidad hecha 2026-07-13 (detalle completo en
 `docs/ESCALABILIDAD.md`, local — no versionado). Resumen de lo ya hecho
 y lo que falta:
 
-**Ya hecho** (PRs #46, #47, #49):
+**Ya hecho** (PRs #46, #47, #49, #53):
 - Timeout de 10s en las llamadas del gateway a los microservicios.
 - `max` explícito en los pools de Postgres de los 4 servicios + `max_connections=200`.
 - Rate limiting (global y en `/auth/*`).
 - Healthchecks en los 6 contenedores de aplicación.
 - Polling del frontend con back-pressure (no apila requests contra un backend lento).
 - Compresión (gzip/zstd) en Caddy.
+- **Polling del estado de partida aliviado con WS "aviso + fetch"** (PR #53):
+  `ms-salas` avisa a `ms-social` tras cada jugada, que empuja
+  `partida_actualizada` por el WS de chat de la sala ya abierto; el poll de
+  respaldo bajó de 2s a 20s.
+- **Monitoreo**: dashboard Netdata (servicio `netdata` en
+  `docker-compose.yml`), 100% local/open source, sin cuenta externa —
+  ver más arriba (†) cómo acceder por túnel SSH.
 
 **Pendiente**:
-- **Monitoreo**: `docker compose logs` sirve de arranque, pero no hay
-  forma de enterarse de un problema sin que un jugador se queje. Falta un
-  cron con `docker stats`/`df -h` + alerta por webhook, y/o un uptime
-  checker externo (UptimeRobot u otro) apuntando a `/api/health`.
-- **CI en el VPS**: Jenkins en sí corre local (PC del dev), pero el paso
-  final del pipeline (`Jenkinsfile`, stage "Deploy a VPS") hace
-  `docker compose up -d --build` por SSH DIRECTO en el VPS de
-  producción — cada imagen se recompila ahí mismo, compitiendo por
-  CPU/RAM con el tráfico real. Falta decidir cómo resolverlo (build
-  local + push de imagen ya armada, o un runner de CI aparte).
-- **Polling del estado de partida**: sigue siendo HTTP cada 2s (con
-  back-pressure, pero sigue siendo polling). El siguiente paso natural es
-  un WebSocket "aviso + fetch" reusando la infraestructura que ya tiene
-  `ms-social` para el chat de partida — scoping ya hecho, ver
-  `docs/ESCALABILIDAD.md`.
+- **CI en el VPS**: fuera de alcance por ahora (Jenkins corre local, en la
+  PC del dev — bien). El paso final del pipeline (`Jenkinsfile`, stage
+  "Deploy a VPS") sigue haciendo `docker compose up -d --build` por SSH
+  DIRECTO en el VPS de producción — cada imagen se recompila ahí mismo,
+  compitiendo por CPU/RAM con el tráfico real. Si en algún momento se
+  retoma: decidir entre build local + push de imagen ya armada, o un
+  runner de CI aparte.
+- **Alertas basadas en umbral externo** (Telegram/Discord/email cuando
+  algo cruza un límite): Netdata ya trae ~130 reglas de alerta por
+  defecto, pero notifican solo dentro del dashboard hasta que se configure
+  un canal de salida (`health_alarm_notify.conf`) — no urgente, el
+  dashboard ya cubre "puedo revisar cuando quiera".
 - **Redis / réplicas**: no urgente hoy — solo hace falta el día que
   algún servicio necesite correr en más de una instancia (hoy el caché
   de `reglas_juego`, el mutex de bots de `ms-salas` y la presencia de

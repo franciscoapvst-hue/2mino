@@ -172,7 +172,42 @@ services:
       frontend:
         condition: service_healthy
 
+  # ── Monitoreo (Netdata) ──────────────────────────
+  # Dashboard local, open source, sin cuenta ni servicio externo (Netdata
+  # Cloud es opcional y NO se usa acá). Lee el socket de Docker + /proc,
+  # /sys del host para graficar CPU/RAM/disco/red, global y por contenedor.
+  # docs/ESCALABILIDAD.md — cierra el gap de "no hay forma de enterarse de
+  # un problema sin que un jugador se queje".
+  netdata:
+    image: netdata/netdata:stable
+    restart: unless-stopped
+    cap_add:
+      - SYS_PTRACE
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - netdata_config:/etc/netdata
+      - netdata_lib:/var/lib/netdata
+      - netdata_cache:/var/cache/netdata
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    # Mismo criterio que api-integracion: solo loopback, nunca la interfaz
+    # pública — se revisa por túnel SSH (ver docs/DEPLOY.md), nunca expuesto
+    # a internet. No se usa network_mode:host (más preciso para stats de red
+    # del host, pero rompería este aislamiento) — alcanza con el socket de
+    # Docker para CPU/RAM/disco por contenedor, que es lo que se necesita acá.
+    ports:
+      - "127.0.0.1:19999:19999"
+
 volumes:
   postgres_data:
   caddy_data:
   caddy_config:
+  netdata_config:
+  netdata_lib:
+  netdata_cache:
