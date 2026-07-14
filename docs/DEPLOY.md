@@ -49,9 +49,11 @@ tráfico real del VPS). Ver `monitoring/docker-compose.yml`.
 
 1. Abrí el túnel SSH hacia el VPS (mismo mecanismo que ya usa el Back
    Office, ver `docs/CASOS_DE_USO_BACKOFFICE.md` §10.1, local — no
-   versionado):
+   versionado). El lado local de `cadvisor` es **18080, no 8080** — el
+   8080 de tu PC ya lo usa Jenkins (`ci/`, corre siempre); el lado remoto
+   (el puerto real en la VPS) sigue siendo 8080:
    ```bash
-   ssh -N -L 8080:127.0.0.1:8080 -L 9100:127.0.0.1:9100 root@vps-2mino
+   ssh -N -L 18080:127.0.0.1:8080 -L 9100:127.0.0.1:9100 root@vps-2mino
    ```
 2. En tu PC, levantá el stack de monitoreo (separado del de la app, igual
    que `ci/`):
