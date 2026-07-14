@@ -181,7 +181,14 @@ services:
   # corriendo en tu máquina. docs/ESCALABILIDAD.md — cierra el gap de "no
   # hay forma de enterarse de un problema sin que un jugador se queje".
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    # v0.49.1 (gcr.io, registro viejo) no resuelve contenedores en Docker
+    # 29.x con el containerd snapshotter (driver-type
+    # io.containerd.snapshotter.v1) — error "failed to identify the
+    # read-write layer ID". Soporte agregado en v0.53.0+ (PR #3709,
+    # google/cadvisor), que además movió el registro a ghcr.io/google.
+    # Verificado v0.60.5 en la VPS real: resuelve nombres/labels de todos
+    # los contenedores sin errores.
+    image: ghcr.io/google/cadvisor:v0.60.5
     restart: unless-stopped
     volumes:
       - /:/rootfs:ro
