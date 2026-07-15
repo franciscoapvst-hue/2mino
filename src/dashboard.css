@@ -288,6 +288,15 @@
   box-shadow: 0 18px 40px -18px rgba(239, 159, 46, 0.5);
 }
 .dash-featured:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+/* Ranked deshabilitado para invitados — mismo bloque visual, sin invitar
+   al click (la barrera real es del servidor, esto solo evita un botón
+   muerto). */
+.dash-featured-disabled {
+  cursor: default;
+  opacity: 0.68;
+  border-color: rgba(239, 159, 46, 0.16);
+}
+.dash-featured-disabled:hover { transform: none; box-shadow: none; }
 .dash-featured-tile {
   position: absolute;
   opacity: 0.14;

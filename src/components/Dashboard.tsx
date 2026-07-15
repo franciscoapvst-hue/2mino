@@ -211,25 +211,39 @@ export default function Dashboard({
         {/* Elige cómo jugar */}
         <h2 className="dash-section-title">Elige cómo jugar</h2>
 
-        {/* Ranked destacado */}
-        <button className="dash-featured" onClick={onGoToRanked}>
-          <Bone a={6} b={6} className="dash-featured-tile dash-featured-tile-a" />
-          <Bone a={5} b={4} className="dash-featured-tile dash-featured-tile-b" />
-          <div className="dash-featured-content">
-            <span className="dash-featured-kicker"><RankedIcon /> Competitivo</span>
-            <h3>Partida Ranked</h3>
-            <p>Cada mano cuenta hacia tu ELO. Sube de rango y demuestra quién manda en la mesa.</p>
+        {/* Ranked destacado — bloqueado para invitados (la barrera real
+            está en api-integracion/src/routes/ranked.ts, esto es solo
+            para no mostrar un botón que termina en 403). */}
+        {config.segmento === 'invitado' ? (
+          <div className="dash-featured dash-featured-disabled">
+            <Bone a={6} b={6} className="dash-featured-tile dash-featured-tile-a" />
+            <Bone a={5} b={4} className="dash-featured-tile dash-featured-tile-b" />
+            <div className="dash-featured-content">
+              <span className="dash-featured-kicker"><RankedIcon /> Competitivo</span>
+              <h3>Partida Ranked</h3>
+              <p>Creá una cuenta para jugar ranked y subir de ELO.</p>
+            </div>
           </div>
-          <div className="dash-featured-action">
-            {rango && (
-              <span className="dash-featured-rank">
-                {rango.url && <img src={rango.url} alt="" />}
-                <span>{elo} ELO</span>
-              </span>
-            )}
-            <span className="dash-featured-cta">Buscar ranked →</span>
-          </div>
-        </button>
+        ) : (
+          <button className="dash-featured" onClick={onGoToRanked}>
+            <Bone a={6} b={6} className="dash-featured-tile dash-featured-tile-a" />
+            <Bone a={5} b={4} className="dash-featured-tile dash-featured-tile-b" />
+            <div className="dash-featured-content">
+              <span className="dash-featured-kicker"><RankedIcon /> Competitivo</span>
+              <h3>Partida Ranked</h3>
+              <p>Cada mano cuenta hacia tu ELO. Sube de rango y demuestra quién manda en la mesa.</p>
+            </div>
+            <div className="dash-featured-action">
+              {rango && (
+                <span className="dash-featured-rank">
+                  {rango.url && <img src={rango.url} alt="" />}
+                  <span>{elo} ELO</span>
+                </span>
+              )}
+              <span className="dash-featured-cta">Buscar ranked →</span>
+            </div>
+          </button>
+        )}
 
         {/* Casual + Salas */}
         <div className="dash-row">

@@ -45,6 +45,25 @@ const TokenUserSchema = {
 // ─────────────────────────────────────────────────
 export async function authRoutes(app: FastifyInstance) {
 
+  // El cliente del frontend (src/api.ts, req()) manda siempre
+  // `Content-Type: application/json`, incluso en rutas sin body como
+  // /auth/invitado — el parser JSON por defecto de Fastify rechaza esa
+  // combinación (Content-Type presente + cuerpo vacío) con
+  // FST_ERR_CTP_EMPTY_JSON_BODY. Acá se trata un body vacío como `{}` en
+  // vez de error; scoped a este plugin (encapsulamiento de Fastify), no
+  // afecta otras rutas del gateway. Las rutas que sí requieren campos
+  // (register, login, etc.) siguen rechazando `{}` igual, solo que ahora
+  // vía el schema (400 "required property"), no el content-type parser.
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+    const raw = body as string;
+    if (raw.trim() === '') { done(null, {}); return; }
+    try {
+      done(null, JSON.parse(raw));
+    } catch (err) {
+      done(err as Error, undefined);
+    }
+  });
+
   // ── POST /auth/register ─────────────────────────
   app.post<{ Body: { username: string; email: string; password: string } }>(
     '/auth/register',
@@ -294,6 +313,25 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(status).send({ token, user });
     },
   );
+
+  // ── POST /auth/invitado ─────────────────────────
+  app.post('/auth/invitado', {
+    config: { rateLimit: { max: 10, timeWindow: '1 minute' } }, // mismo grupo que register/login/google — evita spam de cuentas gratis
+    schema: {
+      tags:        ['auth'],
+      summary:     'Sesión de invitado, sin registro',
+      description: 'Crea una cuenta efímera y devuelve un JWT — no accede a ranked ni (cuando exista) a torneos.',
+      response: {
+        201: { description: 'Sesión creada', ...TokenUserSchema },
+      },
+    },
+  }, async (req, reply) => {
+    const { status, data } = await callMs('/usuarios/invitado', 'POST');
+    if (status !== 201) return reply.code(status).send(data);
+    const user = data as { id: string; username: string; segmento: string };
+    const token = signToken(user);
+    return reply.code(201).send({ token, user });
+  });
 
   // ── GET /auth/me ────────────────────────────────
   app.get(

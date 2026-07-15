@@ -44,6 +44,16 @@ const SCHEMA = `
     '{}'
   ) ON CONFLICT (nombre) DO NOTHING;
 
+  -- Segmento invitado: puede jugar casual/salas y usar el chat, pero no
+  -- accede a ranked (bloqueado en api-integracion/src/routes/ranked.ts,
+  -- auth()) ni a torneos (cuando exista esa feature, debe aplicar el mismo
+  -- chequeo — ver docs/CASOS_DE_USO_TORNEOS.md).
+  INSERT INTO segmentos (nombre, descripcion, config) VALUES (
+    'invitado',
+    'Sesión sin registro — sin acceso a ranked ni torneos',
+    '{"tema":"dark","idioma":"es","modos_juego":["clasico","rapido"],"features":{"registro_habilitado":true,"login_habilitado":true,"tabla_clasificacion":true,"perfil_publico":false,"chat_partida":true,"replay":false}}'
+  ) ON CONFLICT (nombre) DO NOTHING;
+
   CREATE TABLE IF NOT EXISTS usuarios (
     id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     username      VARCHAR(20) UNIQUE NOT NULL,

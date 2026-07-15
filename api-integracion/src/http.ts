@@ -50,9 +50,12 @@ export async function callService(
   try {
     const res = await fetch(`${base}${path}`, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      // Content-Type solo si de verdad hay body — mandarlo sin body hace
+      // que el parser JSON por defecto del microservicio de destino
+      // rechace la request con "body cannot be empty" (encontrado real
+      // llamando a POST /usuarios/invitado sin body).
+      ...(body !== undefined ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
       signal: controller.signal,
-      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
     const data = await res.json();
     return { status: res.status, data };
