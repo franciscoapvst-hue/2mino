@@ -2,7 +2,7 @@ import Fastify from 'fastify';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { runMigrations } from './db/pool';
-import { salasRoutes } from './routes/salas';
+import { salasRoutes, limpiarSalasIncompletas } from './routes/salas';
 import { juegosRoutes } from './routes/juegos';
 import { rankedRoutes } from './routes/ranked';
 import { matchmakingRoutes } from './routes/matchmaking';
@@ -59,6 +59,17 @@ async function start() {
     const port = Number(process.env.PORT) || 6001;
     await app.listen({ port, host: '0.0.0.0' });
     app.log.info(`Swagger UI → http://localhost:${port}/docs`);
+
+    // Cada minuto, borra salas 'esperando' que no se llenaron en 5 min y
+    // 'cancelada' viejas (ver limpiarSalasIncompletas() en routes/salas.ts).
+    setInterval(async () => {
+      try {
+        const borradas = await limpiarSalasIncompletas();
+        if (borradas > 0) app.log.info(`Limpieza: ${borradas} sala(s) incompleta(s) borrada(s)`);
+      } catch (err) {
+        app.log.error(err, 'Error en limpieza de salas incompletas');
+      }
+    }, 60_000);
   } catch (err) {
     app.log.error(err);
     process.exit(1);

@@ -61,17 +61,18 @@ const SalaSchema = {
 const SalaResumenSchema = {
   type: 'object',
   properties: {
-    id:              { type: 'string', format: 'uuid' },
-    codigo:          { type: 'string' },
-    nombre:          { type: ['string', 'null'] },
-    creador_id:      { type: 'string', format: 'uuid' },
-    estado:          { type: 'string' },
-    tipo:            { type: 'string' },
-    modo:            { type: 'string' },
-    max_jugadores:   { type: 'integer' },
-    jugadores_count: { type: 'integer' },
-    privada:         { type: 'boolean' },
-    created_at:      { type: 'string', format: 'date-time' },
+    id:                { type: 'string', format: 'uuid' },
+    codigo:            { type: 'string' },
+    nombre:            { type: ['string', 'null'] },
+    creador_id:        { type: 'string', format: 'uuid' },
+    creador_username:  { type: ['string', 'null'] },
+    estado:            { type: 'string' },
+    tipo:              { type: 'string' },
+    modo:              { type: 'string' },
+    max_jugadores:     { type: 'integer' },
+    jugadores_count:   { type: 'integer' },
+    privada:           { type: 'boolean' },
+    created_at:        { type: 'string', format: 'date-time' },
   },
 } as const;
 
@@ -132,9 +133,11 @@ export async function salasRoutes(app: FastifyInstance) {
     const { rows } = await pool.query(
       `SELECT s.id, s.codigo, s.nombre, s.creador_id, s.estado, s.tipo, s.modo,
               s.max_jugadores, s.privada, s.created_at,
-              COUNT(sj.usuario_id)::int AS jugadores_count
+              COUNT(sj.usuario_id)::int AS jugadores_count,
+              MAX(creador.username) AS creador_username
        FROM salas s
-       LEFT JOIN sala_jugadores sj ON sj.sala_id = s.id
+       LEFT JOIN sala_jugadores sj      ON sj.sala_id = s.id
+       LEFT JOIN sala_jugadores creador ON creador.sala_id = s.id AND creador.usuario_id = s.creador_id
        WHERE ${where}
        GROUP BY s.id
        ORDER BY s.created_at DESC`,
@@ -186,9 +189,11 @@ export async function salasRoutes(app: FastifyInstance) {
       pool.query(
         `SELECT s.id, s.codigo, s.nombre, s.creador_id, s.estado, s.tipo, s.modo,
                 s.max_jugadores, s.privada, s.created_at,
-                COUNT(sj.usuario_id)::int AS jugadores_count
+                COUNT(sj.usuario_id)::int AS jugadores_count,
+                MAX(creador.username) AS creador_username
          FROM salas s
-         LEFT JOIN sala_jugadores sj ON sj.sala_id = s.id
+         LEFT JOIN sala_jugadores sj      ON sj.sala_id = s.id
+         LEFT JOIN sala_jugadores creador ON creador.sala_id = s.id AND creador.usuario_id = s.creador_id
          ${where}
          GROUP BY s.id
          ORDER BY s.created_at DESC
@@ -567,4 +572,34 @@ export async function salasRoutes(app: FastifyInstance) {
     const sala = await getSalaConJugadores(id);
     return reply.send(sala);
   });
+}
+
+// ── Limpieza: salas incompletas/abandonadas ───────
+// Dos casos, ambos sin partida jugada (no hay historial/ELO/replay que
+// perder — esas tablas solo tienen filas para salas que llegaron a
+// 'en_juego'):
+//  - 'esperando' que no se llenó (jugadores_count < max_jugadores) en los
+//    primeros 5 minutos desde su creación — el caso típico es el creador
+//    solo, que nunca invitó a nadie ni salió formalmente (comprobado
+//    contra la base real: hay salas 'esperando' con 1 solo jugador desde
+//    hace días). Se ancla a created_at, no a "cuánto lleva incompleta",
+//    para no depender de una columna nueva que haya que tocar en cada
+//    join/salida — simple a propósito, esto es limpieza best-effort.
+//  - 'cancelada' — se genera cuando el último jugador se va (POST
+//    /salas/:id/salir) o el creador cierra la sala (PATCH
+//    /salas/:id/estado), pero nunca se borra sola, así que se acumulan.
+//    updated_at sí queda exacto acá (ambos paths lo tocan al cancelar).
+export async function limpiarSalasIncompletas(): Promise<number> {
+  const { rowCount } = await pool.query(
+    `DELETE FROM salas s
+     WHERE (
+       s.estado = 'esperando'
+       AND s.created_at < NOW() - INTERVAL '5 minutes'
+       AND (SELECT COUNT(*) FROM sala_jugadores sj WHERE sj.sala_id = s.id) < s.max_jugadores
+     ) OR (
+       s.estado = 'cancelada'
+       AND s.updated_at < NOW() - INTERVAL '5 minutes'
+     )`,
+  );
+  return rowCount ?? 0;
 }

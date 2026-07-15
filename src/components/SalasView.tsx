@@ -51,6 +51,7 @@ function SalaCard({
 
       <p className="sv-nombre">{sala.nombre ?? 'Sin nombre'}</p>
       <p className="sv-modo">{MODO_LABEL[sala.modo] ?? sala.modo}</p>
+      {sala.creador_username && <p className="sv-creador">por @{sala.creador_username}</p>}
 
       <div className="sv-card-foot">
         <div className="sv-players-row">
