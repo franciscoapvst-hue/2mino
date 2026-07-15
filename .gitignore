@@ -29,6 +29,11 @@ docs/CASOS_DE_USO_BACKOFFICE.md
 docs/CASOS_DE_USO_BACKOFFICE.docx
 docs/PENDIENTES_JUEGO.md
 docs/ESCALABILIDAD.md
+docs/CASOS_DE_USO_TORNEOS.md
+docs/PENDIENTES.md
+docs/PLAN_REDIS.md
+docs/PLAN_TORNEOS.md
+docs/Recomendaciones para la Aprobacion.md
 
 # build outputs
 ms-usuarios/dist/
