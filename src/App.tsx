@@ -16,6 +16,10 @@ import MatchHistoryView from './components/social/MatchHistoryView';
 import ReplayViewer from './components/social/ReplayViewer';
 import OnboardingLevelScreen, { type NivelDomino } from './components/tutorial/OnboardingLevelScreen';
 import TutorialGame from './components/tutorial/TutorialGame';
+import TorneosListView from './torneos/TorneosListView';
+import TorneoDetalleView from './torneos/TorneoDetalleView';
+import TorneoInscripcionForm from './torneos/TorneoInscripcionForm';
+import TorneoUnirseView from './torneos/TorneoUnirseView';
 import { api, tokenStore, type AuthUser, type UserConfig, type Sala } from './api';
 import { DominoTile, SunIcon, MoonIcon } from './components/icons';
 import { useSocialSocket } from './hooks/useSocialSocket';
@@ -23,7 +27,8 @@ import { sounds } from './game/sounds';
 
 export type View = 'login' | 'register' | 'forgot';
 type AppView = View | 'dashboard' | 'salas' | 'ranked' | 'casual' | 'piece-demo' | 'game'
-  | 'amigos' | 'leaderboard' | 'historial' | 'replay' | 'onboarding' | 'tutorial';
+  | 'amigos' | 'leaderboard' | 'historial' | 'replay' | 'onboarding' | 'tutorial'
+  | 'torneos' | 'torneo-detalle' | 'torneo-inscripcion' | 'torneo-unirse';
 
 // El tutorial se ofrece una sola vez: se marca en `opciones` del usuario
 // (mismo bucket genérico que ya usan tema/idioma — ver ms-frontend-landing),
@@ -70,6 +75,11 @@ export default function App() {
   const [gameOrigin, setGameOrigin] = useState<'salas' | 'dashboard'>('salas');
   // Sala seleccionada para ver su repetición (MatchHistoryView → ReplayViewer).
   const [replaySalaId, setReplaySalaId] = useState<string | null>(null);
+  // Torneo seleccionado al navegar de listado → detalle/inscripción/unirse.
+  const [torneoIdActual, setTorneoIdActual] = useState<string | null>(null);
+  // Sala 'esperando' a abrir directamente al entrar a SalasView (revancha /
+  // invitación aceptada) — de un solo uso: SalasView avisa al consumirla.
+  const [salaEsperaInicial, setSalaEsperaInicial] = useState<Sala | null>(null);
   // Partida en_juego que el usuario ya tenía abierta al iniciar sesión —
   // se ofrece reintegrarse desde un banner en el dashboard, en vez de
   // forzar la navegación (por eso vive aparte de `gameSala`).
@@ -222,7 +232,15 @@ export default function App() {
       const final = yaEstoy ? detalle : await api.salas.unirse(detalle.id);
       setGameSala(final);
       setGameOrigin('dashboard');
-      setView(final.estado === 'en_juego' ? 'game' : 'salas');
+      if (final.estado === 'en_juego') {
+        setView('game');
+      } else {
+        // Aterrizar DENTRO de la sala de espera, no en la lista de salas —
+        // ya estamos sentados en el backend; sin esto el jugador quedaba
+        // "afuera" mirando el listado.
+        setSalaEsperaInicial(final);
+        setView('salas');
+      }
     } catch {
       // TODO: mostrar aviso de error (código no encontrado / sala llena)
       setView('salas');
@@ -237,7 +255,12 @@ export default function App() {
       const nuevaSala = await api.salas.porCodigo(sala_codigo);
       setGameSala(nuevaSala);
       setGameOrigin('dashboard');
-      setView(nuevaSala.estado === 'en_juego' ? 'game' : 'salas');
+      // La sala de revancha nace 'esperando' (con el solicitante ya
+      // sentado): entrar directo a su sala de espera. Antes esto hacía
+      // setView('salas') a secas → lista de salas → el jugador percibía
+      // que "jugar de nuevo" lo echaba de la partida.
+      setSalaEsperaInicial(nuevaSala);
+      setView('salas');
     } catch { /* noop, botón best-effort */ }
   }
   function handleInvitarCompanero(usuarioId: string) {
@@ -372,6 +395,8 @@ export default function App() {
         dark={dark}
         onBack={() => setView('dashboard')}
         onGameStart={(sala) => { setGameSala(sala); setGameOrigin('salas'); setView('game'); }}
+        salaInicial={salaEsperaInicial}
+        onSalaInicialUsada={() => setSalaEsperaInicial(null)}
       />
     );
   }
@@ -385,6 +410,46 @@ export default function App() {
         onBack={() => setView('dashboard')}
         onGameStart={(sala) => { setGameSala(sala); setGameOrigin('dashboard'); setView('game'); }}
         autoJoinCodigo={view === 'ranked' ? partyCodigo : null}
+      />
+    );
+  }
+
+  if (view === 'torneos' && session) {
+    return (
+      <TorneosListView
+        onVolver={() => setView('dashboard')}
+        onVerTorneo={(id) => { setTorneoIdActual(id); setView('torneo-detalle'); }}
+      />
+    );
+  }
+
+  if (view === 'torneo-detalle' && session && torneoIdActual) {
+    return (
+      <TorneoDetalleView
+        torneoId={torneoIdActual}
+        onVolver={() => setView('torneos')}
+        onInscribirme={(id) => { setTorneoIdActual(id); setView('torneo-inscripcion'); }}
+        onUnirseConCodigo={(id) => { setTorneoIdActual(id); setView('torneo-unirse'); }}
+      />
+    );
+  }
+
+  if (view === 'torneo-inscripcion' && session && torneoIdActual) {
+    return (
+      <TorneoInscripcionForm
+        torneoId={torneoIdActual}
+        onVolver={() => setView('torneo-detalle')}
+        onListo={(id) => { setTorneoIdActual(id); setView('torneo-detalle'); }}
+      />
+    );
+  }
+
+  if (view === 'torneo-unirse' && session && torneoIdActual) {
+    return (
+      <TorneoUnirseView
+        torneoId={torneoIdActual}
+        onVolver={() => setView('torneo-detalle')}
+        onListo={(id) => { setTorneoIdActual(id); setView('torneo-detalle'); }}
       />
     );
   }
@@ -407,6 +472,7 @@ export default function App() {
         onGoToAmigos={() => setView('amigos')}
         onGoToLeaderboard={() => setView('leaderboard')}
         onGoToHistorial={() => setView('historial')}
+        onGoToTorneos={() => setView('torneos')}
         onUnirseSala={handleUnirseSala}
         notifVersion={notifVersion}
         salaParaReintegrar={salaParaReintegrar}

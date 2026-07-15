@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { api, type AuthUser, type UserConfig, type Sala } from '../api';
-import { SunIcon, MoonIcon, CasualIcon, RankedIcon, SalasIcon, BellIcon, PeopleIcon, TrophyIcon, HistoryIcon } from './icons';
+import { SunIcon, MoonIcon, CasualIcon, RankedIcon, SalasIcon, BellIcon, PeopleIcon, TrophyIcon, HistoryIcon, TournamentIcon } from './icons';
 import { Bone } from './DominoStage';
 import { avatarUrl } from '../avatars';
 import { rangoDeElo, progresoRango } from '../ranks';
@@ -24,6 +24,7 @@ type Props = {
   onGoToAmigos:      () => void;
   onGoToLeaderboard: () => void;
   onGoToHistorial:   () => void;
+  onGoToTorneos:     () => void;
   onUnirseSala:      (codigo: string) => void;
   /** Sube cada vez que llega `notificacion_nueva` por el WS de sociales. */
   notifVersion?: number;
@@ -53,7 +54,7 @@ function PlayCard({ icon, title, desc, action, accent, onClick }: {
 // ── Dashboard / Lobby ─────────────────────────────
 export default function Dashboard({
   user, config, dark, onToggleTheme, onLogout, onGoToSalas, onGoToRanked, onGoToCasual, onPieceDemo, onAvatarChange,
-  onGoToAmigos, onGoToLeaderboard, onGoToHistorial, onUnirseSala, notifVersion,
+  onGoToAmigos, onGoToLeaderboard, onGoToHistorial, onGoToTorneos, onUnirseSala, notifVersion,
   salaParaReintegrar, onReintegrarSala, onDescartarReintegro,
 }: Props) {
   const [elo, setElo] = useState<number | null>(null);
@@ -264,6 +265,25 @@ export default function Dashboard({
             onClick={onGoToSalas}
           />
         </div>
+
+        {/* Torneos — detrás del flag torneos_habilitado (§7.4 de
+            docs/CASOS_DE_USO_BACKOFFICE.md). El backend real de flags
+            todavía no existe (ver docs/PLAN_TORNEOS.md §0 prerrequisitos),
+            así que por ahora se muestra siempre: reemplazar este `true`
+            por `config.opciones?.torneos_habilitado` cuando el Back
+            Office pueda apagarlo de verdad. */}
+        {true && (
+          <div className="dash-row dash-row-solo">
+            <PlayCard
+              icon={<TournamentIcon />}
+              title="Torneos"
+              desc="Inscribite en pareja, compite por fases y sube en el ranking del torneo."
+              action="Ver torneos"
+              accent="teal"
+              onClick={onGoToTorneos}
+            />
+          </div>
+        )}
 
         {/* Comunidad: leaderboard + historial */}
         <h2 className="dash-section-title">Comunidad</h2>

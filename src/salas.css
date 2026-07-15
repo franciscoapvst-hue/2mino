@@ -314,6 +314,22 @@
 }
 .sv-leave-btn:hover:not(:disabled) { border-color: #e06060; color: #e06060; }
 
+/* Cerrar sala (solo creador): destructivo para todos los sentados — rojo
+   contenido, y el estado de confirmación ("¿Seguro?") se marca más fuerte. */
+.sv-close-btn {
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(224, 96, 96, 0.45);
+  background: transparent;
+  color: #e06060;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease;
+}
+.sv-close-btn:hover:not(:disabled) { background: rgba(224, 96, 96, 0.10); }
+.sv-close-btn:disabled { opacity: 0.5; cursor: default; }
+
 @media (max-width: 600px) {
   .sv-slot-grid { grid-template-columns: repeat(2, 1fr) !important; }
 }
