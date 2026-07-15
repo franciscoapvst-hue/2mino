@@ -173,6 +173,7 @@
 
 .sv-nombre { font-weight: 700; color: var(--d-ink); font-size: 0.98rem; }
 .sv-modo { font-size: 0.8rem; color: var(--d-muted); margin-bottom: 6px; }
+.sv-creador { font-size: 0.74rem; color: var(--d-muted); opacity: 0.8; margin-bottom: 6px; }
 
 .sv-card-foot {
   margin-top: auto;

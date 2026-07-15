@@ -17,6 +17,7 @@ export type Sala = {
   codigo:          string;
   nombre:          string | null;
   creador_id:      string;
+  creador_username?: string | null;
   estado:          'esperando' | 'en_juego' | 'finalizada' | 'cancelada';
   tipo:            'casual' | 'ranked';
   modo:            'clasico' | 'rapido' | 'torneo';
