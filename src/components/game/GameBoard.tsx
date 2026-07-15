@@ -431,6 +431,13 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
   const esMiTurno = partida.fase === 'jugando' && partida.turno === partida.miSeat;
   const maxJ      = partida.maxJugadores;
 
+  // Asientos de la mesa relativos a mí (yo siempre abajo) — ver el
+  // comentario sobre el render de la mesa.
+  const miSeat  = partida.miSeat;
+  const seatIzq = (miSeat + 1) % maxJ;
+  const seatTop = maxJ === 2 ? (1 - miSeat) : (miSeat + 2) % maxJ;
+  const seatDer = (miSeat + 3) % maxJ;
+
   // Mano 1: apertura obligada (p. ej. el 6-6) — solo esa ficha es jugable
   const forzada = partida.tablero.length === 0 ? partida.salidaForzada : null;
   const esForzada = (p: Pieza) =>
@@ -516,22 +523,28 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
       )}
 
       {/* ── Mesa ────────────────────────────────── */}
+      {/* Los asientos de la mesa se muestran RELATIVOS a miSeat (yo siempre
+          abajo): antes estaban hardcodeados a 1/2/3 asumiendo miSeat=0, y a
+          quien le tocaba otro asiento veía los nombres corridos (incluso el
+          suyo propio enfrente) mientras "turno de" —que usa el asiento
+          absoluto— salía bien. Turnos van 0→1→2→3: el siguiente a mí queda a
+          mi izquierda, mi compañero enfrente, el anterior a mi derecha. */}
       <div className={`game-table table-${maxJ}p`}>
         {maxJ === 4 && (
           <div className="seat seat-left">
-            <OpSeat nombre={nombreAsiento(1)} count={partida.conteoManos[1] ?? 0} activo={partida.turno === 1} position="side" />
+            <OpSeat nombre={nombreAsiento(seatIzq)} count={partida.conteoManos[seatIzq] ?? 0} activo={partida.turno === seatIzq} position="side" />
           </div>
         )}
         <div className="seat seat-top">
           <OpSeat
-            nombre={nombreAsiento(maxJ === 2 ? 1 : 2)}
-            count={partida.conteoManos[maxJ === 2 ? 1 : 2] ?? 0}
-            activo={partida.turno === (maxJ === 2 ? 1 : 2)}
+            nombre={nombreAsiento(seatTop)}
+            count={partida.conteoManos[seatTop] ?? 0}
+            activo={partida.turno === seatTop}
           />
         </div>
         {maxJ === 4 && (
           <div className="seat seat-right">
-            <OpSeat nombre={nombreAsiento(3)} count={partida.conteoManos[3] ?? 0} activo={partida.turno === 3} position="side" />
+            <OpSeat nombre={nombreAsiento(seatDer)} count={partida.conteoManos[seatDer] ?? 0} activo={partida.turno === seatDer} position="side" />
           </div>
         )}
 

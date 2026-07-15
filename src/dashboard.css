@@ -361,6 +361,10 @@
   gap: 16px;
   margin-bottom: 40px;
 }
+/* Fila con una sola card (ej. Torneos): sin esto, auto-fit + 1fr la estira
+   a todo el ancho de la fila y queda desproporcionada frente a sus vecinas
+   de 2 columnas. Misma anchura máxima que una card en la fila de 2. */
+.dash-row-solo { grid-template-columns: minmax(260px, 468px); }
 .dash-card {
   text-align: left;
   display: flex;

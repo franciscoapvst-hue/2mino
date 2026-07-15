@@ -1,0 +1,373 @@
+/* ═══════════════════════════════════════════════════════
+   Torneos — mismo sistema visual que Dashboard/Salas/Matchmaking:
+   fieltro + ámbar + teal, Space Grotesk para títulos. Namespaced .tor-.
+   Dark por defecto — el toggle claro/oscuro se agrega cuando este
+   frontend deje de ser mock y quede colgado del theme global de App.tsx.
+   ═══════════════════════════════════════════════════════ */
+
+.tor-shell {
+  --tor-bg:        #0a0f0d;
+  --tor-surface:   #111815;
+  --tor-surface-2: #0e1512;
+  --tor-ink:       #f2ede3;
+  --tor-muted:     #b6beb4;
+  --tor-border:    rgba(242, 237, 227, 0.10);
+  --tor-border-hi: rgba(242, 237, 227, 0.18);
+  --tor-amber:     #ef9f2e;
+  --tor-amber-hi:  #f7ad3f;
+  --tor-amber-ink: #201400;
+  --tor-teal:      #34d3b4;
+  --tor-err:       #ff8080;
+
+  min-height: 100vh;
+  background:
+    radial-gradient(120% 70% at 12% -8%, rgba(239, 159, 46, 0.10) 0%, transparent 46%),
+    radial-gradient(90% 60% at 96% 4%, rgba(23, 165, 138, 0.08) 0%, transparent 50%),
+    var(--tor-bg);
+  color: var(--tor-ink);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* .btn-primary global (styles.css) es el botón violeta/gradiente heredado
+   del diseño previo a la marca (ver anti-referencias de PRODUCT.md: "morado
+   neón casino" retirado a propósito) — mismo patrón que game.css/tutorial.css,
+   cada pantalla rediseñada lo sobreescribe localmente en vez de tocar el
+   global (usado también por pantallas viejas sin rediseñar todavía). */
+.tor-shell .btn-primary {
+  width: auto;
+  background: var(--tor-amber) !important;
+  color: var(--tor-amber-ink) !important;
+  animation: none !important;
+  border-radius: 10px;
+  font-weight: 700;
+}
+.tor-shell .btn-primary:hover { background: var(--tor-amber-hi) !important; opacity: 1 !important; }
+
+/* ── Nav ─────────────────────────────────────────── */
+.tor-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--tor-border);
+  position: sticky;
+  top: 0;
+  background: color-mix(in srgb, var(--tor-bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  z-index: 10;
+}
+.tor-nav-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--tor-ink);
+}
+.tor-nav-title svg { color: var(--tor-amber); }
+
+/* ── Listado ─────────────────────────────────────── */
+.tor-list-wrap { max-width: 880px; margin: 0 auto; padding: 28px 20px 60px; }
+.tor-loading { color: var(--tor-muted); text-align: center; padding: 60px 0; }
+.tor-loading-wrap { display: flex; align-items: center; justify-content: center; min-height: 60vh; }
+
+.tor-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+.tor-card {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 20px;
+  border-radius: 16px;
+  border: 1px solid var(--tor-border);
+  background: var(--tor-surface);
+  cursor: pointer;
+  transition: border-color .15s ease, transform .15s ease;
+}
+.tor-card:hover { border-color: var(--tor-amber); transform: translateY(-2px); }
+.tor-card:focus-visible { outline: 2px solid var(--tor-teal); outline-offset: 2px; }
+
+.tor-card-top { display: flex; gap: 8px; flex-wrap: wrap; }
+.tor-card-title {
+  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--tor-ink);
+  margin: 0;
+  text-wrap: balance;
+}
+.tor-card-meta { font-size: 0.85rem; color: var(--tor-muted); margin: 0; }
+.tor-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+.tor-card-cuota { font-size: 0.85rem; font-weight: 600; color: var(--tor-teal); white-space: nowrap; }
+.tor-card-cta { font-size: 0.85rem; font-weight: 600; color: var(--tor-amber); white-space: nowrap; margin-left: auto; }
+
+/* ── Badges ──────────────────────────────────────── */
+.tor-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.tor-badge-open { background: color-mix(in srgb, var(--tor-teal) 18%, transparent); color: var(--tor-teal); }
+.tor-badge-live { background: color-mix(in srgb, var(--tor-amber) 20%, transparent); color: var(--tor-amber); }
+.tor-badge-done { background: var(--tor-border-hi); color: var(--tor-muted); }
+.tor-badge-mine { background: var(--tor-amber); color: var(--tor-amber-ink); }
+
+/* ── Detalle: paneles ────────────────────────────── */
+.tor-detalle-wrap { max-width: 720px; margin: 0 auto; padding: 28px 20px 60px; display: flex; flex-direction: column; gap: 16px; }
+.tor-form-wrap { max-width: 480px; margin: 0 auto; padding: 40px 20px 60px; }
+
+.tor-panel {
+  padding: 22px 24px;
+  border-radius: 16px;
+  border: 1px solid var(--tor-border);
+  background: var(--tor-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.tor-panel-mine { border-color: color-mix(in srgb, var(--tor-amber) 35%, var(--tor-border)); }
+.tor-panel-title {
+  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--tor-ink);
+  margin: 0;
+}
+.tor-panel-text { font-size: 0.92rem; line-height: 1.6; color: var(--tor-muted); margin: 0; }
+.tor-panel-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: 0.82rem;
+  color: var(--tor-muted);
+  padding-top: 8px;
+  border-top: 1px solid var(--tor-border);
+}
+.tor-panel-facts strong { color: var(--tor-ink); }
+
+/* Reglamento en PDF, adjuntado por el admin — link con ícono, no botón
+   (es una descarga, no una acción del flujo). */
+.tor-pdf-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--tor-border-hi);
+  background: var(--tor-surface-2);
+  color: var(--tor-teal);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  width: fit-content;
+  transition: border-color .15s ease;
+}
+.tor-pdf-link:hover { border-color: var(--tor-teal); }
+.tor-pdf-link svg { flex-shrink: 0; }
+.tor-pdf-nombre { color: var(--tor-muted); font-weight: 400; }
+
+/* HTML de marca cargado por el admin — hereda tipografía pero no puede
+   romper el layout del panel (imágenes/tablas se acotan al ancho). */
+.tor-info-html { font-size: 0.92rem; line-height: 1.6; color: var(--tor-muted); }
+.tor-info-html img, .tor-info-html table { max-width: 100%; }
+.tor-info-html h1, .tor-info-html h2, .tor-info-html h3 { color: var(--tor-ink); font-family: 'Space Grotesk', Inter, sans-serif; }
+
+/* ── Código de equipo ────────────────────────────── */
+.tor-codigo-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  padding: 18px;
+  border-radius: 12px;
+  border: 1px dashed color-mix(in srgb, var(--tor-amber) 45%, transparent);
+  background: color-mix(in srgb, var(--tor-amber) 8%, transparent);
+}
+.tor-codigo-label { font-size: 0.8rem; color: var(--tor-muted); }
+.tor-codigo-valor {
+  font-family: 'Space Grotesk', monospace;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--tor-amber);
+}
+
+/* ── Fases ───────────────────────────────────────── */
+.tor-fases-list { display: flex; flex-direction: column; gap: 8px; }
+.tor-fase-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--tor-surface-2);
+  border: 1px solid var(--tor-border);
+}
+.tor-fase-en_curso { border-color: color-mix(in srgb, var(--tor-amber) 40%, var(--tor-border)); }
+.tor-fase-info { display: flex; flex-direction: column; gap: 2px; }
+.tor-fase-nombre { font-weight: 600; font-size: 0.9rem; color: var(--tor-ink); }
+.tor-fase-meta { font-size: 0.78rem; color: var(--tor-muted); }
+.tor-fase-estado { font-size: 0.75rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.tor-fase-estado-pendiente  { background: var(--tor-border-hi); color: var(--tor-muted); }
+.tor-fase-estado-en_curso   { background: color-mix(in srgb, var(--tor-amber) 20%, transparent); color: var(--tor-amber); }
+.tor-fase-estado-finalizada { background: color-mix(in srgb, var(--tor-teal) 18%, transparent); color: var(--tor-teal); }
+
+/* ── Tabla de posiciones ─────────────────────────── */
+.tor-table-wrap { overflow-x: auto; }
+.tor-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.tor-table th {
+  text-align: left;
+  padding: 8px 10px;
+  color: var(--tor-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--tor-border);
+}
+.tor-table td { padding: 9px 10px; border-bottom: 1px solid var(--tor-border); color: var(--tor-ink); }
+.tor-table tr.tor-row-mine td { background: color-mix(in srgb, var(--tor-amber) 6%, transparent); }
+
+/* ── Inscribirse (acciones) ──────────────────────── */
+.tor-inscribir-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.tor-btn-ghost {
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: 1.5px solid var(--tor-border-hi);
+  background: transparent;
+  color: var(--tor-muted);
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: border-color .15s ease, color .15s ease;
+}
+.tor-btn-ghost:hover { border-color: var(--tor-teal); color: var(--tor-teal); }
+
+/* ── Formularios (inscripción / unirse) ──────────── */
+.tor-field { display: flex; flex-direction: column; gap: 6px; }
+.tor-field-label { font-size: 0.85rem; font-weight: 600; color: var(--tor-ink); }
+.tor-field-req { color: var(--tor-amber); }
+.tor-input {
+  padding: 11px 14px;
+  border-radius: 10px;
+  border: 1.5px solid var(--tor-border-hi);
+  background: var(--tor-surface-2);
+  color: var(--tor-ink);
+  font-size: 0.92rem;
+}
+.tor-input:focus-visible { outline: none; border-color: var(--tor-amber); }
+.tor-input-codigo { text-align: center; letter-spacing: 0.15em; font-family: 'Space Grotesk', monospace; font-weight: 700; text-transform: uppercase; }
+.tor-form-error { color: var(--tor-err); font-size: 0.85rem; margin: 0; }
+.tor-form-submit { width: 100%; justify-content: center; margin-top: 4px; }
+.tor-form-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Políticas del torneo: PDF en el propio formulario, con vista previa
+   y aceptación explícita antes de poder inscribirse ─────────────────── */
+.tor-politicas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--tor-border-hi);
+  background: var(--tor-surface-2);
+}
+.tor-pdf-preview-wrap {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--tor-border);
+  background: #fff; /* la página del PDF se dibuja sobre blanco, como el documento real */
+}
+.tor-pdf-canvas-wrap { display: flex; flex-direction: column; }
+.tor-pdf-status { margin: 0; padding: 60px 16px; text-align: center; font-size: 0.85rem; color: #6b7280; }
+.tor-pdf-status-error { color: var(--tor-err); }
+.tor-pdf-canvas-scroll { max-height: 340px; overflow: auto; }
+.tor-pdf-canvas-scroll canvas { display: block; width: 100%; height: auto; }
+.tor-pdf-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #f3f4f6;
+  border-top: 1px solid #e5e7eb;
+  font-size: 0.78rem;
+  color: #374151;
+}
+.tor-pdf-pager button {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.tor-pdf-pager button:disabled { opacity: 0.4; cursor: not-allowed; }
+.tor-pdf-open-link { align-self: flex-start; font-size: 0.8rem; color: var(--tor-teal); text-decoration: none; }
+.tor-pdf-open-link:hover { text-decoration: underline; }
+
+.tor-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding-top: 4px;
+  font-size: 0.88rem;
+  color: var(--tor-ink);
+  cursor: pointer;
+}
+.tor-checkbox input[type="checkbox"] {
+  margin-top: 2px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--tor-amber);
+  cursor: pointer;
+}
+
+/* ── Pago ────────────────────────────────────────── */
+.tor-pago-resumen {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--tor-surface-2);
+  font-size: 0.95rem;
+}
+.tor-pago-resumen strong { font-size: 1.3rem; color: var(--tor-amber); font-family: 'Space Grotesk', sans-serif; }
+.tor-politica { font-size: 0.8rem; padding: 10px 12px; background: var(--tor-surface-2); border-radius: 8px; }
+.tor-aviso-azul { font-size: 0.82rem; color: var(--tor-teal); margin: 0; }
+.tor-mock-note { font-size: 0.75rem; color: var(--tor-muted); font-style: italic; text-align: center; margin: 4px 0 0; }
+
+.tor-procesando { align-items: center; text-align: center; padding: 40px 24px; }
+.tor-spinner {
+  width: 32px; height: 32px;
+  border: 3px solid var(--tor-border-hi);
+  border-top-color: var(--tor-amber);
+  border-radius: 50%;
+  animation: tor-spin 0.8s linear infinite;
+}
+@keyframes tor-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .tor-spinner { animation-duration: 2s; }
+}

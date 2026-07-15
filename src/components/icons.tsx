@@ -146,6 +146,25 @@ export function TrophyIcon() {
   );
 }
 
+export function TournamentIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 4h4v5a3 3 0 0 0 3 3h2a3 3 0 0 0 3-3V4h4" />
+      <path d="M4 4v2a3 3 0 0 0 3 3M20 4v2a3 3 0 0 1-3 3" />
+      <path d="M12 12v4M9 20h6M12 16v4" />
+    </svg>
+  );
+}
+
+export function DocumentIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+      <path d="M14 2v6h6M9 13h6M9 17h6" />
+    </svg>
+  );
+}
+
 export function HistoryIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">

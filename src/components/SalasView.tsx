@@ -9,6 +9,11 @@ type Props = {
   dark:         boolean;
   onBack:       () => void;
   onGameStart:  (sala: Sala) => void;
+  /** Sala 'esperando' a abrir directamente al montar (revancha / invitación
+   *  aceptada, ver App.tsx) — de un solo uso: se avisa al consumirla para
+   *  que el padre la limpie y no re-abra una sala vieja la próxima vez. */
+  salaInicial?:        Sala | null;
+  onSalaInicialUsada?: () => void;
 };
 
 // ── Helpers ───────────────────────────────────────
@@ -68,12 +73,23 @@ function SalaCard({
 // ── Sala de espera ────────────────────────────────
 function WaitingRoom({
   sala, userId, onSalir, saliendo, onIniciar, iniciando, onCambiarPosicion,
+  onCerrar, cerrando,
 }: {
   sala: Sala; userId: string; onSalir: () => void; saliendo: boolean;
   onIniciar: () => void; iniciando: boolean;
   onCambiarPosicion: (posicion: number) => void;
+  onCerrar: () => void; cerrando: boolean;
 }) {
   const [copied, setCopied] = useState(false);
+  // Cerrar la sala echa a TODOS los sentados: pedir un segundo clic de
+  // confirmación en vez de ejecutar al primero (sin modal nuevo — el
+  // propio botón cambia de texto y se revierte solo a los 4s).
+  const [confirmandoCierre, setConfirmandoCierre] = useState(false);
+  useEffect(() => {
+    if (!confirmandoCierre) return;
+    const t = setTimeout(() => setConfirmandoCierre(false), 4000);
+    return () => clearTimeout(t);
+  }, [confirmandoCierre]);
 
   function copyCodigo() {
     navigator.clipboard.writeText(sala.codigo).then(() => {
@@ -136,9 +152,18 @@ function WaitingRoom({
             {iniciando ? 'Iniciando…' : sala.estado === 'en_juego' ? 'Partida en curso' : 'Iniciar partida'}
           </button>
         )}
-        <button className="sv-leave-btn" onClick={onSalir} disabled={saliendo}>
+        <button className="sv-leave-btn" onClick={onSalir} disabled={saliendo || cerrando}>
           {saliendo ? 'Saliendo…' : 'Salir de la sala'}
         </button>
+        {soyCreador && (
+          <button
+            className="sv-close-btn"
+            onClick={() => (confirmandoCierre ? onCerrar() : setConfirmandoCierre(true))}
+            disabled={cerrando || saliendo}
+          >
+            {cerrando ? 'Cerrando…' : confirmandoCierre ? '¿Seguro? Se cierra para todos' : 'Cerrar sala'}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -258,7 +283,7 @@ function CreateForm({ onCrear, creating }: { onCrear: (b: CreateBody) => void; c
 }
 
 // ── Main view ─────────────────────────────────────
-export default function SalasView({ user, dark, onBack, onGameStart }: Props) {
+export default function SalasView({ user, dark, onBack, onGameStart, salaInicial, onSalaInicialUsada }: Props) {
   const [salas,       setSalas]       = useState<Sala[]>([]);
   const [loading,     setLoading]     = useState(true);
   const [refreshing,  setRefreshing]  = useState(false);
@@ -268,10 +293,18 @@ export default function SalasView({ user, dark, onBack, onGameStart }: Props) {
   const [joining,     setJoining]     = useState<string | null>(null);
   const [saliendo,    setSaliendo]    = useState(false);
   const [iniciando,   setIniciando]   = useState(false);
-  const [sala,        setSala]        = useState<Sala | null>(null);
+  const [cerrando,    setCerrando]    = useState(false);
+  const [sala,        setSala]        = useState<Sala | null>(salaInicial ?? null);
   const [searchCode,  setSearchCode]  = useState('');
   const [searching,   setSearching]   = useState(false);
   const [searchErr,   setSearchErr]   = useState<string | null>(null);
+
+  // La sala inicial es de un solo uso: consumida como estado inicial de
+  // arriba, se le avisa al padre para que no la re-inyecte en un remount.
+  useEffect(() => {
+    if (salaInicial) onSalaInicialUsada?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadSalas = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -349,6 +382,23 @@ export default function SalasView({ user, dark, onBack, onGameStart }: Props) {
     }
   }
 
+  // Cerrar la sala (solo el creador): la cancela para TODOS los sentados y
+  // la saca del listado de salas abiertas — el backend ya lo soportaba
+  // (PATCH /salas/:id/estado, restringido al creador), faltaba el botón.
+  async function handleCerrarSala() {
+    if (!sala) return;
+    setCerrando(true);
+    try {
+      await api.salas.cambiarEstado(sala.id, 'cancelada');
+      setSala(null);
+      loadSalas(true);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'No se pudo cerrar la sala');
+    } finally {
+      setCerrando(false);
+    }
+  }
+
   async function handleCambiarPosicion(posicion: number) {
     if (!sala) return;
     try {
@@ -415,6 +465,8 @@ export default function SalasView({ user, dark, onBack, onGameStart }: Props) {
             onIniciar={handleIniciar}
             iniciando={iniciando}
             onCambiarPosicion={handleCambiarPosicion}
+            onCerrar={handleCerrarSala}
+            cerrando={cerrando}
           />
         </div>
       </div>
