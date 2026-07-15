@@ -362,6 +362,34 @@
 .lg-google:focus-visible { outline: 2px solid var(--pl-link); outline-offset: 2px; }
 .lg-google:disabled { cursor: not-allowed; opacity: 0.55; }
 
+/* ── Invitado (verde, destacado) ─────────────────── */
+.lg-guest {
+  --guest-green: #3d7a5c;
+  width: 100%;
+  padding: 15px;
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  border: none;
+  background: var(--guest-green);
+  color: #f1f8f3;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: transform .16s ease, box-shadow .2s ease, background .16s ease;
+  box-shadow: 0 8px 22px -8px color-mix(in srgb, var(--guest-green) 70%, transparent);
+}
+.lg-guest:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--guest-green) 88%, white);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px -8px color-mix(in srgb, var(--guest-green) 80%, transparent);
+}
+.lg-guest:active:not(:disabled) { transform: translateY(0); }
+.lg-guest:focus-visible { outline: 2px solid var(--pl-ink); outline-offset: 2px; }
+.lg-guest:disabled { cursor: not-allowed; opacity: 0.55; }
+
 .lg-foot {
   margin-top: 4px;
   text-align: center;

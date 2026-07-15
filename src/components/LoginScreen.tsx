@@ -122,6 +122,23 @@ export default function LoginScreen({ onSwitch, onSuccess, dark, onToggleTheme }
     }
   }
 
+  // Cuenta efímera, sin datos que pedir — por eso sessionStorage (persist
+  // false): no hay email/contraseña que recordar si se pierde el token.
+  async function handleGuestClick() {
+    setApiError(null);
+    setLoading(true);
+    try {
+      const authRes = await api.jugarInvitado();
+      tokenStore.set(authRes.token, false);
+      const config = await api.getPreferencias();
+      onSuccess(authRes.user, config);
+    } catch (err: unknown) {
+      setApiError(err instanceof Error ? err.message : 'No se pudo iniciar como invitado');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   // El code client se crea una sola vez (no hace falta re-crearlo por
   // cambios de tema, a diferencia del widget prearmado de antes).
   const codeClientRef = useRef<{ requestCode: () => void } | null>(null);
@@ -259,6 +276,15 @@ export default function LoginScreen({ onSwitch, onSuccess, dark, onToggleTheme }
             title={GOOGLE_CLIENT_ID ? undefined : 'Próximamente'}
           >
             <GoogleIcon /> Continuar con Google
+          </button>
+
+          <button
+            type="button"
+            className="lg-guest"
+            onClick={handleGuestClick}
+            disabled={loading}
+          >
+            Jugar como invitado
           </button>
 
           <p className="lg-foot">

@@ -8,6 +8,12 @@ const AnySchema    = { type: 'object', additionalProperties: true } as const;
 function auth(req: { headers: { authorization?: string } }, reply: { code: (n: number) => any }) {
   const payload = verifyToken(req.headers.authorization);
   if (!payload) { reply.code(401).send({ error: 'Token requerido' }); return null; }
+  // Único choke point de /ranked/* — ms-salas no tiene auth propia, así
+  // que el bloqueo de invitados tiene que vivir acá.
+  if (payload.segmento === 'invitado') {
+    reply.code(403).send({ error: 'Los invitados no pueden acceder a partidas ranked' });
+    return null;
+  }
   return payload;
 }
 

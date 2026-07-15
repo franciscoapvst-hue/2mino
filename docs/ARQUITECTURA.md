@@ -71,6 +71,35 @@ loguea (dev local sin API key real). `EMAIL_FROM` con un dominio propio
 (en vez de `onboarding@resend.dev`) requiere verificar ese dominio en
 Resend (Domains → agregar registros DNS).
 
+**Sesión de invitado** (2026-07): `POST /usuarios/invitado` crea una
+cuenta real y efímera (username `Invitado` + sufijo, email sintético
+`invitado-<uuid>@guest.2mino.local`, password aleatoria que nunca se usa)
+en el segmento `invitado` — mismo patrón que `oauth-google` (find-or-create
+sin datos del usuario), pero sin ningún dato de entrada. El gateway expone
+esto en `POST /auth/invitado`, que firma sesión directo (sin paso de
+login aparte). Es una cuenta real (no un JWT fabricado) a propósito: así
+el chat de partida y cualquier lookup de `ms-social` a
+`GET /usuarios/:id` siguen funcionando sin casos especiales.
+
+El bloqueo de ranked para este segmento vive en el gateway
+(`api-integracion/src/routes/ranked.ts`, helper `auth()`) — `ms-salas` no
+tiene autenticación propia, así que ese es el único choke point posible.
+Cuando exista Torneos como feature real (hoy es solo
+`docs/CASOS_DE_USO_TORNEOS.md`, sin aprobar), sus endpoints van a
+necesitar el mismo chequeo.
+
+**Bug real encontrado al construir esto**: `callService()`
+(`api-integracion/src/http.ts`) mandaba siempre `Content-Type:
+application/json` a los microservicios internos, aunque la llamada no
+llevara body (`callMs('/usuarios/invitado', 'POST')`, sin tercer
+argumento). El parser JSON por defecto de Fastify rechaza esa combinación
+con `FST_ERR_CTP_EMPTY_JSON_BODY` — el gateway devolvía ese 400 tal cual
+se lo pasaba `ms-usuarios`, sin relación aparente con `/auth/invitado` en
+sí (costó bastante rastrearlo). Fix: el header `Content-Type` ahora solo
+se manda cuando `body !== undefined`. Aplica a cualquier llamada interna
+sin body, no solo a esta — vale la pena recordarlo si aparece el mismo
+error en otra ruta nueva.
+
 ### ms-frontend-landing (puerto 5000, interno)
 
 Configuración del landing y overrides de preferencias por usuario.

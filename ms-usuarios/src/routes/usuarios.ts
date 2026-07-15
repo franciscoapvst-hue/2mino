@@ -829,4 +829,47 @@ export async function usuariosRoutes(app: FastifyInstance) {
       return reply.code(500).send({ error: 'No se pudo generar un username único' });
     },
   );
+
+  // ── POST /usuarios/invitado ─────────────────────
+  // Crea una cuenta real y efímera, sin pedir ningún dato — mismo patrón
+  // que oauth-google (username generado, password aleatoria que la cuenta
+  // nunca usa), pero sin email real: se genera uno sintético único porque
+  // la columna es NOT NULL UNIQUE. email_verificado queda en su default
+  // (true), no hace falta verificar nada. El bloqueo de ranked/torneos
+  // para este segmento vive en el gateway (api-integracion), no acá.
+  app.post('/usuarios/invitado', {
+    schema: {
+      tags:        ['usuarios'],
+      summary:     'Crea una sesión de invitado (sin registro)',
+      description: 'Cuenta efímera sin email/password reales — el gateway bloquea ranked (y, cuando exista, torneos) para este segmento.',
+      response: {
+        201: { description: 'Cuenta creada', ...UserSchema },
+      },
+    },
+  }, async (req, reply) => {
+    const { rows: segRows } = await pool.query(
+      `SELECT id FROM segmentos WHERE nombre = 'invitado' AND activo = true`,
+    );
+    const segmentoId = segRows[0].id;
+    const email = `invitado-${crypto.randomUUID()}@guest.2mino.local`;
+    const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), ROUNDS);
+
+    // Mismo loop de reintento con sufijo numérico que oauth-google.
+    for (let intento = 0; intento < 20; intento++) {
+      const username = intento === 0 ? 'Invitado' : `Invitado${crypto.randomInt(10000)}`.slice(0, 20);
+      try {
+        const { rows } = await pool.query(
+          `INSERT INTO usuarios (username, email, password_hash, segmento_id)
+           VALUES ($1, $2, $3, $4)
+           RETURNING id, username, email, segmento_id, avatar, created_at`,
+          [username, email, passwordHash, segmentoId],
+        );
+        return reply.code(201).send({ ...rows[0], segmento: 'invitado' });
+      } catch (err: any) {
+        if (err.code === '23505' && err.detail?.includes('username')) continue;
+        throw err;
+      }
+    }
+    return reply.code(500).send({ error: 'No se pudo generar un username único' });
+  });
 }

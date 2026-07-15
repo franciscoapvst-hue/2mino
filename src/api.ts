@@ -264,6 +264,9 @@ export const api = {
   loginGoogle: (code: string) =>
     req<AuthResponse>('/auth/google', { method: 'POST', body: JSON.stringify({ code }) }),
 
+  jugarInvitado: () =>
+    req<AuthResponse>('/auth/invitado', { method: 'POST' }),
+
   forgotPassword: (email: string) =>
     req<{ message: string; _dev_token?: string }>('/auth/forgot-password', {
       method: 'POST',
