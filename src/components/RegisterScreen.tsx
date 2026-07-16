@@ -1,11 +1,10 @@
 import { useState, FormEvent } from 'react';
-import type { View } from '../App';
+import { useNavigate } from 'react-router-dom';
 import { api, type AuthUser, type UserConfig } from '../api';
 import { SunIcon, MoonIcon } from './icons';
 import { Bone, DominoStage } from './DominoStage';
 
 type Props = {
-  onSwitch: (v: View) => void;
   onSuccess: (user: AuthUser, config: UserConfig) => void;
   dark: boolean;
   onToggleTheme: () => void;
@@ -20,7 +19,8 @@ function pwStrength(pw: string): 0 | 1 | 2 | 3 {
 }
 const strengthLabel = ['Débil', 'Regular', 'Buena', 'Fuerte'] as const;
 
-export default function RegisterScreen({ onSwitch, onSuccess, dark, onToggleTheme }: Props) {
+export default function RegisterScreen({ onSuccess, dark, onToggleTheme }: Props) {
+  const navigate = useNavigate();
   const [username,  setUsername]  = useState('');
   const [email,     setEmail]     = useState('');
   const [password,  setPassword]  = useState('');
@@ -100,7 +100,7 @@ export default function RegisterScreen({ onSwitch, onSuccess, dark, onToggleThem
               Te mandamos un correo a <strong>{email}</strong> para confirmar tu
               cuenta. Revisa también tu carpeta de spam.
             </p>
-            <button type="button" className="lg-submit" onClick={() => onSwitch('login')}>
+            <button type="button" className="lg-submit" onClick={() => navigate('/login')}>
               Volver al inicio de sesión
             </button>
           </div>
@@ -197,7 +197,7 @@ export default function RegisterScreen({ onSwitch, onSuccess, dark, onToggleThem
 
           <p className="lg-foot">
             ¿Ya tienes cuenta?{' '}
-            <button type="button" className="lg-link lg-link-strong" onClick={() => onSwitch('login')} disabled={loading}>
+            <button type="button" className="lg-link lg-link-strong" onClick={() => navigate('/login')} disabled={loading}>
               Iniciar sesión
             </button>
           </p>
