@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { api, type AuthUser, type UserConfig, type Sala } from '../api';
-import { SunIcon, MoonIcon, CasualIcon, RankedIcon, SalasIcon, BellIcon, PeopleIcon, TrophyIcon, HistoryIcon, TournamentIcon } from './icons';
+import { SunIcon, MoonIcon, BellIcon, PeopleIcon } from './icons';
+import GameIcon, { type GameIconName } from './GameIcons';
 import { Bone } from './DominoStage';
 import { avatarUrl } from '../avatars';
 import { rangoDeElo, progresoRango } from '../ranks';
@@ -35,13 +36,15 @@ type Props = {
 };
 
 // ── Tarjeta de modo secundario (casual / salas) ────
-function PlayCard({ icon, title, desc, action, accent, onClick }: {
-  icon: ReactNode; title: string; desc: string; action: string;
+// El ícono va grande y sin chip de color detrás: estos íconos ya traen su
+// propio color, un chip teal/gris pelearía con ellos.
+function PlayCard({ icono, title, desc, action, accent, onClick }: {
+  icono: GameIconName; title: string; desc: string; action: string;
   accent: 'teal' | 'neutral'; onClick: () => void;
 }) {
   return (
     <button className={`dash-card dash-card-${accent}`} onClick={onClick}>
-      <span className="dash-card-icon">{icon}</span>
+      <span className="dash-card-icon"><GameIcon name={icono} size={48} /></span>
       <span className="dash-card-body">
         <span className="dash-card-title">{title}</span>
         <span className="dash-card-desc">{desc}</span>
@@ -220,7 +223,9 @@ export default function Dashboard({
             <Bone a={6} b={6} className="dash-featured-tile dash-featured-tile-a" />
             <Bone a={5} b={4} className="dash-featured-tile dash-featured-tile-b" />
             <div className="dash-featured-content">
-              <span className="dash-featured-kicker"><RankedIcon /> Competitivo</span>
+              <span className="dash-featured-kicker">
+                <GameIcon name="ranked" size={40} /> Competitivo
+              </span>
               <h3>Partida Ranked</h3>
               <p>Creá una cuenta para jugar ranked y subir de ELO.</p>
             </div>
@@ -230,7 +235,9 @@ export default function Dashboard({
             <Bone a={6} b={6} className="dash-featured-tile dash-featured-tile-a" />
             <Bone a={5} b={4} className="dash-featured-tile dash-featured-tile-b" />
             <div className="dash-featured-content">
-              <span className="dash-featured-kicker"><RankedIcon /> Competitivo</span>
+              <span className="dash-featured-kicker">
+                <GameIcon name="ranked" size={40} /> Competitivo
+              </span>
               <h3>Partida Ranked</h3>
               <p>Cada mano cuenta hacia tu ELO. Sube de rango y demuestra quién manda en la mesa.</p>
             </div>
@@ -249,7 +256,7 @@ export default function Dashboard({
         {/* Casual + Salas */}
         <div className="dash-row">
           <PlayCard
-            icon={<CasualIcon />}
+            icono="casual"
             title="Partida Casual"
             desc="Juega sin presión. Practica y diviértete sin afectar tu ranking."
             action="Buscar partida"
@@ -257,7 +264,7 @@ export default function Dashboard({
             onClick={onGoToCasual}
           />
           <PlayCard
-            icon={<SalasIcon />}
+            icono="salas"
             title="Salas Abiertas"
             desc="Explora partidas en curso, únete a una sala o crea la tuya con amigos."
             action="Ver salas"
@@ -275,7 +282,7 @@ export default function Dashboard({
         {true && (
           <div className="dash-row dash-row-solo">
             <PlayCard
-              icon={<TournamentIcon />}
+              icono="torneos"
               title="Torneos"
               desc="Inscribite en pareja, compite por fases y sube en el ranking del torneo."
               action="Ver torneos"
@@ -289,7 +296,7 @@ export default function Dashboard({
         <h2 className="dash-section-title">Comunidad</h2>
         <div className="dash-row">
           <PlayCard
-            icon={<TrophyIcon />}
+            icono="leaderboard"
             title="Leaderboard"
             desc="Top 100 jugadores por ELO. Mira su historial, capicúas y tranques."
             action="Ver leaderboard"
@@ -297,7 +304,7 @@ export default function Dashboard({
             onClick={onGoToLeaderboard}
           />
           <PlayCard
-            icon={<HistoryIcon />}
+            icono="historial"
             title="Historial de partidas"
             desc="Repasa tus últimas partidas y reproduce cómo fue cada mano."
             action="Ver historial"
