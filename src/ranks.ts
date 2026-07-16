@@ -26,6 +26,12 @@ export function rangoDeElo(elo: number): Rango {
   return { nombre: r.nombre, url: badgeByFile[r.file] ?? null, min: r.min };
 }
 
+// Los 5 escalones con su insignia — para vistas que muestran la progresión
+// completa (landing) en vez de un solo rango (dashboard).
+export function todosLosRangos(): Rango[] {
+  return RANGOS.map(r => ({ nombre: r.nombre, url: badgeByFile[r.file] ?? null, min: r.min }));
+}
+
 // Progreso hacia el siguiente rango: para el panel de rango del dashboard.
 export function progresoRango(elo: number): {
   siguiente: string | null;
