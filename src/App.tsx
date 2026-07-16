@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import LoginForm from './components/LoginForm';
+import LandingScreen from './components/LandingScreen';
 import LoginScreen from './components/LoginScreen';
 import RegisterScreen from './components/RegisterScreen';
 import ForgotScreen from './components/ForgotScreen';
@@ -25,7 +26,7 @@ import { DominoTile, SunIcon, MoonIcon } from './components/icons';
 import { useSocialSocket } from './hooks/useSocialSocket';
 import { sounds } from './game/sounds';
 
-export type View = 'login' | 'register' | 'forgot';
+export type View = 'landing' | 'login' | 'register' | 'forgot';
 type AppView = View | 'dashboard' | 'salas' | 'ranked' | 'casual' | 'piece-demo' | 'game'
   | 'amigos' | 'leaderboard' | 'historial' | 'replay' | 'onboarding' | 'tutorial'
   | 'torneos' | 'torneo-detalle' | 'torneo-inscripcion' | 'torneo-unirse';
@@ -67,7 +68,9 @@ const TOKEN_VERIFICACION_DE_URL: string | null = (() => {
 })();
 
 export default function App() {
-  const [view,     setView]     = useState<AppView>('login');
+  // Un link de invitación a party (/party/:codigo) manda directo a login,
+  // no a la landing — quien llega con ese link ya trae destino claro.
+  const [view,     setView]     = useState<AppView>(() => CODIGO_PARTY_DE_URL ? 'login' : 'landing');
   const [session,  setSession]  = useState<Session | null>(null);
   const [booting,  setBooting]  = useState(true);
   const [gameSala, setGameSala]   = useState<Sala | null>(null);
@@ -316,6 +319,17 @@ export default function App() {
       <TutorialGame
         onSkip={handleTutorialResuelto}
         onFinish={handleTutorialResuelto}
+      />
+    );
+  }
+
+  // Landing pública: primera pantalla para quien llega sin sesión.
+  if (view === 'landing' && !session) {
+    return (
+      <LandingScreen
+        onSwitch={setView}
+        dark={dark}
+        onToggleTheme={() => setDark(d => !d)}
       />
     );
   }
