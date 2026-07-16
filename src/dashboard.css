@@ -317,6 +317,10 @@
   color: var(--amber-hi);
 }
 .dash-featured-kicker svg { width: 15px; height: 15px; }
+/* Más grande que los 48px de las cards a propósito: es la card destacada, y
+   además la ficha va parada — en caja cuadrada pierde alto contra los íconos
+   anchos, así que necesita más caja para pesar igual. */
+.dash-featured-kicker .game-icon { width: 56px; height: 56px; object-fit: contain; margin-right: 2px; }
 .dash-featured h3 {
   font-family: 'Space Grotesk', Inter, sans-serif;
   font-size: 1.7rem;
@@ -382,16 +386,26 @@
 .dash-card-body { display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .dash-card:hover { transform: translateY(-2px); }
 .dash-card:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+/* Sin chip de color detrás: los íconos de destino ya traen su propio color
+   y volumen — un chip teal/gris peleaba con ellos. Solo la caja de tamaño. */
 .dash-card-icon {
-  width: 42px;
-  height: 42px;
+  width: 48px;
+  height: 48px;
   display: grid;
   place-items: center;
-  border-radius: 12px;
+  flex-shrink: 0;
 }
-.dash-card-icon svg { width: 22px; height: 22px; }
-.dash-card-teal    .dash-card-icon { background: color-mix(in srgb, var(--teal) 16%, transparent); color: var(--teal); }
-.dash-card-neutral .dash-card-icon { background: var(--d-border-hi); color: var(--d-muted); }
+.dash-card-icon .game-icon { width: 48px; height: 48px; object-fit: contain; }
+/* Solo en claro: la sombra de estos íconos se diseñó para fieltro oscuro
+   detrás — sobre blanco puro queda como sticker pegado, sin asiento. Un
+   chip neutro tenue les da un piso y suaviza el corte de la sombra. En
+   oscuro se dejan flotando (ya aprobado así, no tocar). */
+.dash.is-light .dash-card-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fbf8f2, #f2ece0);
+}
 .dash-card-teal:hover    { border-color: var(--teal); }
 .dash-card-neutral:hover { border-color: var(--d-border-hi); }
 .dash-card-title {
