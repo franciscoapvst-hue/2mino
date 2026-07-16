@@ -386,24 +386,22 @@
 .dash-card-body { display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .dash-card:hover { transform: translateY(-2px); }
 .dash-card:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
-/* Sin chip de color detrás: los íconos de destino ya traen su propio color
-   y volumen — un chip teal/gris peleaba con ellos. Solo la caja de tamaño. */
+/* Los íconos de destino ya traen su propio color/sombra, pensada para
+   asentarse sobre un piso — sobre la superficie pelada quedan como
+   sticker pegado, sin contraste. Un chip cálido tenue (familia fieltro)
+   les da ese piso; los valores están tocados a mano en los dos modos
+   para no pelear con el color propio del ícono. */
 .dash-card-icon {
-  width: 48px;
-  height: 48px;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-}
-.dash-card-icon .game-icon { width: 48px; height: 48px; object-fit: contain; }
-/* Solo en claro: la sombra de estos íconos se diseñó para fieltro oscuro
-   detrás — sobre blanco puro queda como sticker pegado, sin asiento. Un
-   chip neutro tenue les da un piso y suaviza el corte de la sombra. En
-   oscuro se dejan flotando (ya aprobado así, no tocar). */
-.dash.is-light .dash-card-icon {
   width: 60px;
   height: 60px;
   border-radius: 14px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, #1b221d, #232b25);
+}
+.dash-card-icon .game-icon { width: 48px; height: 48px; object-fit: contain; }
+.dash.is-light .dash-card-icon {
   background: linear-gradient(180deg, #fbf8f2, #f2ece0);
 }
 .dash-card-teal:hover    { border-color: var(--teal); }
