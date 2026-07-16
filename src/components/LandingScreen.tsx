@@ -1,5 +1,5 @@
 import { useRef, useCallback } from 'react';
-import type { View } from '../App';
+import { useNavigate } from 'react-router-dom';
 import { Bone } from './DominoStage';
 import { SunIcon, MoonIcon } from './icons';
 import GameIcon from './GameIcons';
@@ -48,13 +48,13 @@ function HBone({ a, b, className = '' }: { a: number; b: number; className?: str
 type Props = {
   dark: boolean;
   onToggleTheme: () => void;
-  onSwitch: (v: View) => void;
 };
 
 // Landing pública — lo primero que ve alguien sin sesión. Login/Register/
 // Forgot siguen siendo pantallas propias (LoginScreen, etc); esta solo
-// vende el juego y manda al visitante a una de esas con onSwitch.
-export default function LandingScreen({ dark, onToggleTheme, onSwitch }: Props) {
+// vende el juego y navega ahí directo.
+export default function LandingScreen({ dark, onToggleTheme }: Props) {
+  const navigate = useNavigate();
   // Mismo parallax de fichas con el mouse que ya usa DominoStage (login) —
   // reimplementado acá porque el hero tiene su propia escena/tiles.
   const sceneRef = useRef<HTMLDivElement>(null);
@@ -87,8 +87,8 @@ export default function LandingScreen({ dark, onToggleTheme, onSwitch }: Props) 
           >
             {dark ? <SunIcon /> : <MoonIcon />}
           </button>
-          <button className="ld-nav-login" onClick={() => onSwitch('login')}>Iniciar sesión</button>
-          <button className="ld-nav-cta" onClick={() => onSwitch('register')}>Crear cuenta</button>
+          <button className="ld-nav-login" onClick={() => navigate('/login')}>Iniciar sesión</button>
+          <button className="ld-nav-cta" onClick={() => navigate('/register')}>Crear cuenta</button>
         </div>
       </header>
 
@@ -111,10 +111,10 @@ export default function LandingScreen({ dark, onToggleTheme, onSwitch }: Props) 
             Encuentra partida en segundos y deja que tu rango hable por ti.
           </p>
           <div className="ld-hero-actions">
-            <button className="ld-btn-primary" onClick={() => onSwitch('register')}>
+            <button className="ld-btn-primary" onClick={() => navigate('/register')}>
               Jugar gratis ahora
             </button>
-            <button className="ld-btn-ghost" onClick={() => onSwitch('login')}>
+            <button className="ld-btn-ghost" onClick={() => navigate('/login')}>
               Ya tengo cuenta
             </button>
           </div>
@@ -280,7 +280,7 @@ export default function LandingScreen({ dark, onToggleTheme, onSwitch }: Props) 
               llévate algo más que el orgullo.
             </p>
           </div>
-          <button className="ld-btn-primary" onClick={() => onSwitch('register')}>
+          <button className="ld-btn-primary" onClick={() => navigate('/register')}>
             Quiero competir
           </button>
         </div>
@@ -327,12 +327,12 @@ export default function LandingScreen({ dark, onToggleTheme, onSwitch }: Props) 
       {/* ── 8 · CTA final ────────────────────────────── */}
       <section className="ld-final-cta">
         <h2 className="ld-h2">¿Listo para sentarte a la mesa?</h2>
-        <button className="ld-btn-primary ld-btn-lg" onClick={() => onSwitch('register')}>
+        <button className="ld-btn-primary ld-btn-lg" onClick={() => navigate('/register')}>
           Jugar gratis ahora
         </button>
         <p className="ld-final-note">
           ¿Ya tienes cuenta?{' '}
-          <button type="button" className="ld-link" onClick={() => onSwitch('login')}>
+          <button type="button" className="ld-link" onClick={() => navigate('/login')}>
             Inicia sesión
           </button>
         </p>

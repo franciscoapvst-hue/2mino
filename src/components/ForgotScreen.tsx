@@ -1,16 +1,16 @@
 import { useState, FormEvent } from 'react';
-import type { View } from '../App';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { SunIcon, MoonIcon } from './icons';
 import { Bone, DominoStage } from './DominoStage';
 
 type Props = {
-  onSwitch: (v: View) => void;
   dark: boolean;
   onToggleTheme: () => void;
 };
 
-export default function ForgotScreen({ onSwitch, dark, onToggleTheme }: Props) {
+export default function ForgotScreen({ dark, onToggleTheme }: Props) {
+  const navigate = useNavigate();
   const [email,     setEmail]     = useState('');
   const [touched,   setTouched]   = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -64,7 +64,7 @@ export default function ForgotScreen({ onSwitch, dark, onToggleTheme }: Props) {
               Si <strong>{email}</strong> tiene una cuenta, recibirás instrucciones
               en breve. Revisa también tu carpeta de spam.
             </p>
-            <button type="button" className="lg-submit" onClick={() => onSwitch('login')}>
+            <button type="button" className="lg-submit" onClick={() => navigate('/login')}>
               Volver al inicio de sesión
             </button>
             <p className="lg-foot">
@@ -110,7 +110,7 @@ export default function ForgotScreen({ onSwitch, dark, onToggleTheme }: Props) {
             </button>
 
             <p className="lg-foot">
-              <button type="button" className="lg-link lg-link-strong" onClick={() => onSwitch('login')} disabled={loading}>
+              <button type="button" className="lg-link lg-link-strong" onClick={() => navigate('/login')} disabled={loading}>
                 ← Volver al inicio de sesión
               </button>
             </p>
