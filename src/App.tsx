@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import LoginForm from './components/LoginForm';
+import {
+  Routes, Route, Navigate, useNavigate, useLocation, useParams,
+} from 'react-router-dom';
 import LandingScreen from './components/LandingScreen';
 import LoginScreen from './components/LoginScreen';
 import RegisterScreen from './components/RegisterScreen';
 import ForgotScreen from './components/ForgotScreen';
-import RegisterForm from './components/RegisterForm';
-import ForgotPasswordForm from './components/ForgotPasswordForm';
 import Dashboard from './components/Dashboard';
 import SalasView from './components/SalasView';
 import MatchmakingView from './components/MatchmakingView';
@@ -22,14 +22,8 @@ import TorneoDetalleView from './torneos/TorneoDetalleView';
 import TorneoInscripcionForm from './torneos/TorneoInscripcionForm';
 import TorneoUnirseView from './torneos/TorneoUnirseView';
 import { api, tokenStore, type AuthUser, type UserConfig, type Sala } from './api';
-import { DominoTile, SunIcon, MoonIcon } from './components/icons';
 import { useSocialSocket } from './hooks/useSocialSocket';
 import { sounds } from './game/sounds';
-
-export type View = 'landing' | 'login' | 'register' | 'forgot';
-type AppView = View | 'dashboard' | 'salas' | 'ranked' | 'casual' | 'piece-demo' | 'game'
-  | 'amigos' | 'leaderboard' | 'historial' | 'replay' | 'onboarding' | 'tutorial'
-  | 'torneos' | 'torneo-detalle' | 'torneo-inscripcion' | 'torneo-unirse';
 
 // El tutorial se ofrece una sola vez: se marca en `opciones` del usuario
 // (mismo bucket genérico que ya usan tema/idioma — ver ms-frontend-landing),
@@ -40,61 +34,205 @@ function necesitaOnboarding(config: UserConfig): boolean {
 
 type Session = { user: AuthUser; config: UserConfig };
 
-// Sin router todavía (ver docs/REFACTOR.md P4): un link de invitación a
-// party tiene forma /party/:codigo. Se parsea una sola vez al cargar y
-// se limpia la URL, para no tener que instalar react-router por esto.
-//
-// Se calcula a nivel de módulo (corre una única vez, al cargar el JS),
-// no dentro del inicializador de useState: React 18 StrictMode invoca
-// dos veces el inicializador lazy de useState en dev para detectar
-// funciones impuras — como esta función limpia la URL como efecto
-// secundario, una segunda invocación ya no encuentra el código (la
-// primera, descartada por StrictMode, ya la había limpiado), y el link
-// de invitación queda roto en dev.
-const CODIGO_PARTY_DE_URL: string | null = (() => {
-  const m = window.location.pathname.match(/^\/party\/([A-Za-z0-9-]+)/);
-  if (!m) return null;
-  window.history.replaceState(null, '', '/');
-  return m[1];
-})();
+// ── Rutas auxiliares que solo necesitan un param de la URL ─────────
 
-// Link de confirmación de cuenta: /verificar-email/:token (mismo patrón
-// que el de arriba — se lee y se limpia la URL una sola vez al cargar).
-const TOKEN_VERIFICACION_DE_URL: string | null = (() => {
-  const m = window.location.pathname.match(/^\/verificar-email\/([A-Za-z0-9]+)/);
-  if (!m) return null;
-  window.history.replaceState(null, '', '/');
-  return m[1];
-})();
+function GameRoute({ session, onInvitarCompanero, onAgregarAmigo }: {
+  session: Session;
+  onInvitarCompanero: (usuarioId: string) => void;
+  onAgregarAmigo: (usuarioId: string, username: string) => void;
+}) {
+  const { salaId } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [sala, setSala] = useState<Sala | null>(null);
+
+  // Se resuelve fresca contra el backend en cada montaje — a diferencia
+  // del viejo estado en memoria, recargar /game/:id (o entrar por link)
+  // no rompe la partida en curso.
+  useEffect(() => {
+    let cancelado = false;
+    api.salas.detalle(salaId!)
+      .then(s => { if (!cancelado) setSala(s); })
+      .catch(() => navigate('/home', { replace: true }));
+    return () => { cancelado = true; };
+  }, [salaId, navigate]);
+
+  const origin = (location.state as { origin?: string } | null)?.origin === 'rooms' ? '/rooms' : '/home';
+
+  async function handleRevancha() {
+    if (!sala) return;
+    try {
+      const { sala_codigo } = await api.social.revancha(sala.id);
+      const nuevaSala = await api.salas.porCodigo(sala_codigo);
+      navigate('/rooms', { state: { salaEspera: nuevaSala } });
+    } catch { /* noop, botón best-effort */ }
+  }
+
+  if (!sala) {
+    return (
+      <div className="app-shell">
+        <div className="boot-spinner" aria-label="Cargando…" />
+      </div>
+    );
+  }
+
+  return (
+    <GameBoard
+      sala={sala}
+      user={session.user}
+      onExit={() => navigate(origin)}
+      onRevancha={handleRevancha}
+      onInvitarCompanero={onInvitarCompanero}
+      onAgregarAmigo={onAgregarAmigo}
+    />
+  );
+}
+
+function RoomsRoute({ user, dark }: { user: AuthUser; dark: boolean }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const salaInicial = (location.state as { salaEspera?: Sala } | null)?.salaEspera ?? null;
+  return (
+    <SalasView
+      user={user}
+      dark={dark}
+      onBack={() => navigate('/home')}
+      onGameStart={(sala) => navigate(`/game/${sala.id}`, { state: { origin: 'rooms' } })}
+      salaInicial={salaInicial}
+    />
+  );
+}
+
+function MatchmakingRoute({ user, dark, tipo }: { user: AuthUser; dark: boolean; tipo: 'ranked' | 'casual' }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const partyCodigo = tipo === 'ranked'
+    ? ((location.state as { partyCodigo?: string } | null)?.partyCodigo ?? null)
+    : null;
+  return (
+    <MatchmakingView
+      user={user}
+      tipo={tipo}
+      dark={dark}
+      onBack={() => navigate('/home')}
+      onGameStart={(sala) => navigate(`/game/${sala.id}`, { state: { origin: 'home' } })}
+      autoJoinCodigo={partyCodigo}
+    />
+  );
+}
+
+function ReplayRoute({ dark }: { dark: boolean }) {
+  const { salaId } = useParams();
+  const navigate = useNavigate();
+  return <ReplayViewer dark={dark} salaId={salaId!} onBack={() => navigate('/history')} />;
+}
+
+function TorneoDetalleRoute() {
+  const { torneoId } = useParams();
+  const navigate = useNavigate();
+  return (
+    <TorneoDetalleView
+      torneoId={torneoId!}
+      onVolver={() => navigate('/tournaments')}
+      onInscribirme={(id) => navigate(`/tournaments/${id}/enroll`)}
+      onUnirseConCodigo={(id) => navigate(`/tournaments/${id}/join`)}
+    />
+  );
+}
+
+function TorneoEnrollRoute() {
+  const { torneoId } = useParams();
+  const navigate = useNavigate();
+  return (
+    <TorneoInscripcionForm
+      torneoId={torneoId!}
+      onVolver={() => navigate(`/tournaments/${torneoId}`)}
+      onListo={(id) => navigate(`/tournaments/${id}`)}
+    />
+  );
+}
+
+function TorneoJoinRoute() {
+  const { torneoId } = useParams();
+  const navigate = useNavigate();
+  return (
+    <TorneoUnirseView
+      torneoId={torneoId!}
+      onVolver={() => navigate(`/tournaments/${torneoId}`)}
+      onListo={(id) => navigate(`/tournaments/${id}`)}
+    />
+  );
+}
+
+// Link de invitación a party (/party/:codigo): sin sesión manda a login,
+// con sesión manda directo a ranked — en ambos casos el código viaja en
+// location.state para que ranked lo use como autoJoinCodigo.
+function PartyRedirect({ session }: { session: Session | null }) {
+  const { codigo } = useParams();
+  return session
+    ? <Navigate to="/ranked" replace state={{ partyCodigo: codigo }} />
+    : <Navigate to="/login" replace state={{ partyCodigo: codigo }} />;
+}
+
+// Link de confirmación de cuenta por email. El backend ya devuelve
+// token+user al verificar — no hace falta un login aparte.
+function VerifyEmailRoute({ onSuccess }: { onSuccess: (user: AuthUser, config: UserConfig) => void }) {
+  const { token } = useParams();
+  const navigate = useNavigate();
+  const [fallo, setFallo] = useState(false);
+
+  useEffect(() => {
+    api.verificarEmail(token!)
+      .then(async (authRes) => {
+        tokenStore.set(authRes.token, true);
+        const config = await api.getPreferencias();
+        onSuccess(authRes.user, config);
+      })
+      .catch(() => setFallo(true));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  if (fallo) {
+    return (
+      <div className="login-screen">
+        <section className="lg-panel">
+          <div className="lg-form lg-sent">
+            <span className="lg-sent-icon" aria-hidden="true">⚠</span>
+            <h2>El link no es válido o venció</h2>
+            <p className="lg-sent-sub">
+              Los links de confirmación duran 24 horas. Iniciá sesión con tu
+              correo y contraseña — si tu cuenta todavía no está confirmada,
+              ahí vas a poder pedir que te reenviemos el link.
+            </p>
+            <button type="button" className="lg-submit" onClick={() => navigate('/login')}>
+              Ir a iniciar sesión
+            </button>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <div className="app-shell">
+      <div className="boot-spinner" aria-label="Cargando…" />
+    </div>
+  );
+}
 
 export default function App() {
-  // Un link de invitación a party (/party/:codigo) manda directo a login,
-  // no a la landing — quien llega con ese link ya trae destino claro.
-  const [view,     setView]     = useState<AppView>(() => CODIGO_PARTY_DE_URL ? 'login' : 'landing');
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [session,  setSession]  = useState<Session | null>(null);
   const [booting,  setBooting]  = useState(true);
-  const [gameSala, setGameSala]   = useState<Sala | null>(null);
-  // A dónde volver al salir de una partida terminada.
-  const [gameOrigin, setGameOrigin] = useState<'salas' | 'dashboard'>('salas');
-  // Sala seleccionada para ver su repetición (MatchHistoryView → ReplayViewer).
-  const [replaySalaId, setReplaySalaId] = useState<string | null>(null);
-  // Torneo seleccionado al navegar de listado → detalle/inscripción/unirse.
-  const [torneoIdActual, setTorneoIdActual] = useState<string | null>(null);
   // Sala 'esperando' a abrir directamente al entrar a SalasView (revancha /
-  // invitación aceptada) — de un solo uso: SalasView avisa al consumirla.
-  const [salaEsperaInicial, setSalaEsperaInicial] = useState<Sala | null>(null);
+  // invitación aceptada) — viaja como location.state (ver RoomsRoute), este
+  // estado ya no hace falta acá.
   // Partida en_juego que el usuario ya tenía abierta al iniciar sesión —
   // se ofrece reintegrarse desde un banner en el dashboard, en vez de
-  // forzar la navegación (por eso vive aparte de `gameSala`).
+  // forzar la navegación (por eso vive aparte de la ruta /game/:id).
   const [salaParaReintegrar, setSalaParaReintegrar] = useState<Sala | null>(null);
-  // Link de confirmación de cuenta inválido/vencido — se muestra un aviso
-  // en vez de dejar caer silenciosamente a login sin explicar por qué.
-  const [verificacionFallo, setVerificacionFallo] = useState(false);
-  // Invitación a party vía link (/party/ABCD). El inicializador de useState
-  // corre síncrono en el primer render, ANTES que cualquier efecto —
-  // evita que el .then() del restore de sesión capture un valor null por
-  // clausura si en vez usáramos un efecto separado para parsear la URL.
-  const [partyCodigo] = useState<string | null>(() => CODIGO_PARTY_DE_URL);
   const [dark,    setDark]    = useState<boolean>(
     () => localStorage.getItem('2mino-theme') !== 'light'
   );
@@ -121,26 +259,12 @@ export default function App() {
     return () => document.removeEventListener('click', onClick, true);
   }, []);
 
-  // Confirmar cuenta desde el link del email: gana sobre restaurar sesión
-  // (si ya había una sesión vieja en este navegador, el link igual debe
-  // loguear con la cuenta recién confirmada). Al confirmar, el backend ya
-  // devuelve token+user — no hace falta un login aparte.
+  // Restore session from stored token. Si la ruta actual es la de
+  // verificación de email, esa ruta (VerifyEmailRoute) ya se encarga de
+  // loguear con la cuenta recién confirmada — no pisarla con una sesión
+  // vieja que pudiera haber en este navegador.
   useEffect(() => {
-    if (!TOKEN_VERIFICACION_DE_URL) return;
-    api.verificarEmail(TOKEN_VERIFICACION_DE_URL)
-      .then(async (authRes) => {
-        tokenStore.set(authRes.token, true);
-        const config = await api.getPreferencias();
-        handleSuccess(authRes.user, config);
-      })
-      .catch(() => setVerificacionFallo(true))
-      .finally(() => setBooting(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Restore session from stored token
-  useEffect(() => {
-    if (TOKEN_VERIFICACION_DE_URL) return; // el efecto de arriba ya se encarga
+    if (location.pathname.startsWith('/verify-email/')) { setBooting(false); return; }
 
     const token = tokenStore.get();
     if (!token) { setBooting(false); return; }
@@ -149,9 +273,6 @@ export default function App() {
       .then(([user, config]) => {
         if (config.tema) setDark(config.tema === 'dark');
         setSession({ user, config });
-        // Un link de invitación a party siempre gana sobre el onboarding
-        // (no interrumpir a alguien que ya viene con destino claro).
-        setView(partyCodigo ? 'ranked' : necesitaOnboarding(config) ? 'onboarding' : 'dashboard');
       })
       .catch(() => tokenStore.clear())
       .finally(() => setBooting(false));
@@ -180,16 +301,18 @@ export default function App() {
 
   function handleReintegrarSala() {
     if (!salaParaReintegrar) return;
-    setGameSala(salaParaReintegrar);
-    setGameOrigin('dashboard');
-    setView('game');
+    navigate(`/game/${salaParaReintegrar.id}`, { state: { origin: 'home' } });
     setSalaParaReintegrar(null);
   }
 
   function handleSuccess(user: AuthUser, config: UserConfig) {
     if (config.tema) setDark(config.tema === 'dark');
     setSession({ user, config });
-    setView(partyCodigo ? 'ranked' : necesitaOnboarding(config) ? 'onboarding' : 'dashboard');
+    const partyCodigo = (location.state as { partyCodigo?: string } | null)?.partyCodigo;
+    navigate(
+      partyCodigo ? '/ranked' : necesitaOnboarding(config) ? '/onboarding' : '/home',
+      { replace: true, state: partyCodigo ? { partyCodigo } : undefined },
+    );
   }
 
   // Guarda dentro de `opciones` sin pisar otras claves que ya hubiera
@@ -206,22 +329,22 @@ export default function App() {
   async function handleNivelElegido(nivel: NivelDomino) {
     if (nivel === 'suficiente') {
       await guardarOpcionesTutorial({ tutorial_estado: 'completado', tutorial_nivel: nivel });
-      setView('dashboard');
+      navigate('/home');
     } else {
       await guardarOpcionesTutorial({ tutorial_nivel: nivel });
-      setView('tutorial');
+      navigate('/tutorial');
     }
   }
 
   async function handleTutorialResuelto() {
     await guardarOpcionesTutorial({ tutorial_estado: 'completado' });
-    setView('dashboard');
+    navigate('/home');
   }
 
   function handleLogout() {
     tokenStore.clear();
     setSession(null);
-    setView('login');
+    navigate('/login');
   }
 
   // Unirse a una sala desde una invitación de la bandeja de entrada
@@ -233,44 +356,41 @@ export default function App() {
       const detalle = await api.salas.porCodigo(codigo);
       const yaEstoy = detalle.jugadores?.some(j => j.usuario_id === session.user.id);
       const final = yaEstoy ? detalle : await api.salas.unirse(detalle.id);
-      setGameSala(final);
-      setGameOrigin('dashboard');
       if (final.estado === 'en_juego') {
-        setView('game');
+        navigate(`/game/${final.id}`, { state: { origin: 'home' } });
       } else {
         // Aterrizar DENTRO de la sala de espera, no en la lista de salas —
         // ya estamos sentados en el backend; sin esto el jugador quedaba
         // "afuera" mirando el listado.
-        setSalaEsperaInicial(final);
-        setView('salas');
+        navigate('/rooms', { state: { salaEspera: final } });
       }
     } catch {
       // TODO: mostrar aviso de error (código no encontrado / sala llena)
-      setView('salas');
+      navigate('/rooms');
     }
   }
 
-  // Acciones sociales post-partida (§6/§7 del doc de casos de uso).
-  async function handleRevancha() {
-    if (!gameSala) return;
-    try {
-      const { sala_codigo } = await api.social.revancha(gameSala.id);
-      const nuevaSala = await api.salas.porCodigo(sala_codigo);
-      setGameSala(nuevaSala);
-      setGameOrigin('dashboard');
-      // La sala de revancha nace 'esperando' (con el solicitante ya
-      // sentado): entrar directo a su sala de espera. Antes esto hacía
-      // setView('salas') a secas → lista de salas → el jugador percibía
-      // que "jugar de nuevo" lo echaba de la partida.
-      setSalaEsperaInicial(nuevaSala);
-      setView('salas');
-    } catch { /* noop, botón best-effort */ }
-  }
   function handleInvitarCompanero(usuarioId: string) {
     api.social.invitarCompanero(usuarioId).catch(() => {});
   }
   function handleAgregarAmigo(usuarioId: string) {
     api.social.enviarSolicitud(usuarioId).catch(() => {});
+  }
+
+  // Helpers de guarda de rutas — cierran sobre `session`, no una
+  // arquitectura nueva: reemplazan el `&& session`/`&& !session` que se
+  // repetía en cada rama del viejo árbol de `if`. `children` es una
+  // FUNCIÓN, no un elemento ya armado: los `element={...}` de TODAS las
+  // rutas se evalúan en cada render de `<Routes>` (aunque solo se monte
+  // la que hace match con la URL), así que construir el JSX del hijo acá
+  // adentro (recién cuando `session` ya se confirmó no-nulo) es lo que
+  // evita un `session.user` sobre `null` en cualquier ruta que no sea la
+  // activa.
+  function Private({ children }: { children: (s: Session) => JSX.Element }) {
+    return session ? children(session) : <Navigate to="/login" replace />;
+  }
+  function PublicOnly({ children }: { children: JSX.Element }) {
+    return !session ? children : <Navigate to="/home" replace />;
   }
 
   if (booting) {
@@ -281,247 +401,111 @@ export default function App() {
     );
   }
 
-  if (verificacionFallo && !session) {
-    return (
-      <div className={`login-screen${dark ? '' : ' is-light'}`}>
-        <section className="lg-panel">
-          <div className="lg-form lg-sent">
-            <span className="lg-sent-icon" aria-hidden="true">⚠</span>
-            <h2>El link no es válido o venció</h2>
-            <p className="lg-sent-sub">
-              Los links de confirmación duran 24 horas. Iniciá sesión con tu
-              correo y contraseña — si tu cuenta todavía no está confirmada,
-              ahí vas a poder pedir que te reenviemos el link.
-            </p>
-            <button
-              type="button"
-              className="lg-submit"
-              onClick={() => { setVerificacionFallo(false); setView('login'); }}
-            >
-              Ir a iniciar sesión
-            </button>
-          </div>
-        </section>
-      </div>
-    );
-  }
-
-  if (view === 'piece-demo') {
-    return <PieceDemo onBack={() => setView(session ? 'dashboard' : 'login')} />;
-  }
-
-  if (view === 'onboarding' && session) {
-    return <OnboardingLevelScreen dark={dark} onElegir={handleNivelElegido} />;
-  }
-
-  if (view === 'tutorial' && session) {
-    return (
-      <TutorialGame
-        onSkip={handleTutorialResuelto}
-        onFinish={handleTutorialResuelto}
-      />
-    );
-  }
-
-  // Landing pública: primera pantalla para quien llega sin sesión.
-  if (view === 'landing' && !session) {
-    return (
-      <LandingScreen
-        onSwitch={setView}
-        dark={dark}
-        onToggleTheme={() => setDark(d => !d)}
-      />
-    );
-  }
-
-  // Login / registro: pantallas completas dedicadas (forgot sigue en la card)
-  if (view === 'login' && !session) {
-    return (
-      <LoginScreen
-        onSwitch={setView}
-        onSuccess={handleSuccess}
-        dark={dark}
-        onToggleTheme={() => setDark(d => !d)}
-      />
-    );
-  }
-
-  if (view === 'register' && !session) {
-    return (
-      <RegisterScreen
-        onSwitch={setView}
-        onSuccess={handleSuccess}
-        dark={dark}
-        onToggleTheme={() => setDark(d => !d)}
-      />
-    );
-  }
-
-  if (view === 'forgot' && !session) {
-    return (
-      <ForgotScreen
-        onSwitch={setView}
-        dark={dark}
-        onToggleTheme={() => setDark(d => !d)}
-      />
-    );
-  }
-
-  if (view === 'game' && session && gameSala) {
-    return (
-      <GameBoard
-        sala={gameSala}
-        user={session.user}
-        onExit={() => { setGameSala(null); setView(gameOrigin); }}
-        onRevancha={handleRevancha}
-        onInvitarCompanero={handleInvitarCompanero}
-        onAgregarAmigo={handleAgregarAmigo}
-      />
-    );
-  }
-
-  if (view === 'amigos' && session) {
-    return <FriendsView dark={dark} onBack={() => setView('dashboard')} conectadosEnVivo={enVivo} />;
-  }
-
-  if (view === 'leaderboard' && session) {
-    return <LeaderboardView dark={dark} onBack={() => setView('dashboard')} miUsuarioId={session.user.id} />;
-  }
-
-  if (view === 'historial' && session) {
-    return (
-      <MatchHistoryView
-        dark={dark}
-        onBack={() => setView('dashboard')}
-        onVerReplay={(salaId) => { setReplaySalaId(salaId); setView('replay'); }}
-      />
-    );
-  }
-
-  if (view === 'replay' && session && replaySalaId) {
-    return <ReplayViewer dark={dark} salaId={replaySalaId} onBack={() => setView('historial')} />;
-  }
-
-  if (view === 'salas' && session) {
-    return (
-      <SalasView
-        user={session.user}
-        dark={dark}
-        onBack={() => setView('dashboard')}
-        onGameStart={(sala) => { setGameSala(sala); setGameOrigin('salas'); setView('game'); }}
-        salaInicial={salaEsperaInicial}
-        onSalaInicialUsada={() => setSalaEsperaInicial(null)}
-      />
-    );
-  }
-
-  if ((view === 'ranked' || view === 'casual') && session) {
-    return (
-      <MatchmakingView
-        user={session.user}
-        tipo={view}
-        dark={dark}
-        onBack={() => setView('dashboard')}
-        onGameStart={(sala) => { setGameSala(sala); setGameOrigin('dashboard'); setView('game'); }}
-        autoJoinCodigo={view === 'ranked' ? partyCodigo : null}
-      />
-    );
-  }
-
-  if (view === 'torneos' && session) {
-    return (
-      <TorneosListView
-        onVolver={() => setView('dashboard')}
-        onVerTorneo={(id) => { setTorneoIdActual(id); setView('torneo-detalle'); }}
-      />
-    );
-  }
-
-  if (view === 'torneo-detalle' && session && torneoIdActual) {
-    return (
-      <TorneoDetalleView
-        torneoId={torneoIdActual}
-        onVolver={() => setView('torneos')}
-        onInscribirme={(id) => { setTorneoIdActual(id); setView('torneo-inscripcion'); }}
-        onUnirseConCodigo={(id) => { setTorneoIdActual(id); setView('torneo-unirse'); }}
-      />
-    );
-  }
-
-  if (view === 'torneo-inscripcion' && session && torneoIdActual) {
-    return (
-      <TorneoInscripcionForm
-        torneoId={torneoIdActual}
-        onVolver={() => setView('torneo-detalle')}
-        onListo={(id) => { setTorneoIdActual(id); setView('torneo-detalle'); }}
-      />
-    );
-  }
-
-  if (view === 'torneo-unirse' && session && torneoIdActual) {
-    return (
-      <TorneoUnirseView
-        torneoId={torneoIdActual}
-        onVolver={() => setView('torneo-detalle')}
-        onListo={(id) => { setTorneoIdActual(id); setView('torneo-detalle'); }}
-      />
-    );
-  }
-
-  if (view === 'dashboard' && session) {
-    return (
-      <Dashboard
-        user={session.user}
-        config={session.config}
-        dark={dark}
-        onToggleTheme={() => setDark(d => !d)}
-        onLogout={handleLogout}
-        onGoToSalas={() => setView('salas')}
-        onGoToRanked={() => setView('ranked')}
-        onGoToCasual={() => setView('casual')}
-        onPieceDemo={() => setView('piece-demo')}
-        onAvatarChange={(avatar) =>
-          setSession(s => s && { ...s, user: { ...s.user, avatar } })
-        }
-        onGoToAmigos={() => setView('amigos')}
-        onGoToLeaderboard={() => setView('leaderboard')}
-        onGoToHistorial={() => setView('historial')}
-        onGoToTorneos={() => setView('torneos')}
-        onUnirseSala={handleUnirseSala}
-        notifVersion={notifVersion}
-        salaParaReintegrar={salaParaReintegrar}
-        onReintegrarSala={handleReintegrarSala}
-        onDescartarReintegro={() => setSalaParaReintegrar(null)}
-      />
-    );
-  }
-
   return (
-    <div className="app-shell">
-      <div className="auth-card">
-        <header className="card-header">
-          <DominoTile />
-          <div className="logo-text">
-            <h1>2mino</h1>
-            <p>Juega. Compite. Domina.</p>
-          </div>
-          <button
-            className="theme-toggle"
-            onClick={() => setDark(d => !d)}
-            aria-label={dark ? 'Activar modo claro' : 'Activar modo oscuro'}
-          >
-            {dark ? <SunIcon /> : <MoonIcon />}
-          </button>
-        </header>
+    <Routes>
+      <Route path="/" element={<Navigate to={session ? '/home' : '/landing'} replace />} />
 
-        <div className="card-body">
-          <div key={view} className="view-wrap">
-            {view === 'login'    && <LoginForm          onSwitch={setView} onSuccess={handleSuccess} />}
-            {view === 'register' && <RegisterForm        onSwitch={setView} onSuccess={handleSuccess} />}
-            {view === 'forgot'   && <ForgotPasswordForm  onSwitch={setView} />}
-          </div>
-        </div>
-      </div>
-    </div>
+      <Route path="/landing" element={
+        <PublicOnly><LandingScreen dark={dark} onToggleTheme={() => setDark(d => !d)} /></PublicOnly>
+      } />
+      <Route path="/login" element={
+        <PublicOnly><LoginScreen onSuccess={handleSuccess} dark={dark} onToggleTheme={() => setDark(d => !d)} /></PublicOnly>
+      } />
+      <Route path="/register" element={
+        <PublicOnly><RegisterScreen onSuccess={handleSuccess} dark={dark} onToggleTheme={() => setDark(d => !d)} /></PublicOnly>
+      } />
+      <Route path="/forgot" element={
+        <PublicOnly><ForgotScreen dark={dark} onToggleTheme={() => setDark(d => !d)} /></PublicOnly>
+      } />
+
+      <Route path="/piece-demo" element={
+        <PieceDemo onBack={() => navigate(session ? '/home' : '/login')} />
+      } />
+
+      <Route path="/onboarding" element={
+        <Private>{() => <OnboardingLevelScreen dark={dark} onElegir={handleNivelElegido} />}</Private>
+      } />
+      <Route path="/tutorial" element={
+        <Private>{() => <TutorialGame onSkip={handleTutorialResuelto} onFinish={handleTutorialResuelto} />}</Private>
+      } />
+
+      <Route path="/home" element={
+        <Private>{(s) => (
+          <Dashboard
+            user={s.user}
+            config={s.config}
+            dark={dark}
+            onToggleTheme={() => setDark(d => !d)}
+            onLogout={handleLogout}
+            onGoToSalas={() => navigate('/rooms')}
+            onGoToRanked={() => navigate('/ranked')}
+            onGoToCasual={() => navigate('/casual')}
+            onPieceDemo={() => navigate('/piece-demo')}
+            onAvatarChange={(avatar) =>
+              setSession(s => s && { ...s, user: { ...s.user, avatar } })
+            }
+            onGoToAmigos={() => navigate('/friends')}
+            onGoToLeaderboard={() => navigate('/leaderboard')}
+            onGoToHistorial={() => navigate('/history')}
+            onGoToTorneos={() => navigate('/tournaments')}
+            onUnirseSala={handleUnirseSala}
+            notifVersion={notifVersion}
+            salaParaReintegrar={salaParaReintegrar}
+            onReintegrarSala={handleReintegrarSala}
+            onDescartarReintegro={() => setSalaParaReintegrar(null)}
+          />
+        )}</Private>
+      } />
+
+      <Route path="/rooms" element={
+        <Private>{(s) => <RoomsRoute user={s.user} dark={dark} />}</Private>
+      } />
+      <Route path="/ranked" element={
+        <Private>{(s) => <MatchmakingRoute user={s.user} dark={dark} tipo="ranked" />}</Private>
+      } />
+      <Route path="/casual" element={
+        <Private>{(s) => <MatchmakingRoute user={s.user} dark={dark} tipo="casual" />}</Private>
+      } />
+      <Route path="/game/:salaId" element={
+        <Private>{(s) => (
+          <GameRoute
+            session={s}
+            onInvitarCompanero={handleInvitarCompanero}
+            onAgregarAmigo={handleAgregarAmigo}
+          />
+        )}</Private>
+      } />
+
+      <Route path="/friends" element={
+        <Private>{() => <FriendsView dark={dark} onBack={() => navigate('/home')} conectadosEnVivo={enVivo} />}</Private>
+      } />
+      <Route path="/leaderboard" element={
+        <Private>{(s) => <LeaderboardView dark={dark} onBack={() => navigate('/home')} miUsuarioId={s.user.id} />}</Private>
+      } />
+      <Route path="/history" element={
+        <Private>{() => (
+          <MatchHistoryView
+            dark={dark}
+            onBack={() => navigate('/home')}
+            onVerReplay={(salaId) => navigate(`/replay/${salaId}`)}
+          />
+        )}</Private>
+      } />
+      <Route path="/replay/:salaId" element={<Private>{() => <ReplayRoute dark={dark} />}</Private>} />
+
+      <Route path="/tournaments" element={
+        <Private>{() => (
+          <TorneosListView onVolver={() => navigate('/home')} onVerTorneo={(id) => navigate(`/tournaments/${id}`)} />
+        )}</Private>
+      } />
+      <Route path="/tournaments/:torneoId" element={<Private>{() => <TorneoDetalleRoute />}</Private>} />
+      <Route path="/tournaments/:torneoId/enroll" element={<Private>{() => <TorneoEnrollRoute />}</Private>} />
+      <Route path="/tournaments/:torneoId/join" element={<Private>{() => <TorneoJoinRoute />}</Private>} />
+
+      <Route path="/party/:codigo" element={<PartyRedirect session={session} />} />
+      <Route path="/verify-email/:token" element={<VerifyEmailRoute onSuccess={handleSuccess} />} />
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }

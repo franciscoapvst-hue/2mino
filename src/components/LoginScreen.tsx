@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, FormEvent } from 'react';
-import type { View } from '../App';
+import { useNavigate } from 'react-router-dom';
 import { api, tokenStore, ApiError, type AuthUser, type UserConfig } from '../api';
 import { GoogleIcon, SunIcon, MoonIcon } from './icons';
 import { Bone, DominoStage } from './DominoStage';
@@ -33,13 +33,13 @@ declare global {
 }
 
 type Props = {
-  onSwitch: (v: View) => void;
   onSuccess: (user: AuthUser, config: UserConfig) => void;
   dark: boolean;
   onToggleTheme: () => void;
 };
 
-export default function LoginScreen({ onSwitch, onSuccess, dark, onToggleTheme }: Props) {
+export default function LoginScreen({ onSuccess, dark, onToggleTheme }: Props) {
+  const navigate = useNavigate();
   const [email,     setEmail]     = useState('');
   const [password,  setPassword]  = useState('');
   const [remember,  setRemember]  = useState(false);
@@ -255,7 +255,7 @@ export default function LoginScreen({ onSwitch, onSuccess, dark, onToggleTheme }
             <button
               type="button"
               className="lg-link"
-              onClick={() => onSwitch('forgot')}
+              onClick={() => navigate('/forgot')}
               disabled={loading}
             >
               ¿Olvidaste tu contraseña?
@@ -289,7 +289,7 @@ export default function LoginScreen({ onSwitch, onSuccess, dark, onToggleTheme }
 
           <p className="lg-foot">
             ¿No tienes cuenta?{' '}
-            <button type="button" className="lg-link lg-link-strong" onClick={() => onSwitch('register')} disabled={loading}>
+            <button type="button" className="lg-link lg-link-strong" onClick={() => navigate('/register')} disabled={loading}>
               Crear cuenta
             </button>
           </p>
