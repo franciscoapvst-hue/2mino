@@ -58,3 +58,108 @@ export type AdminSession = {
   segmento: 'admin';
   token: string;
 };
+
+// ── Torneos (Etapa 1 de docs/PLAN_TORNEOS.md) ──────────────────────
+// Backend en snake_case — se usa tal cual (sin mapeo a camelCase como
+// Usuario) porque el wizard manda de vuelta el mismo shape que recibe.
+export type TorneoFase = {
+  id?: string;
+  tipo: 'inicial' | 'eliminatoria';
+  orden?: number;
+  nombre: string;
+  puntos_objetivo?: number;
+  ventana_inicio: string;
+  ventana_fin: string;
+  clasifican_n?: number | null;
+  metrica?: 'puntos' | 'elo_torneo' | 'victorias';
+  estado?: string;
+};
+
+export type TorneoCampo = {
+  id?: string;
+  etiqueta: string;
+  tipo: 'texto' | 'numero' | 'telefono' | 'email';
+  requerido: boolean;
+  orden?: number;
+};
+
+export type TorneoEquipo = {
+  id: string;
+  nombre: string | null;
+  estado: string;
+  codigo_equipo: string;
+  jugador1_username: string;
+  jugador2_username: string | null;
+  elo_torneo: number;
+  puntos: number;
+  victorias: number;
+  derrotas: number;
+  capicuas: number;
+  tranques: number;
+};
+
+export type TorneoResumen = {
+  id: string;
+  nombre: string;
+  estado: string;
+  modo: string;
+  visibilidad: string;
+  max_equipos: number;
+  equipos_inscritos: number;
+  cuota_monto: number;   // centavos USD
+  moneda: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  created_at: string;
+};
+
+export type TorneoDetalle = {
+  id: string;
+  nombre: string;
+  estado: string;
+  modo: 'clasico' | 'rapido';
+  puntos_objetivo: number;
+  tiene_fase_inicial: boolean;
+  puntos_clasificacion: number | null;
+  num_fases_eliminatorias: number;
+  max_equipos: number;
+  visibilidad: 'publico' | 'privado';
+  codigo_invitacion: string | null;
+  elo_min: number | null;
+  elo_max: number | null;
+  fecha_inicio: string;
+  fecha_fin: string;
+  cuota_monto: number;
+  moneda: string;
+  politica_reembolso: string | null;
+  reglas_override: Record<string, unknown>;
+  avance_automatico: boolean;
+  info_html: string | null;
+  created_at: string;
+  fases: TorneoFase[];
+  equipos: TorneoEquipo[];
+  campos_inscripcion: TorneoCampo[];
+};
+
+// Lo que manda el wizard (create/update) — el gateway inyecta creado_por.
+export type TorneoInput = {
+  nombre: string;
+  modo: 'clasico' | 'rapido';
+  puntos_objetivo: number;
+  tiene_fase_inicial: boolean;
+  puntos_clasificacion: number | null;
+  num_fases_eliminatorias: number;
+  max_equipos: number;
+  visibilidad: 'publico' | 'privado';
+  elo_min: number | null;
+  elo_max: number | null;
+  fecha_inicio: string;
+  fecha_fin: string;
+  cuota_monto: number;
+  politica_reembolso: string | null;
+  reglas_override: Record<string, unknown>;
+  avance_automatico: boolean;
+  info_html: string | null;
+  fases: TorneoFase[];
+  campos_inscripcion: TorneoCampo[];
+};

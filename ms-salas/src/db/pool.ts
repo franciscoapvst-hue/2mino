@@ -222,6 +222,189 @@ const SCHEMA = `
     ('tiempo_limite_jugada_ms', '{"casual":null,"ranked":null}', 'Tiempo límite por turno para jugar, según tipo de partida — null = sin límite'),
     ('delay_fin_mano_ms',  '2000',                     'Espera (ms) antes de mostrar la pantalla de fin de mano, para ver el tablero final un momento antes')
   ON CONFLICT (clave) DO NOTHING;
+
+  -- ── Torneos (docs/PLAN_TORNEOS.md §2, sobre CASOS_DE_USO_BACKOFFICE §7.2) ──
+  -- Config completa definida por el admin ANTES de abrir inscripción, para
+  -- que el bracket se genere determinístico al iniciar.
+  --
+  -- Nota vs. el schema del doc: un solo campo estado (con 'borrador' como
+  -- primer valor) en vez de estado + estado_wizard por separado — dos
+  -- columnas de estado solapadas eran fuente segura de inconsistencia
+  -- (¿qué significa estado_wizard='borrador' + estado='eliminatoria'?).
+  -- Misma información, una sola fuente de verdad.
+  CREATE TABLE IF NOT EXISTS torneos (
+    id                      UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    nombre                  VARCHAR(80) NOT NULL,
+    estado                  VARCHAR(20) NOT NULL DEFAULT 'borrador'
+                            CHECK (estado IN ('borrador','inscripcion','fase_inicial','eliminatoria','finalizado','cancelado')),
+    modo                    VARCHAR(20) NOT NULL DEFAULT 'clasico'
+                            CHECK (modo IN ('clasico','rapido')),
+    max_jugadores           INT         NOT NULL DEFAULT 4 CHECK (max_jugadores = 4), -- siempre 2 equipos de 2; un torneo nunca es 1v1
+    max_equipos             INT         NOT NULL CHECK (max_equipos >= 2),
+    puntos_objetivo         INT         NOT NULL DEFAULT 100,  -- puntaje default de cada partida (las fases pueden sobrescribirlo)
+    tiene_fase_inicial      BOOLEAN     NOT NULL DEFAULT true,
+    puntos_clasificacion    INT,                               -- puntos acumulados para clasificar en fase inicial (NULL si no hay fase inicial)
+    num_fases_eliminatorias INT         NOT NULL DEFAULT 1 CHECK (num_fases_eliminatorias >= 1),
+    visibilidad             VARCHAR(10) NOT NULL DEFAULT 'publico'
+                            CHECK (visibilidad IN ('publico','privado')),
+    codigo_invitacion       VARCHAR(10),                       -- solo si visibilidad='privado'
+    elo_min                 INT,                               -- targeting opcional (NULL = sin límite)
+    elo_max                 INT,
+    fecha_inicio            TIMESTAMPTZ NOT NULL,              -- rango general publicado (informativo)
+    fecha_fin               TIMESTAMPTZ NOT NULL,
+    -- Cuota de inscripción: PayPal no soporta DOP, la moneda real de cobro
+    -- es USD (docs/PLAN_TORNEOS.md §0/§5); el RD$ que ve el jugador es
+    -- solo un equivalente visual.
+    cuota_monto             INT         NOT NULL DEFAULT 0 CHECK (cuota_monto >= 0), -- centavos USD; 0 = gratis
+    moneda                  VARCHAR(3)  NOT NULL DEFAULT 'USD',
+    politica_reembolso      TEXT,                              -- se muestra ANTES de pagar
+    reglas_override         JSONB       NOT NULL DEFAULT '{}', -- solo las claves cambiadas vs. reglas_juego globales
+    avance_automatico       BOOLEAN     NOT NULL DEFAULT false,
+    info_html               TEXT,                              -- contenido de marketing del detalle (se sanitiza al renderizar)
+    reglamento_pdf_url      TEXT,                              -- documento formal/legal (distinto de info_html)
+    reglamento_pdf_nombre   VARCHAR(120),
+    creado_por              UUID        NOT NULL,
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    inicia_at               TIMESTAMPTZ,                       -- momento REAL de iniciar (puede diferir de fecha_inicio)
+    finalizado_at           TIMESTAMPTZ,
+    CHECK (fecha_fin > fecha_inicio),
+    CHECK (elo_min IS NULL OR elo_max IS NULL OR elo_max >= elo_min)
+  );
+  CREATE INDEX IF NOT EXISTS idx_torneos_estado ON torneos(estado);
+
+  -- Fases del torneo. Se insertan al CREAR/EDITAR el wizard (no al iniciar):
+  -- el paso 5 define la ventana propia de cada fase y esas validaciones
+  -- cruzan filas — tenerlas como filas desde el borrador simplifica editar.
+  -- clasifican_n generaliza el "clasifican_por_grupo" del doc §7.2 a un N
+  -- por transición (PLAN §2): cuántos pasan AL CERRAR esta fase (NULL en
+  -- la final). metrica solo aplica a tipo='inicial' (en eliminatorias pasa
+  -- el ganador de cada cruce).
+  CREATE TABLE IF NOT EXISTS torneo_fases (
+    id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    torneo_id         UUID        NOT NULL REFERENCES torneos(id) ON DELETE CASCADE,
+    tipo              VARCHAR(20) NOT NULL CHECK (tipo IN ('inicial','eliminatoria')),
+    orden             INT         NOT NULL,           -- 0 = fase inicial (si existe), 1..N = eliminatorias
+    nombre            VARCHAR(40) NOT NULL,           -- 'Fase de grupos' / 'Cuartos de final' / 'Semifinal' / 'Final'
+    puntos_objetivo   INT         NOT NULL,
+    ventana_inicio    TIMESTAMPTZ NOT NULL,
+    ventana_fin       TIMESTAMPTZ NOT NULL,
+    clasifican_n      INT,
+    metrica           VARCHAR(20) NOT NULL DEFAULT 'puntos'
+                      CHECK (metrica IN ('puntos','elo_torneo','victorias')),
+    requiere_atencion BOOLEAN     NOT NULL DEFAULT false, -- ventana vencida con partidas pendientes / empate en el corte
+    estado            VARCHAR(20) NOT NULL DEFAULT 'pendiente'
+                      CHECK (estado IN ('pendiente','en_curso','finalizada')),
+    UNIQUE (torneo_id, orden),
+    CHECK (ventana_fin > ventana_inicio)
+  );
+  CREATE INDEX IF NOT EXISTS idx_torneo_fases_torneo ON torneo_fases(torneo_id, orden);
+
+  -- Unidad de inscripción y estadística: SIEMPRE una pareja. Inscripción
+  -- en dos pasos: jugador1 crea el equipo y comparte codigo_equipo;
+  -- jugador2 se une con él. Con cuota>0 arranca en 'pendiente_pago';
+  -- gratis salta directo a 'pendiente_companero'.
+  CREATE TABLE IF NOT EXISTS torneo_equipos (
+    id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    torneo_id         UUID        NOT NULL REFERENCES torneos(id) ON DELETE CASCADE,
+    nombre            VARCHAR(40),                    -- opcional; si falta se muestra "user1 & user2"
+    estado            VARCHAR(20) NOT NULL DEFAULT 'pendiente_companero'
+                      CHECK (estado IN ('pendiente_pago','pendiente_companero','completo','eliminado','campeon')),
+    codigo_equipo     VARCHAR(10) NOT NULL UNIQUE,
+    jugador1_id       UUID        NOT NULL,
+    jugador1_username VARCHAR(20) NOT NULL,
+    jugador2_id       UUID,                           -- NULL mientras falta el compañero
+    jugador2_username VARCHAR(20),
+    inscrito_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    completado_at     TIMESTAMPTZ,
+    eliminado_en      UUID        REFERENCES torneo_fases(id), -- fase en la que cayó (NULL en carrera)
+    -- Estadísticas del torneo (aparte del ELO global de ranked — ver doc §7.2):
+    elo_torneo        INT         NOT NULL DEFAULT 1000,
+    puntos            INT         NOT NULL DEFAULT 0,
+    victorias         INT         NOT NULL DEFAULT 0,
+    derrotas          INT         NOT NULL DEFAULT 0,
+    capicuas          INT         NOT NULL DEFAULT 0,
+    tranques          INT         NOT NULL DEFAULT 0,
+    UNIQUE (torneo_id, jugador1_id),
+    UNIQUE (torneo_id, jugador2_id),  -- múltiples NULL permitidos: no bloquea equipos pendientes
+    CHECK (jugador1_id <> jugador2_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_torneo_equipos_torneo ON torneo_equipos(torneo_id);
+
+  -- Registro por partida jugada — trazabilidad (el replay vive en la sala).
+  CREATE TABLE IF NOT EXISTS torneo_partidas (
+    id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    torneo_id         UUID        NOT NULL REFERENCES torneos(id) ON DELETE CASCADE,
+    fase_id           UUID        NOT NULL REFERENCES torneo_fases(id) ON DELETE CASCADE,
+    sala_id           UUID        REFERENCES salas(id) ON DELETE SET NULL, -- NULL hasta que el motor crea la sala (el bracket es visible antes)
+    ronda             INT         NOT NULL DEFAULT 1,
+    equipo1_id        UUID        NOT NULL REFERENCES torneo_equipos(id),
+    equipo2_id        UUID        NOT NULL REFERENCES torneo_equipos(id),
+    fecha_programada  TIMESTAMPTZ,                    -- horario puntual (solo eliminatorias)
+    ganador_equipo_id UUID        REFERENCES torneo_equipos(id),
+    puntos_equipo1    INT         NOT NULL DEFAULT 0,
+    puntos_equipo2    INT         NOT NULL DEFAULT 0,
+    hubo_capicua      BOOLEAN     NOT NULL DEFAULT false,
+    hubo_tranque      BOOLEAN     NOT NULL DEFAULT false,
+    walkover          BOOLEAN     NOT NULL DEFAULT false, -- resuelta por el admin al forzar cierre de fase, no jugada
+    jugada_at         TIMESTAMPTZ,
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CHECK (equipo1_id <> equipo2_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_torneo_partidas_torneo ON torneo_partidas(torneo_id, fase_id);
+
+  -- Campos del formulario de inscripción, definidos por el admin (Paso 7).
+  CREATE TABLE IF NOT EXISTS torneo_campos_inscripcion (
+    id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    torneo_id  UUID        NOT NULL REFERENCES torneos(id) ON DELETE CASCADE,
+    etiqueta   VARCHAR(60) NOT NULL,
+    tipo       VARCHAR(10) NOT NULL DEFAULT 'texto'
+               CHECK (tipo IN ('texto','numero','telefono','email')),
+    requerido  BOOLEAN     NOT NULL DEFAULT true,
+    orden      INT         NOT NULL DEFAULT 0
+  );
+  CREATE INDEX IF NOT EXISTS idx_torneo_campos_torneo ON torneo_campos_inscripcion(torneo_id, orden);
+
+  -- Respuestas de cada jugador al formulario (cada uno llena LO SUYO — por
+  -- eso jugador_id en la PK, no solo el equipo).
+  CREATE TABLE IF NOT EXISTS torneo_inscripcion_datos (
+    equipo_id  UUID        NOT NULL REFERENCES torneo_equipos(id) ON DELETE CASCADE,
+    campo_id   UUID        NOT NULL REFERENCES torneo_campos_inscripcion(id) ON DELETE CASCADE,
+    jugador_id UUID        NOT NULL,
+    valor      TEXT        NOT NULL,
+    PRIMARY KEY (equipo_id, campo_id, jugador_id)
+  );
+
+  -- Pagos PayPal — una fila por INTENTO (reintento = fila nueva, Order nuevo).
+  -- paypal_capture_id aparte del order_id: el refund va sobre la captura.
+  CREATE TABLE IF NOT EXISTS torneo_pagos (
+    id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    torneo_id         UUID        NOT NULL REFERENCES torneos(id),
+    equipo_id         UUID        NOT NULL REFERENCES torneo_equipos(id),
+    paypal_order_id   VARCHAR(30) UNIQUE NOT NULL,
+    monto             INT         NOT NULL,            -- centavos USD
+    moneda            VARCHAR(3)  NOT NULL DEFAULT 'USD',
+    estado            VARCHAR(20) NOT NULL DEFAULT 'iniciado'
+                      CHECK (estado IN ('iniciado','aprobado','declinado','cancelado','expirado','reembolsado')),
+    paypal_capture_id VARCHAR(30),
+    paypal_respuesta  JSONB,
+    reembolso_motivo  TEXT,
+    reembolso_at      TIMESTAMPTZ,
+    reembolso_por     UUID,
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    resuelto_at       TIMESTAMPTZ
+  );
+  CREATE INDEX IF NOT EXISTS idx_torneo_pagos_equipo ON torneo_pagos(equipo_id);
+
+  -- Registro de emails de torneo — dedupe + auditoría: un INSERT que
+  -- conflictúa = ya se mandó, no repetir.
+  CREATE TABLE IF NOT EXISTS torneo_emails (
+    torneo_id  UUID        NOT NULL,
+    tipo       VARCHAR(30) NOT NULL,
+    ref        VARCHAR(60) NOT NULL,   -- equipo_id / partida_id / fase_id según tipo
+    enviado_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (torneo_id, tipo, ref)
+  );
 `;
 
 // Cambios sobre tablas que pueden ya existir de un arranque previo
