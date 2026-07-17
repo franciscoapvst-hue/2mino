@@ -87,7 +87,7 @@ async function crearSala(
 ): Promise<{ salaId: string; juegoId: string; partidaInicial: PartidaState }> {
   const puntosMm = getRegla('puntos_objetivo', [100, 150, 200])[0] ?? PUNTOS_MM_DEFECTO;
 
-  const codigo = await codigoDisponibleEn('salas', '2M-');
+  const codigo = await codigoDisponibleEn('salas', '2M-', client);
   const { rows: salaRows } = await client.query(
     `INSERT INTO salas (codigo, creador_id, tipo, modo, max_jugadores, estado, started_at, config)
      VALUES ($1, $2, $3, 'clasico', $4, 'en_juego', NOW(), $5)
