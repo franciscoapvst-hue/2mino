@@ -150,6 +150,13 @@ export async function setUsuarioEstado(id: string, activo: boolean): Promise<Usu
   return mapUsuario(row);
 }
 
+// Borrado real (no reversible) — distinto de setUsuarioEstado(false), que
+// solo banea. Ver comentario en ms-usuarios/src/routes/usuarios.ts sobre
+// qué no limpia (referencias en salas/ranked/amigos de otros jugadores).
+export async function deleteUsuario(id: string): Promise<void> {
+  await adminFetch<{ message: string }>(`/admin/usuarios/${id}`, { method: 'DELETE' });
+}
+
 // Detalle completo — click en un usuario dentro de UsuariosView.
 type UsuarioCompletoApi = {
   id: string; username: string; email: string; avatar: string | null; activo: boolean;

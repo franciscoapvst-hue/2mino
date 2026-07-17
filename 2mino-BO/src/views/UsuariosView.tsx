@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { listSegmentos, listUsuarios, setUsuarioEstado, setUsuarioSegmento } from '../lib/api';
+import { deleteUsuario, listSegmentos, listUsuarios, setUsuarioEstado, setUsuarioSegmento } from '../lib/api';
 import type { Segmento, Usuario } from '../lib/types';
 import Badge from '../components/Badge';
 import ConfirmModal from '../components/ConfirmModal';
@@ -10,6 +10,8 @@ export default function UsuariosView() {
   const [segmentos, setSegmentos] = useState<Segmento[]>([]);
   const [query, setQuery] = useState('');
   const [confirmTarget, setConfirmTarget] = useState<Usuario | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Usuario | null>(null);
+  const [eliminando, setEliminando] = useState(false);
   const [detalleId, setDetalleId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,6 +54,20 @@ export default function UsuariosView() {
       setError(err instanceof Error ? err.message : 'No se pudo actualizar el estado.');
     } finally {
       setConfirmTarget(null);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setEliminando(true);
+    try {
+      await deleteUsuario(deleteTarget.id);
+      setUsuarios((prev) => prev?.filter((x) => x.id !== deleteTarget.id) ?? null);
+      setDeleteTarget(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo eliminar la cuenta.');
+    } finally {
+      setEliminando(false);
     }
   }
 
@@ -136,6 +152,13 @@ export default function UsuariosView() {
                       >
                         {u.activo ? 'Banear' : 'Reactivar'}
                       </button>
+                      <button
+                        type="button"
+                        className="bo-btn bo-btn-danger"
+                        onClick={() => setDeleteTarget(u)}
+                      >
+                        Eliminar
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -157,6 +180,22 @@ export default function UsuariosView() {
         tone={confirmTarget?.activo ? 'danger' : 'primary'}
         onConfirm={confirmEstadoToggle}
         onCancel={() => setConfirmTarget(null)}
+      />
+
+      <ConfirmModal
+        open={!!deleteTarget}
+        title={`Eliminar a ${deleteTarget?.username}`}
+        body={
+          'Borrado real, no reversible (a diferencia de banear). Libera el ' +
+          'email y el username para volver a registrarse — útil para ' +
+          'cuentas de prueba. Si esta cuenta jugó partidas reales contra ' +
+          'otros usuarios, su historial/amigos pueden mostrar una ' +
+          'referencia rota; para jugadores reales, preferir "Banear".'
+        }
+        confirmLabel={eliminando ? 'Eliminando…' : 'Eliminar'}
+        tone="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
       />
 
       <UsuarioDetalleModal usuarioId={detalleId} onClose={() => setDetalleId(null)} />
