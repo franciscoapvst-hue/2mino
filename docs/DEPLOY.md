@@ -119,11 +119,12 @@ DOMAIN=2mino.online
 CORS_ORIGIN=https://2mino.online
 
 # Email de confirmación de cuenta — ya integrado (Resend), ver
-# docs/ARQUITECTURA.md. Poner en true + completar RESEND_API_KEY cuando
-# el dominio 2mino.online esté verificado en Resend.
-ENABLE_EMAIL=false
+# docs/ARQUITECTURA.md. El dominio 2mino.online ya está verificado en
+# Resend (2026-07-16): poner ENABLE_EMAIL=true + RESEND_API_KEY real +
+# EMAIL_FROM con el dominio propio.
+ENABLE_EMAIL=true
 RESEND_API_KEY=
-EMAIL_FROM=2mino <onboarding@resend.dev>
+EMAIL_FROM=2mino <no-reply@2mino.online>
 APP_URL=https://2mino.online
 ```
 
