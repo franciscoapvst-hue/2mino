@@ -181,6 +181,31 @@
   color: rgba(244, 236, 221, 0.55);
 }
 
+.ld-guest-cta {
+  display: block;
+  margin: 18px auto 0;
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  color: rgba(244, 236, 221, 0.65);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color .16s ease;
+}
+.ld-guest-cta:hover:not(:disabled) { color: #f4ecdd; }
+.ld-guest-cta:focus-visible { outline: 2px solid #f4ecdd; outline-offset: 2px; }
+.ld-guest-cta:disabled { cursor: not-allowed; opacity: 0.55; }
+
+.ld-guest-err {
+  margin: 10px auto 0;
+  max-width: 40ch;
+  font-size: 0.82rem;
+  color: #ff9c8f;
+}
+
 .ld-btn-primary {
   padding: 14px 26px;
   border: none;
