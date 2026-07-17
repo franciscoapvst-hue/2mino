@@ -8,9 +8,24 @@ const AnySchema    = { type: 'object', additionalProperties: true } as const;
 function auth(req: { headers: { authorization?: string } }, reply: { code: (n: number) => any }) {
   const payload = verifyToken(req.headers.authorization);
   if (!payload) { reply.code(401).send({ error: 'Token requerido' }); return null; }
-  // Único choke point de /ranked/* — ms-salas no tiene auth propia, así
-  // que el bloqueo de invitados tiene que vivir acá.
-  if (payload.segmento === 'invitado') {
+  return payload;
+}
+
+// Único choke point de /ranked/* — ms-salas no tiene auth propia, así que
+// el bloqueo de invitados tiene que vivir acá. Pero /ranked/* también sirve
+// la cola y las party CASUALES (mismo prefijo de ruta, distinguido por
+// `tipo` en el body) — bloquear el prefijo entero le tiraba 403 a un
+// invitado que solo quería jugar casual. Solo bloquea cuando la acción es
+// realmente ranked; sin `tipo` explícito (endpoints de estado/salida que
+// operan sobre un ticket/party ya creado) no hay nada que bloquear acá.
+function authNoRanked(
+  req: { headers: { authorization?: string } },
+  reply: { code: (n: number) => any },
+  tipo?: 'casual' | 'ranked',
+) {
+  const payload = auth(req, reply);
+  if (!payload) return null;
+  if (payload.segmento === 'invitado' && (tipo ?? 'ranked') === 'ranked') {
     reply.code(403).send({ error: 'Los invitados no pueden acceder a partidas ranked' });
     return null;
   }
@@ -29,6 +44,12 @@ export async function rankedGatewayRoutes(app: FastifyInstance) {
     },
   }, async (req, reply) => {
     const payload = auth(req, reply); if (!payload) return;
+    // A diferencia del resto de /ranked/*, esto sí es siempre ranked
+    // (ELO/récord) — no hay una versión "casual" de este endpoint.
+    if (payload.segmento === 'invitado') {
+      reply.code(403).send({ error: 'Los invitados no pueden acceder a partidas ranked' });
+      return;
+    }
     const { status, data } = await callSalas(`/ranked/${payload.sub}`, 'GET');
     return reply.code(status).send(data);
   });
@@ -66,7 +87,7 @@ export async function rankedGatewayRoutes(app: FastifyInstance) {
       response: { 201: AnySchema, 401: { ...ErrorSchema } },
     },
   }, async (req, reply) => {
-    const payload = auth(req, reply); if (!payload) return;
+    const payload = authNoRanked(req, reply, req.body?.tipo); if (!payload) return;
     const { status, data } = await callSalas('/ranked/party', 'POST', {
       usuario_id: payload.sub, username: payload.username, tipo: req.body?.tipo,
     });
@@ -81,6 +102,8 @@ export async function rankedGatewayRoutes(app: FastifyInstance) {
       response: { 200: AnySchema, 401: { ...ErrorSchema }, 404: { ...ErrorSchema } },
     },
   }, async (req, reply) => {
+    // Sin `tipo` acá (solo el código) — no hay nada ranked-específico que
+    // bloquear al solo consultar el estado de una party ya creada.
     if (!auth(req, reply)) return;
     const { status, data } = await callSalas(`/ranked/party/${req.params.codigo}`, 'GET');
     return reply.code(status).send(data);
@@ -147,7 +170,7 @@ export async function rankedGatewayRoutes(app: FastifyInstance) {
       response: { 200: AnySchema, 400: { ...ErrorSchema }, 401: { ...ErrorSchema } },
     },
   }, async (req, reply) => {
-    const payload = auth(req, reply); if (!payload) return;
+    const payload = authNoRanked(req, reply, req.body?.tipo); if (!payload) return;
     const { status, data } = await callSalas('/ranked/cola/entrar', 'POST', {
       usuario_id: payload.sub, username: payload.username, modo: req.body.modo, tipo: req.body?.tipo,
     });
