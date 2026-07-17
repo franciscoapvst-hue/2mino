@@ -341,7 +341,12 @@ export default function App() {
     navigate('/home');
   }
 
-  function handleLogout() {
+  async function handleLogout() {
+    // Si es invitado, el gateway borra la cuenta acá (efímera a propósito)
+    // — por eso hay que esperarlo ANTES de limpiar el token, que es lo que
+    // manda el header Authorization. Best-effort: si falla (red caída),
+    // igual hay que dejar salir al usuario.
+    try { await api.logout(); } catch { /* noop */ }
     tokenStore.clear();
     setSession(null);
     navigate('/login');

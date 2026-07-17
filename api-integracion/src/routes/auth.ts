@@ -356,6 +356,35 @@ export async function authRoutes(app: FastifyInstance) {
     },
   );
 
+  // ── POST /auth/logout ───────────────────────────
+  // Las cuentas invitado son efímeras a propósito — dejarlas en la base
+  // para siempre después de que el jugador se va es basura acumulándose
+  // sin límite (y cada una encima le costó un bcrypt.hash al crearse). Acá
+  // se borran de verdad al cerrar sesión; el barrido periódico en
+  // ms-usuarios (limpiarInvitadosAbandonados) cubre el caso de la pestaña
+  // cerrada sin pasar por acá. Para una cuenta real, esto es un logout
+  // normal — no se toca la fila.
+  app.post(
+    '/auth/logout',
+    {
+      schema: {
+        tags:        ['auth'],
+        summary:     'Cerrar sesión',
+        description: 'Si el token es de una cuenta invitado, la borra de la base — son efímeras a propósito.',
+        security:    [{ bearerAuth: [] }],
+        response: { 200: { ...MessageSchema } },
+      },
+    },
+    async (req, reply) => {
+      const payload = verifyToken(req.headers.authorization);
+      if (payload?.segmento === 'invitado') {
+        // Best-effort: el logout del cliente no debe fallar por esto.
+        await callMs(`/usuarios/${payload.sub}`, 'DELETE').catch(() => {});
+      }
+      return reply.send({ message: 'Sesión cerrada' });
+    },
+  );
+
   // ── PATCH /auth/avatar ──────────────────────────
   app.patch<{ Body: { avatar: string } }>(
     '/auth/avatar',

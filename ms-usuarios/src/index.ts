@@ -2,7 +2,7 @@ import Fastify from 'fastify';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { runMigrations } from './db/pool';
-import { usuariosRoutes } from './routes/usuarios';
+import { usuariosRoutes, limpiarInvitadosAbandonados } from './routes/usuarios';
 
 const app = Fastify({
   logger: true,
@@ -64,6 +64,17 @@ async function start() {
     const port = Number(process.env.PORT) || 4000;
     await app.listen({ port, host: '0.0.0.0' });
     app.log.info(`Swagger UI → http://localhost:${port}/docs`);
+
+    // Cada hora, borra cuentas invitado de más de 24h (ver
+    // limpiarInvitadosAbandonados() en routes/usuarios.ts).
+    setInterval(async () => {
+      try {
+        const borrados = await limpiarInvitadosAbandonados();
+        if (borrados > 0) app.log.info(`Limpieza: ${borrados} invitado(s) abandonado(s) borrado(s)`);
+      } catch (err) {
+        app.log.error(err, 'Error en limpieza de invitados abandonados');
+      }
+    }, 60 * 60_000);
   } catch (err) {
     app.log.error(err);
     process.exit(1);

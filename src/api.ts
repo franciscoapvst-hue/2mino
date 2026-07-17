@@ -268,6 +268,11 @@ export const api = {
   jugarInvitado: () =>
     req<AuthResponse>('/auth/invitado', { method: 'POST' }),
 
+  // Si la cuenta es invitado, el gateway la borra de verdad acá — hay que
+  // llamarlo ANTES de limpiar el token (usa el Authorization header).
+  logout: () =>
+    req<{ message: string }>('/auth/logout', { method: 'POST', body: '{}' }),
+
   forgotPassword: (email: string) =>
     req<{ message: string; _dev_token?: string }>('/auth/forgot-password', {
       method: 'POST',
