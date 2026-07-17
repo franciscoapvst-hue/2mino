@@ -1,4 +1,7 @@
-import type { AdminSession, FeatureFlag, ReglaJuego, Segmento, Usuario, UsuarioCompleto } from './types';
+import type {
+  AdminSession, FeatureFlag, ReglaJuego, Segmento, Usuario, UsuarioCompleto,
+  TorneoDetalle, TorneoInput, TorneoResumen,
+} from './types';
 import { apiUrl } from './env';
 
 /**
@@ -155,6 +158,53 @@ export async function setUsuarioEstado(id: string, activo: boolean): Promise<Usu
 // qué no limpia (referencias en salas/ranked/amigos de otros jugadores).
 export async function deleteUsuario(id: string): Promise<void> {
   await adminFetch<{ message: string }>(`/admin/usuarios/${id}`, { method: 'DELETE' });
+}
+
+// ── Torneos (Etapa 1) — real, contra api-integracion ────────────────
+export async function listTorneos(): Promise<TorneoResumen[]> {
+  return adminFetch<TorneoResumen[]>('/admin/torneos');
+}
+
+export async function getTorneo(id: string): Promise<TorneoDetalle> {
+  return adminFetch<TorneoDetalle>(`/admin/torneos/${id}`);
+}
+
+export async function createTorneo(input: TorneoInput): Promise<TorneoDetalle> {
+  return adminFetch<TorneoDetalle>('/admin/torneos', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateTorneo(id: string, input: TorneoInput): Promise<TorneoDetalle> {
+  return adminFetch<TorneoDetalle>(`/admin/torneos/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+// Los POST sin payload igual mandan '{}': adminFetch siempre pone
+// Content-Type: application/json, y Fastify rechaza un body JSON vacío
+// (FST_ERR_CTP_EMPTY_JSON_BODY) si el header está pero el body no.
+export async function abrirInscripcionTorneo(id: string): Promise<TorneoDetalle> {
+  return adminFetch<TorneoDetalle>(`/admin/torneos/${id}/abrir-inscripcion`, {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
+export async function cancelarTorneo(id: string): Promise<TorneoDetalle> {
+  return adminFetch<TorneoDetalle>(`/admin/torneos/${id}/estado`, {
+    method: 'PATCH',
+    body: JSON.stringify({ estado: 'cancelado' }),
+  });
+}
+
+export async function rotarCodigoTorneo(id: string): Promise<{ codigo_invitacion: string }> {
+  return adminFetch<{ codigo_invitacion: string }>(`/admin/torneos/${id}/codigo`, {
+    method: 'POST',
+    body: '{}',
+  });
 }
 
 // Detalle completo — click en un usuario dentro de UsuariosView.

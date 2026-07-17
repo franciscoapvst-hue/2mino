@@ -8,6 +8,7 @@ import { rankedRoutes } from './routes/ranked';
 import { matchmakingRoutes } from './routes/matchmaking';
 import { historialRoutes } from './routes/historial';
 import { reglasRoutes } from './routes/reglas';
+import { torneosRoutes } from './routes/torneos';
 import { cargarReglas } from './game/reglas';
 
 const app = Fastify({
@@ -39,6 +40,7 @@ app.register(rankedRoutes);
 app.register(matchmakingRoutes);
 app.register(historialRoutes);
 app.register(reglasRoutes);
+app.register(torneosRoutes);
 
 app.get('/health', {
   schema: {

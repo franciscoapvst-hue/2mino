@@ -203,6 +203,155 @@ export async function adminRoutes(app: FastifyInstance) {
     },
   );
 
+  // ── Torneos (Etapa 1 de docs/PLAN_TORNEOS.md) ───
+  // Proxies a ms-salas. El schema fino (fases, fechas, formato) lo valida
+  // ms-salas — acá solo pasan el body y se inyecta creado_por del JWT
+  // (nunca se confía en un creado_por que venga del cliente).
+  const TorneoBodySchema = { type: 'object', additionalProperties: true } as const;
+  const TorneoRespuestaSchema = { type: 'object', additionalProperties: true } as const;
+
+  app.post<{ Body: Record<string, unknown> }>('/admin/torneos', {
+    preHandler: requireAdmin,
+    schema: {
+      tags:     ['admin'],
+      summary:  'Crear un torneo (borrador)',
+      security: [{ bearerAuth: [] }],
+      body: TorneoBodySchema,
+      response: {
+        201: TorneoRespuestaSchema,
+        400: { description: 'Estructura o fechas inválidas', ...ErrorSchema },
+        ...AuthErrors,
+      },
+    },
+  }, async (req, reply) => {
+    const admin = (req as typeof req & { admin: { sub: string } }).admin;
+    const { status, data } = await callSalas('/torneos', 'POST', {
+      ...req.body,
+      creado_por: admin.sub,
+    });
+    return reply.code(status).send(data);
+  });
+
+  app.patch<{ Params: { id: string }; Body: Record<string, unknown> }>('/admin/torneos/:id', {
+    preHandler: requireAdmin,
+    schema: {
+      tags:     ['admin'],
+      summary:  'Editar un torneo en borrador',
+      security: [{ bearerAuth: [] }],
+      params: UuidParamSchema,
+      body: TorneoBodySchema,
+      response: {
+        200: TorneoRespuestaSchema,
+        400: { description: 'Estructura inválida',    ...ErrorSchema },
+        404: { description: 'Torneo no encontrado',   ...ErrorSchema },
+        409: { description: 'Ya no está en borrador', ...ErrorSchema },
+        ...AuthErrors,
+      },
+    },
+  }, async (req, reply) => {
+    const { status, data } = await callSalas(`/torneos/${req.params.id}`, 'PATCH', req.body);
+    return reply.code(status).send(data);
+  });
+
+  app.post<{ Params: { id: string } }>('/admin/torneos/:id/abrir-inscripcion', {
+    preHandler: requireAdmin,
+    schema: {
+      tags:     ['admin'],
+      summary:  'Abrir la inscripción de un torneo en borrador',
+      security: [{ bearerAuth: [] }],
+      params: UuidParamSchema,
+      response: {
+        200: TorneoRespuestaSchema,
+        404: { description: 'Torneo no encontrado', ...ErrorSchema },
+        409: { description: 'No está en borrador',  ...ErrorSchema },
+        ...AuthErrors,
+      },
+    },
+  }, async (req, reply) => {
+    const { status, data } = await callSalas(`/torneos/${req.params.id}/abrir-inscripcion`, 'POST');
+    return reply.code(status).send(data);
+  });
+
+  app.get('/admin/torneos', {
+    preHandler: requireAdmin,
+    schema: {
+      tags:     ['admin'],
+      summary:  'Listar todos los torneos (incluye borradores)',
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: { type: 'array', items: TorneoRespuestaSchema },
+        ...AuthErrors,
+      },
+    },
+  }, async (_req, reply) => {
+    const { status, data } = await callSalas('/torneos', 'GET');
+    return reply.code(status).send(data);
+  });
+
+  app.get<{ Params: { id: string } }>('/admin/torneos/:id', {
+    preHandler: requireAdmin,
+    schema: {
+      tags:     ['admin'],
+      summary:  'Detalle de un torneo (config + fases + equipos)',
+      security: [{ bearerAuth: [] }],
+      params: UuidParamSchema,
+      response: {
+        200: TorneoRespuestaSchema,
+        404: { description: 'Torneo no encontrado', ...ErrorSchema },
+        ...AuthErrors,
+      },
+    },
+  }, async (req, reply) => {
+    const { status, data } = await callSalas(`/torneos/${req.params.id}`, 'GET');
+    return reply.code(status).send(data);
+  });
+
+  app.patch<{ Params: { id: string }; Body: { estado: string } }>('/admin/torneos/:id/estado', {
+    preHandler: requireAdmin,
+    schema: {
+      tags:     ['admin'],
+      summary:  'Cancelar un torneo',
+      security: [{ bearerAuth: [] }],
+      params: UuidParamSchema,
+      body: {
+        type: 'object',
+        required: ['estado'],
+        properties: { estado: { type: 'string', enum: ['cancelado'] } },
+      },
+      response: {
+        200: TorneoRespuestaSchema,
+        404: { description: 'Torneo no encontrado',    ...ErrorSchema },
+        409: { description: 'Ya finalizado/cancelado', ...ErrorSchema },
+        ...AuthErrors,
+      },
+    },
+  }, async (req, reply) => {
+    const { status, data } = await callSalas(`/torneos/${req.params.id}/estado`, 'PATCH', req.body);
+    return reply.code(status).send(data);
+  });
+
+  app.post<{ Params: { id: string } }>('/admin/torneos/:id/codigo', {
+    preHandler: requireAdmin,
+    schema: {
+      tags:     ['admin'],
+      summary:  'Regenerar el código de invitación (torneos privados)',
+      security: [{ bearerAuth: [] }],
+      params: UuidParamSchema,
+      response: {
+        200: {
+          type: 'object',
+          properties: { codigo_invitacion: { type: 'string' } },
+        },
+        404: { description: 'Torneo no encontrado', ...ErrorSchema },
+        409: { description: 'El torneo es público', ...ErrorSchema },
+        ...AuthErrors,
+      },
+    },
+  }, async (req, reply) => {
+    const { status, data } = await callSalas(`/torneos/${req.params.id}/codigo`, 'POST');
+    return reply.code(status).send(data);
+  });
+
   // ── GET /admin/usuarios ─────────────────────────
   // Proxy directo a ms-usuarios (GET /usuarios?q=, nuevo).
   app.get<{ Querystring: { q?: string } }>('/admin/usuarios', {
