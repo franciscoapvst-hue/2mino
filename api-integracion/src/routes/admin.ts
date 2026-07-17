@@ -299,6 +299,32 @@ export async function adminRoutes(app: FastifyInstance) {
     },
   );
 
+  // ── DELETE /admin/usuarios/:id ──────────────────
+  // Borrado real, no reversible — a diferencia de /estado (ban). Ver el
+  // comentario en ms-usuarios/src/routes/usuarios.ts sobre qué NO limpia
+  // (referencias huérfanas en salas/ranked/amigos de otros jugadores).
+  app.delete<{ Params: { id: string } }>('/admin/usuarios/:id', {
+    preHandler: requireAdmin,
+    schema: {
+      tags:        ['admin'],
+      summary:     'Eliminar una cuenta (borrado real, no reversible)',
+      security:    [{ bearerAuth: [] }],
+      params: UuidParamSchema,
+      response: {
+        200: {
+          description: 'Usuario eliminado',
+          type: 'object',
+          properties: { message: { type: 'string' } },
+        },
+        ...AuthErrors,
+        404: { description: 'Usuario no encontrado', ...ErrorSchema },
+      },
+    },
+  }, async (req, reply) => {
+    const { status, data } = await callMs(`/usuarios/${req.params.id}`, 'DELETE');
+    return reply.code(status).send(data);
+  });
+
   // ── GET /admin/segmentos ────────────────────────
   // A diferencia de GET /segmentos (público, solo activos), este trae
   // también los desactivados — uso exclusivo del Back Office.

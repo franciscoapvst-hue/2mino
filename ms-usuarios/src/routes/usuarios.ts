@@ -240,6 +240,38 @@ export async function usuariosRoutes(app: FastifyInstance) {
     return reply.send(rows[0]);
   });
 
+  // ── DELETE /usuarios/:id ─────────────────────────
+  // Borrado real (a diferencia de /estado, que solo banea con un flag).
+  // Pensado para liberar email/username de cuentas de prueba (ej. volver
+  // a registrar con la misma cuenta de Google al testear OAuth) — no es
+  // el flujo de "eliminar mi cuenta" de un jugador real, ese debería ser
+  // el ban reversible de siempre.
+  //
+  // usuario_id en ms-salas/ms-social es un UUID suelto, SIN constraint de
+  // FK real entre servicios (bounded contexts separados aunque compartan
+  // Postgres) — este DELETE no puede fallar por eso, pero tampoco limpia
+  // esas filas: el historial/ranked de OTRO jugador que compitió contra
+  // este usuario sigue intacto (referencia un id que ya no existe, mismo
+  // criterio que cualquier plataforma real: borrar tu cuenta no borra el
+  // resultado del partido de tu rival). Aceptable para cuentas de prueba
+  // de bajo uso; si esto se usa sobre cuentas con actividad real, evaluar
+  // sumar limpieza en cascada en ms-salas/ms-social.
+  app.delete<{ Params: { id: string } }>('/usuarios/:id', {
+    schema: {
+      tags:        ['usuarios'],
+      summary:     'Eliminar una cuenta (borrado real, no reversible)',
+      params: { type: 'object', properties: { id: { type: 'string', format: 'uuid' } } },
+      response: {
+        200: { description: 'Usuario eliminado',     ...MessageSchema },
+        404: { description: 'Usuario no encontrado', ...ErrorSchema },
+      },
+    },
+  }, async (req, reply) => {
+    const { rowCount } = await pool.query('DELETE FROM usuarios WHERE id = $1', [req.params.id]);
+    if (!rowCount) return reply.code(404).send({ error: 'Usuario no encontrado' });
+    return reply.send({ message: 'Usuario eliminado' });
+  });
+
   // ── POST /usuarios ──────────────────────────────
   app.post<{ Body: { username: string; email: string; password: string; segmento?: string } }>(
     '/usuarios',
