@@ -5,6 +5,14 @@ import { pool } from '../db/pool';
 import { enviarEmailVerificacion } from '../email';
 
 const ROUNDS = 12;
+// bcrypt(12) por invitado (varios cientos de ms de CPU cada uno, y esa
+// contraseña no la ve ni la usa nadie — nunca hay login real contra una
+// cuenta invitado) fue el cuello de botella real bajo carga en el load
+// test de docs/ESCALABILIDAD.md, no Postgres. 4 rounds es ~256x más barato
+// y sigue siendo un hash bcrypt válido (compare() contra un formato roto
+// puede tirar en vez de devolver false, así que no vale la pena ahorrarse
+// el bcrypt.hash entero acá solo para esta cuenta descartable).
+const ROUNDS_INVITADO = 4;
 
 // ── Schemas reutilizables ─────────────────────────
 const SegmentoSchema = {
@@ -884,7 +892,7 @@ export async function usuariosRoutes(app: FastifyInstance) {
     );
     const segmentoId = segRows[0].id;
     const email = `invitado-${crypto.randomUUID()}@guest.2mino.local`;
-    const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), ROUNDS);
+    const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), ROUNDS_INVITADO);
 
     // Mismo loop de reintento con sufijo numérico que oauth-google.
     for (let intento = 0; intento < 20; intento++) {
@@ -904,4 +912,27 @@ export async function usuariosRoutes(app: FastifyInstance) {
     }
     return reply.code(500).send({ error: 'No se pudo generar un username único' });
   });
+}
+
+// ── Limpieza: invitados abandonados ─────────────────
+// El logout normal ya borra la cuenta invitado al momento (ver POST
+// /auth/logout en el gateway) — esto es la red de seguridad para la
+// pestaña cerrada sin pasar por ahí (recarga, crash, cerrar el
+// navegador), que es el caso más común en la práctica. El token de
+// invitado vive en sessionStorage (no localStorage — ver LoginScreen.tsx
+// handleGuestClick), así que del lado del cliente esa sesión ya está
+// muerta apenas se cierra la pestaña; acá solo falta que el servidor se
+// entere. 24h en vez de calcarle los 5 minutos a limpiarSalasIncompletas
+// porque una cuenta sí puede seguir "viva" (misma pestaña, mismo token)
+// por horas de juego real — no hay forma de distinguir eso de un
+// abandono sin agregar una columna de "última actividad".
+export async function limpiarInvitadosAbandonados(): Promise<number> {
+  const { rowCount } = await pool.query(
+    `DELETE FROM usuarios u
+     USING segmentos s
+     WHERE u.segmento_id = s.id
+       AND s.nombre = 'invitado'
+       AND u.created_at < NOW() - INTERVAL '24 hours'`,
+  );
+  return rowCount ?? 0;
 }
