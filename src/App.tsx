@@ -406,7 +406,7 @@ export default function App() {
       <Route path="/" element={<Navigate to={session ? '/home' : '/landing'} replace />} />
 
       <Route path="/landing" element={
-        <PublicOnly><LandingScreen dark={dark} onToggleTheme={() => setDark(d => !d)} /></PublicOnly>
+        <PublicOnly><LandingScreen dark={dark} onToggleTheme={() => setDark(d => !d)} onSuccess={handleSuccess} /></PublicOnly>
       } />
       <Route path="/login" element={
         <PublicOnly><LoginScreen onSuccess={handleSuccess} dark={dark} onToggleTheme={() => setDark(d => !d)} /></PublicOnly>
