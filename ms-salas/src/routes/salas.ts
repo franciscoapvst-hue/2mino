@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import type { Pool, PoolClient } from 'pg';
 import { pool } from '../db/pool';
 
 // ── Código corto único (reutilizable: salas "2M-" y parties "PT-") ──
@@ -11,10 +12,19 @@ export function generarCodigo(prefijo = '2M-'): string {
 
 export async function codigoDisponibleEn(
   tabla: 'salas' | 'ranked_parties', prefijo: string,
+  // Opcional: la conexión de una transacción ya abierta (ver crearSala en
+  // matchmaking.ts). Sin esto, un caller que ya tiene un client afuera de
+  // una transacción con un advisory lock tomado pedía OTRA conexión del
+  // mismo pool acá adentro — bajo carga, con el pool lleno de conexiones
+  // bloqueadas esperando ese mismo advisory lock, esta query nunca
+  // encontraba una conexión libre: la transacción quedaba "idle in
+  // transaction" para siempre, sin soltar el lock, y todo el matchmaking
+  // se trababa detrás (reproducido en producción, ver docs/ESCALABILIDAD.md).
+  db: Pick<Pool, 'query'> | PoolClient = pool,
 ): Promise<string> {
   for (let i = 0; i < 10; i++) {
     const code = generarCodigo(prefijo);
-    const { rows } = await pool.query(`SELECT id FROM ${tabla} WHERE codigo = $1`, [code]);
+    const { rows } = await db.query(`SELECT id FROM ${tabla} WHERE codigo = $1`, [code]);
     if (!rows.length) return code;
   }
   throw new Error('No se pudo generar un código único');
