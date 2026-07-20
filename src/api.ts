@@ -57,6 +57,9 @@ export type PartidaPublica = {
   // Fichas reales de todos los asientos — null mientras se está jugando,
   // se revela recién al cerrar la mano (transparencia del conteo de puntos).
   manosReveladas: Pieza[][] | null;
+  // Fichas sin repartir — siempre 0 con 4 jugadores. En 1vs1, si no tienes
+  // jugada, "Pasar" primero roba de acá hasta conseguir una jugable.
+  pozoRestante: number;
   tablero:      FichaTablero[];
   turno:        number;
   pasadas:      number;

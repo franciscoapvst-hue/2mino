@@ -157,15 +157,40 @@ describe('resolverTurnosBot — tiempo límite por jugada (docs/PENDIENTES_JUEGO
     const base = crearPartida([asiento('humano-1', 'ana', 1), asiento('humano-2', 'beto', 2)]);
     // Tablero abierto en 0-0: ninguna ficha que no toque el valor 0 puede
     // jugarse ahí, así que este filtro garantiza una mano sin jugada válida.
+    // pozo vacío a propósito (docs/PENDIENTES_JUEGO.md §3): con pozo real
+    // (14 fichas en un 1vs1) aplicarPase roba antes de pasar, y es muy
+    // probable que alguna de esas 14 sí toque el 0 — este test quiere el
+    // caso "de verdad no hay NADA jugable en ningún lado", no ese.
     const manoSinJugada = base.manos[0].filter(p => p.a !== 0 && p.b !== 0);
     const vencida: PartidaState = {
       ...base, turno: 0, salidaForzada: null,
       manos: [manoSinJugada, base.manos[1]],
+      pozo: [],
       tablero: [abrirTablero({ a: 0, b: 0 })],
       limiteJugadaMs: 15_000, turnoEmpiezaEn: Date.now() - 20_000,
     };
     const { movimientos } = resolverTurnosBot(vencida);
     expect(movimientos[0]).toMatchObject({ seat: 0, tipo: 'pasar', pieza: null });
+  });
+
+  it('agotado el límite, sin jugada en mano pero con una jugable en el pozo (1vs1): roba y NO pasa', () => {
+    const base = crearPartida([asiento('humano-1', 'ana', 1), asiento('humano-2', 'beto', 2)]);
+    const manoSinJugada = base.manos[0].filter(p => p.a !== 0 && p.b !== 0);
+    const vencida: PartidaState = {
+      ...base, turno: 0, salidaForzada: null,
+      manos: [manoSinJugada, base.manos[1]],
+      pozo: [{ a: 5, b: 5 }, { a: 0, b: 6 }], // la 2da conecta con el 0
+      tablero: [abrirTablero({ a: 0, b: 0 })],
+      limiteJugadaMs: 15_000, turnoEmpiezaEn: Date.now() - 20_000,
+    };
+    const { partida, movimientos } = resolverTurnosBot(vencida);
+    // El robo no es un "pasar" real (docs/PENDIENTES_JUEGO.md §3): no
+    // queda logueado como movimiento, y el turno se lo queda seat 0, que
+    // ahora sí tiene una ficha jugable (la que acaba de robar).
+    expect(movimientos).toEqual([]);
+    expect(partida.turno).toBe(0);
+    expect(partida.pozo).toEqual([]);
+    expect(partida.manos[0]).toContainEqual({ a: 0, b: 6 });
   });
 });
 

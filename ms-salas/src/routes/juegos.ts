@@ -401,7 +401,13 @@ export async function juegosRoutes(app: FastifyInstance) {
 
     if (!resultado.ok) return reply.code(400).send({ error: resultado.error });
 
-    const movimientos: MovimientoInput[] = seat === -1 ? [] : [{
+    // 1vs1: si aplicarPase robó del pozo y encontró una ficha jugable,
+    // corta ahí SIN pasar de verdad (turno no avanza, `pasadas` no se
+    // toca) — no se loguea como pase. `pasadas` (no `turno`) es la señal
+    // confiable: una tranca cierra la mano sin cambiar `turno` pero
+    // siempre incrementa `pasadas` antes (ver aplicarPase en logic.ts).
+    const pasoDeVerdad = resultado.partida.pasadas !== partida.pasadas;
+    const movimientos: MovimientoInput[] = seat === -1 || !pasoDeVerdad ? [] : [{
       numeroMano: numeroManoAntes, seat, tipo: 'pasar', pieza: null, lado: null,
     }];
     await guardarMovimientos(juego.sala_id, movimientos);

@@ -87,6 +87,12 @@ function resolverUnPasoBot(
       : aplicarPase(partida, asiento.usuario_id);
     if (!resultado.ok) return null; // no debería ocurrir; corta por seguridad
 
+    // 1vs1: aplicarPase pudo robar del pozo y encontrar una ficha jugable
+    // sin pasar de verdad (turno sigue en este mismo asiento, `pasadas`
+    // no cambia) — no es un "pasar" real, no se loguea como movimiento
+    // (mismo criterio que la ruta POST /juego/pasar en juegos.ts).
+    const pasoDeVerdad = !!pieza || resultado.partida.pasadas !== partida.pasadas;
+
     // Si fue forzado por tiempo (no por ser bot), avisar al frontend cuál
     // asiento se quedó sin tiempo — mismo mecanismo que "pasó a todos".
     const partidaFinal = tiempoAgotado
@@ -95,12 +101,12 @@ function resolverUnPasoBot(
 
     return {
       partida: partidaFinal,
-      movimiento: {
+      movimiento: pasoDeVerdad ? {
         numeroMano, seat,
         tipo:  pieza ? 'jugar' : 'pasar',
         pieza: pieza ?? null,
         lado:  pieza ? resultado.partida.ultimaJugada?.lado ?? null : null,
-      },
+      } : null,
       forzadoPorTiempo: tiempoAgotado,
     };
   }

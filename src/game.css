@@ -123,6 +123,7 @@
 .score-nos strong   { color: var(--teal) !important; }
 .score-ellos strong { color: #ff8080 !important; }
 .score-target { color: var(--g-muted) !important; }
+.score-pozo   { opacity: 0.75; }
 
 /* ── Banners ─────────────────────────────────────── */
 .game-error-banner {

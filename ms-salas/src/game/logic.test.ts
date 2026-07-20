@@ -31,6 +31,7 @@ function partida(over: Partial<PartidaState> = {}): PartidaState {
     capicuasPorEquipo: [0, 0],
     trancasPorEquipo:  [0, 0],
     manos: Array.from({ length: n }, () => []),
+    pozo: [],
     tablero: [],
     turno: 0,
     pasadas: 0,
@@ -97,6 +98,16 @@ describe('crearPartida', () => {
   it('delayFinManoMs por defecto es 0 (sin límite explícito, no rompe partidas viejas)', () => {
     const p = crearPartida(asientos(2));
     expect(p.delayFinManoMs).toBe(0);
+  });
+
+  it('2 jugadores: reparte 14 y deja 14 en el pozo; 4 jugadores: pozo vacío', () => {
+    const p2 = crearPartida(asientos(2));
+    expect(p2.manos[0]).toHaveLength(7);
+    expect(p2.manos[1]).toHaveLength(7);
+    expect(p2.pozo).toHaveLength(14);
+
+    const p4 = crearPartida(asientos(4));
+    expect(p4.pozo).toHaveLength(0);
   });
 
   it('acepta un delayFinManoMs explícito (configurado desde reglas_juego)', () => {
@@ -424,6 +435,67 @@ describe('aplicarPase', () => {
     expect(s.marcador).toEqual([100, 0]);
     expect(s.fase).toBe('fin_partida');
     expect(s.equipoGanadorPartida).toBe(0);
+  });
+});
+
+// ── Robo del pozo en 1vs1 (docs/PENDIENTES_JUEGO.md §3) ────────────
+describe('aplicarPase — robo del pozo en 1vs1', () => {
+  it('sin jugada y con una ficha jugable en el pozo: roba y NO pasa (mismo turno)', () => {
+    const p = partida({
+      manos: [[pz(0, 0)], [pz(1, 1)]],
+      pozo: [pz(6, 6), pz(2, 5)], // la primera no entra, la segunda sí (conecta con el 2)
+      tablero: [abrirTablero(pz(2, 3))],
+      turno: 0, pasadas: 0,
+    });
+    const s = ok(aplicarPase(p, 'u0'));
+    expect(s.turno).toBe(0);   // sigue siendo su turno
+    expect(s.pasadas).toBe(0); // no fue un pase real
+    expect(s.pozo).toEqual([]);
+    expect(s.manos[0]).toHaveLength(3);
+    expect(s.manos[0]).toContainEqual(pz(2, 5));
+  });
+
+  it('sin jugada y sin nada jugable en el pozo: vacía el pozo y pasa de verdad', () => {
+    const p = partida({
+      manos: [[pz(0, 0)], [pz(1, 1)]],
+      pozo: [pz(6, 6), pz(5, 5)], // ninguna conecta con los extremos 2/3
+      tablero: [abrirTablero(pz(2, 3))],
+      turno: 0, pasadas: 0, ultimoQueJugo: 1,
+    });
+    const s = ok(aplicarPase(p, 'u0'));
+    expect(s.turno).toBe(1);   // ahí sí pasa de verdad
+    expect(s.pasadas).toBe(1);
+    expect(s.pozo).toEqual([]);
+    expect(s.manos[0]).toHaveLength(3); // se queda con lo robado en la mano
+  });
+
+  it('pozo vacío: pasa directo, comportamiento de siempre', () => {
+    const p = partida({
+      manos: [[pz(0, 0)], [pz(1, 1)]],
+      pozo: [],
+      tablero: [abrirTablero(pz(2, 3))],
+      turno: 0, pasadas: 0, ultimoQueJugo: 1,
+    });
+    const s = ok(aplicarPase(p, 'u0'));
+    expect(s.turno).toBe(1);
+    expect(s.pasadas).toBe(1);
+    expect(s.manos[0]).toEqual([pz(0, 0)]);
+  });
+
+  it('4 jugadores: nunca roba del pozo, aunque tenga fichas', () => {
+    const p = partida({
+      maxJugadores: 4,
+      asientos: asientos(4),
+      manos: [[pz(0, 0)], [pz(1, 2)], [pz(1, 3)], [pz(1, 4)]],
+      pozo: [pz(2, 5)], // conectaría con el 2 si robara — no debe pasar con 4P
+      tablero: [abrirTablero(pz(2, 3))],
+      turno: 0, pasadas: 0, ultimoQueJugo: 3,
+    });
+    const s = ok(aplicarPase(p, 'u0'));
+    expect(s.turno).toBe(1);
+    expect(s.pasadas).toBe(1);
+    expect(s.pozo).toEqual([pz(2, 5)]); // intacto
+    expect(s.manos[0]).toEqual([pz(0, 0)]); // sin cambios
   });
 });
 

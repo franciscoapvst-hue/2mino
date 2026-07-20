@@ -113,6 +113,10 @@ export type PartidaState = {
   trancasPorEquipo:  [number, number];
   // — mano en curso —
   manos:          Pieza[][];     // manos[seat]
+  // Fichas sobrantes sin repartir (docs/PENDIENTES_JUEGO.md §3) — con 4
+  // jugadores siempre vacío (repartir(4,7) reparte las 28); con 2 quedan
+  // 14, de las que se puede robar al no tener jugada (ver aplicarPase).
+  pozo:           Pieza[];
   tablero:        FichaTablero[];
   turno:          number;        // seat al que le toca
   pasadas:        number;        // pases consecutivos
@@ -164,7 +168,7 @@ export function crearPartida(
 ): PartidaState {
   const ordenados = [...jugadores].sort((a, b) => a.posicion - b.posicion);
   const maxJugadores = ordenados.length;
-  const { manos } = repartir(maxJugadores);
+  const { manos, pozo } = repartir(maxJugadores);
 
   // Mano 1: sale quien tenga el doble más alto (6-6 con 4 jugadores) y
   // está OBLIGADO a abrir con él. Con 2 jugadores el 6-6 puede quedar en
@@ -185,6 +189,7 @@ export function crearPartida(
     capicuasPorEquipo: [0, 0],
     trancasPorEquipo:  [0, 0],
     manos,
+    pozo,
     tablero: [],
     turno: apertura?.seat ?? 0,
     pasadas: 0,
@@ -386,6 +391,37 @@ export function aplicarPase(partida: PartidaState, usuarioId: string): Resultado
   });
   if (tieneJugada) return { ok: false, error: 'Tienes una ficha jugable, no puedes pasar' };
 
+  // ── 1vs1: robar del pozo antes de pasar de verdad ──────────────────
+  // Regla estándar del dominó bloqueado/de robo con 2 jugadores (con 4
+  // no aplica: repartir(4,7) reparte las 28 fichas, pozo sale vacío). Se
+  // roba de a una hasta conseguir una jugable — ahí NO pasa, se corta acá
+  // mismo y el jugador decide qué hacer con la ficha nueva vía el /jugar
+  // normal (puede volver a intentar /pasar, pero aplicarPase va a
+  // rechazarlo: la ficha recién robada ya cuenta como "tieneJugada" más
+  // arriba) — o hasta vaciar el pozo, y ahí sí pasa de verdad, con la
+  // mano ya aumentada por todo lo robado en el camino.
+  if (partida.maxJugadores === 2 && partida.pozo.length > 0) {
+    const pozoRestante = [...partida.pozo];
+    const manoNueva = [...(partida.manos[seat] ?? [])];
+    let jugable = false;
+    while (pozoRestante.length > 0) {
+      const robada = pozoRestante.shift()!;
+      manoNueva.push(robada);
+      const o = puedeJugar(robada, ext);
+      if (o.izq || o.der) { jugable = true; break; }
+    }
+    const manos = partida.manos.map((h, i) => i === seat ? manoNueva : h);
+    if (jugable) {
+      return {
+        ok: true,
+        partida: { ...partida, manos, pozo: pozoRestante, turnoEmpiezaEn: Date.now() },
+      };
+    }
+    // Pozo vaciado sin nada jugable: pasa de verdad, con la mano y el
+    // pozo ya actualizados por el robo.
+    partida = { ...partida, manos, pozo: pozoRestante };
+  }
+
   const nuevasPasadas = partida.pasadas + 1;
 
   // ── Tranca: todos pasaron, incluido quien cerró ──
@@ -445,12 +481,13 @@ export function marcarListo(partida: PartidaState, usuarioId: string): Resultado
 
   // Todos listos → repartir la siguiente mano. Sale `salida` (ganador de
   // la mano anterior o regla de tranca), sin ficha de apertura forzada.
-  const { manos } = repartir(partida.maxJugadores);
+  const { manos, pozo } = repartir(partida.maxJugadores);
   return {
     ok: true,
     partida: {
       ...partida,
       manos,
+      pozo,
       tablero: [],
       turno: partida.salida,
       pasadas: 0,
@@ -480,6 +517,9 @@ export type PartidaPublica = {
   // expone recién al cerrar la mano (docs/PENDIENTES_JUEGO.md §1), para
   // que se pueda verificar el conteo de pips de una tranca a simple vista.
   manosReveladas: Pieza[][] | null;
+  // Solo la cantidad — el contenido del pozo es tan oculto como la mano
+  // rival. Siempre 0 con 4 jugadores (ver PartidaState.pozo).
+  pozoRestante: number;
   tablero:      FichaTablero[];
   turno:        number;
   pasadas:      number;
@@ -516,6 +556,7 @@ export function vistaPublica(partida: PartidaState, usuarioId: string): PartidaP
     miMano:       miSeat >= 0 ? partida.manos[miSeat] ?? [] : [],
     conteoManos:  partida.manos.map(h => h.length),
     manosReveladas: partida.fase !== 'jugando' ? partida.manos : null,
+    pozoRestante: partida.pozo.length,
     tablero:      partida.tablero,
     turno:        partida.turno,
     pasadas:      partida.pasadas,

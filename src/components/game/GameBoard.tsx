@@ -505,7 +505,12 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
         <span className="score-team score-nos">
           Nosotros <strong>{marcadorNos}</strong>
         </span>
-        <span className="score-target">Mano {partida.numeroMano} · a {partida.puntosObjetivo}</span>
+        <span className="score-target">
+          Mano {partida.numeroMano} · a {partida.puntosObjetivo}
+          {partida.maxJugadores === 2 && (
+            <span className="score-pozo"> · Pozo {partida.pozoRestante}</span>
+          )}
+        </span>
         <span className="score-team score-ellos">
           <strong>{marcadorEllos}</strong> Ellos
         </span>
