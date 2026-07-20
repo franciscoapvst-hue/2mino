@@ -209,6 +209,20 @@ async function intentarEmparejar(modo: 2 | 4, tipo: Tipo): Promise<{ matched: bo
   }
 }
 
+// ── Limpieza: búsquedas colgadas ─────────────────────
+// Sin esto, un ticket de cola puede esperar indefinidamente si nadie más
+// entra a esa combinación modo+tipo (encontrado real: un ticket ranked
+// solo, sin nadie para emparejar — ranked no tiene bot-fill — quedó 10
+// DÍAS esperando en producción). El frontend ya maneja bien que el
+// ticket "desaparezca" sin haber emparejado (MatchmakingView.tsx: sin
+// ticket en el poll, vuelve al menú), así que alcanza con borrarlo acá.
+export async function limpiarColaExpirada(): Promise<number> {
+  const { rowCount } = await pool.query(
+    `DELETE FROM ranked_cola WHERE created_at < NOW() - INTERVAL '3 minutes'`,
+  );
+  return rowCount ?? 0;
+}
+
 /** Da forma de ColaEstado (front) a un intento recién hecho. */
 function respuestaCola(
   resultado: { matched: boolean; salaId?: string },

@@ -613,3 +613,35 @@ export async function limpiarSalasIncompletas(): Promise<number> {
   );
   return rowCount ?? 0;
 }
+
+// ── Limpieza: partidas 'en_juego' abandonadas ─────
+// Encontrado real en producción: salas 'en_juego' de hasta 10 días de
+// antigüedad, con ambos jugadores desconectados hace rato — nunca se
+// cierran solas. El síntoma visible es "te une a partidas vacías": GET
+// /salas/activa (arriba) ofrece reintegrarse a la más reciente sala
+// en_juego del usuario SIN chequear si sigue viva, así que un jugador
+// real puede terminar reintegrado a una partida fantasma de hace días.
+//
+// "Sin actividad" se mide por juegos.updated_at (se toca en cada jugada
+// real, ver guardarPartida() en juegos.ts) — no created_at/started_at,
+// que no cambian aunque la partida siga en curso. 30 minutos es a
+// propósito bien holgado: el límite de tiempo por jugada (cuando está
+// configurado) ya fuerza el turno de un jugador inactivo, así que 30 min
+// sin ningún movimiento real significa que NADIE la está ni siquiera
+// mirando (nadie hizo GET /juego, que es lo que dispara ese forzado).
+//
+// Reusa el pipe de 'cancelada' de arriba en vez de borrar directo: así
+// no duplica la lógica de qué es seguro borrar (historial/ELO de una
+// partida que sí se jugó), solo la marca y el limpiador de siempre se
+// encarga 5 minutos después.
+export async function limpiarPartidasAbandonadas(): Promise<number> {
+  const { rowCount } = await pool.query(
+    `UPDATE salas s SET estado = 'cancelada', updated_at = NOW()
+     WHERE s.estado = 'en_juego'
+       AND EXISTS (
+         SELECT 1 FROM juegos j
+         WHERE j.sala_id = s.id AND j.updated_at < NOW() - INTERVAL '30 minutes'
+       )`,
+  );
+  return rowCount ?? 0;
+}
