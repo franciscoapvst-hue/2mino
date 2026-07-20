@@ -31,6 +31,14 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
   const [selectedPiece, setSelectedPiece] = useState<Pieza | null>(null);
   const [sobreZona,     setSobreZona]     = useState<'izq' | 'der' | null>(null);
   const [nuevaFichaIdx, setNuevaFichaIdx] = useState<number | null>(null);
+  // Tomar del pozo (1vs1, docs/PENDIENTES_JUEGO.md §3): `tomando` bloquea
+  // doble-click mientras la animación + el request están en curso;
+  // `fichaVolando` es la ficha fantasma que viaja del pozo a la mano.
+  const [tomando,      setTomando]      = useState(false);
+  const [fichaVolando, setFichaVolando] = useState<
+    { left: number; top: number; dx: number; dy: number } | null
+  >(null);
+  const poolElRef = useRef<HTMLDivElement | null>(null);
   const [boardWidth, boardRef] = useMeasuredWidth();
   const [handWidth,  handMeasureRef] = useMeasuredWidth();
   // Además del ancho, el reorden necesita el elemento real de la mano
@@ -259,6 +267,48 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
     }
   }
 
+  // ── Tomar del pozo (1vs1) ──────────────────────
+  // De a UNA ficha por click (el servidor solo entrega una por llamada,
+  // ver aplicarTomar en logic.ts) — si la que tocó no es jugable, el
+  // jugador vuelve a clickear. La animación es puramente visual: mide la
+  // posición real del pozo y de la mano en pantalla (getBoundingClientRect)
+  // y hace viajar una ficha fantasma de una a la otra; el estado real
+  // (con la ficha ya en la mano) recién se aplica cuando termina, para que
+  // no bloquea el estado real: el polling/WS de la partida puede refrescar
+  // `partida` en cualquier momento (incluso más rápido que la animación),
+  // así que la ficha fantasma es puro adorno en paralelo, no una gate.
+  async function handleTomar() {
+    if (jugando || tomando || !esMiTurno) return;
+    setTomando(true);
+    setSelectedPiece(null);
+
+    const poolEl = poolElRef.current;
+    const handEl = handElRef.current;
+    if (poolEl && handEl) {
+      const poolRect = poolEl.getBoundingClientRect();
+      const handRect = handEl.getBoundingClientRect();
+      setFichaVolando({
+        left: poolRect.left + poolRect.width / 2 - 20,
+        top:  poolRect.top + poolRect.height / 2 - 27,
+        dx: (handRect.left + handRect.width / 2) - (poolRect.left + poolRect.width / 2),
+        dy: (handRect.top + 10) - (poolRect.top + poolRect.height / 2),
+      });
+      window.setTimeout(() => setFichaVolando(null), 320);
+    }
+
+    try {
+      const nueva = await api.juego.tomar(sala.id);
+      sounds.click();
+      setPartida(nueva);
+    } catch (e: unknown) {
+      setFichaVolando(null);
+      setError(e instanceof Error ? e.message : 'No puedes tomar del pozo');
+      setTimeout(() => setError(null), 2500);
+    } finally {
+      setTomando(false);
+    }
+  }
+
   // ── Tap-para-seleccionar (funciona en móvil y desktop) ──
   function onTapPieza(pieza: Pieza) {
     if (!esMiTurno || jugando) return;
@@ -443,8 +493,13 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
   const esForzada = (p: Pieza) =>
     !forzada || (p.a === forzada.a && p.b === forzada.b) || (p.a === forzada.b && p.b === forzada.a);
 
-  const puedoPasar = esMiTurno && ext !== null &&
+  const sinJugada = esMiTurno && ext !== null &&
     !partida.miMano.some(p => { const o = puedeJugar(p, ext); return o.izq || o.der; });
+  // 1vs1 (docs/PENDIENTES_JUEGO.md §3): sin jugada y con pozo disponible,
+  // hay que tomar antes de poder pasar — el botón "Pasar" ni aparece.
+  const hayPozoPorTomar = partida.maxJugadores === 2 && partida.pozoRestante > 0;
+  const puedoTomar = sinJugada && hayPozoPorTomar;
+  const puedoPasar = sinJugada && !hayPozoPorTomar;
 
   // Zonas de juego: la ficha activa (arrastrando o tocada) se previsualiza
   // en las puntas donde REALMENTE se puede jugar — si vale en ambas,
@@ -505,12 +560,7 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
         <span className="score-team score-nos">
           Nosotros <strong>{marcadorNos}</strong>
         </span>
-        <span className="score-target">
-          Mano {partida.numeroMano} · a {partida.puntosObjetivo}
-          {partida.maxJugadores === 2 && (
-            <span className="score-pozo"> · Pozo {partida.pozoRestante}</span>
-          )}
-        </span>
+        <span className="score-target">Mano {partida.numeroMano} · a {partida.puntosObjetivo}</span>
         <span className="score-team score-ellos">
           <strong>{marcadorEllos}</strong> Ellos
         </span>
@@ -594,6 +644,36 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
 
       {/* ── Mi mano ──────────────────────────────── */}
       <div className="my-hand-zone">
+       <div className="hand-and-pool">
+        {/* ── Pozo (1vs1): stack de fichas restantes, a un lado de la mano
+            (a la izquierda — a la derecha choca con el chat flotante) ── */}
+        {partida.maxJugadores === 2 && (
+          <div
+            ref={poolElRef}
+            className={`pool-stack${puedoTomar ? ' pool-clickable' : ''}${tomando ? ' pool-tomando' : ''}`}
+            onClick={puedoTomar ? handleTomar : undefined}
+            role={puedoTomar ? 'button' : undefined}
+            aria-label={`Pozo: ${partida.pozoRestante} ficha${partida.pozoRestante === 1 ? '' : 's'}`}
+            title={puedoTomar ? 'Tomar del pozo' : undefined}
+          >
+            {partida.pozoRestante > 0 ? (
+              <>
+                <div className="pool-stack-pile">
+                  {Array.from({ length: Math.min(3, partida.pozoRestante) }).map((_, i) => (
+                    <DominoPiece
+                      key={i} a={0} b={0} orient="v" faceDown
+                      className="pool-stack-tile"
+                      style={{ width: 32, height: 58, top: -i * 3, left: -i * 2 }}
+                    />
+                  ))}
+                </div>
+                <span className="pool-stack-count">{partida.pozoRestante}</span>
+              </>
+            ) : (
+              <span className="pool-stack-empty">Pozo<br />vacío</span>
+            )}
+          </div>
+        )}
         <div
           className="my-hand"
           ref={handRef}
@@ -636,8 +716,12 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
             );
           })}
         </div>
+       </div>
 
-        {esMiTurno && (
+        {/* Pasar solo existe si de verdad no hay nada más para tomar —
+            con pozo disponible, el botón directamente no aparece (hay
+            que tomar sí o sí, ver docs/PENDIENTES_JUEGO.md §3). */}
+        {esMiTurno && !hayPozoPorTomar && (
           <button
             className="btn-pasar"
             disabled={!puedoPasar || jugando}
@@ -645,6 +729,20 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
           >
             Pasar
           </button>
+        )}
+
+        {fichaVolando && (
+          <div
+            className="ficha-volando"
+            style={{
+              left: fichaVolando.left,
+              top: fichaVolando.top,
+              ['--dx' as string]: `${fichaVolando.dx}px`,
+              ['--dy' as string]: `${fichaVolando.dy}px`,
+            }}
+          >
+            <DominoPiece a={0} b={0} orient="v" faceDown style={{ width: 40, height: 74 }} />
+          </div>
         )}
       </div>
 

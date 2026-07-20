@@ -391,35 +391,14 @@ export function aplicarPase(partida: PartidaState, usuarioId: string): Resultado
   });
   if (tieneJugada) return { ok: false, error: 'Tienes una ficha jugable, no puedes pasar' };
 
-  // ── 1vs1: robar del pozo antes de pasar de verdad ──────────────────
-  // Regla estándar del dominó bloqueado/de robo con 2 jugadores (con 4
-  // no aplica: repartir(4,7) reparte las 28 fichas, pozo sale vacío). Se
-  // roba de a una hasta conseguir una jugable — ahí NO pasa, se corta acá
-  // mismo y el jugador decide qué hacer con la ficha nueva vía el /jugar
-  // normal (puede volver a intentar /pasar, pero aplicarPase va a
-  // rechazarlo: la ficha recién robada ya cuenta como "tieneJugada" más
-  // arriba) — o hasta vaciar el pozo, y ahí sí pasa de verdad, con la
-  // mano ya aumentada por todo lo robado en el camino.
+  // ── 1vs1: hay que tomar del pozo antes de poder pasar de verdad ─────
+  // Regla estándar del dominó bloqueado/de robo con 2 jugadores (con 4 no
+  // aplica: repartir(4,7) reparte las 28 fichas, pozo sale vacío). El
+  // robo es una acción propia y explícita del jugador (ver aplicarTomar,
+  // un tile por vez — UI: click en el pozo, con animación), no algo que
+  // /pasar haga por su cuenta.
   if (partida.maxJugadores === 2 && partida.pozo.length > 0) {
-    const pozoRestante = [...partida.pozo];
-    const manoNueva = [...(partida.manos[seat] ?? [])];
-    let jugable = false;
-    while (pozoRestante.length > 0) {
-      const robada = pozoRestante.shift()!;
-      manoNueva.push(robada);
-      const o = puedeJugar(robada, ext);
-      if (o.izq || o.der) { jugable = true; break; }
-    }
-    const manos = partida.manos.map((h, i) => i === seat ? manoNueva : h);
-    if (jugable) {
-      return {
-        ok: true,
-        partida: { ...partida, manos, pozo: pozoRestante, turnoEmpiezaEn: Date.now() },
-      };
-    }
-    // Pozo vaciado sin nada jugable: pasa de verdad, con la mano y el
-    // pozo ya actualizados por el robo.
-    partida = { ...partida, manos, pozo: pozoRestante };
+    return { ok: false, error: 'Debes tomar del pozo antes de poder pasar' };
   }
 
   const nuevasPasadas = partida.pasadas + 1;
@@ -463,6 +442,37 @@ export function aplicarPase(partida: PartidaState, usuarioId: string): Resultado
       turnoEmpiezaEn: Date.now(),
     },
   };
+}
+
+// ── Toma UNA ficha del pozo (1vs1, docs/PENDIENTES_JUEGO.md §3) ────
+// A diferencia de aplicarJugada/aplicarPase, esto NO avanza `turno` ni
+// toca `turnoEmpiezaEn` — sigue siendo el turno de quien tomó (puede que
+// la ficha nueva sea jugable, o puede que tenga que tomar de nuevo).
+// Deliberadamente de a UNA por llamada, no en loop: es una acción propia
+// del jugador (click en el pozo, con su animación) o, de a un paso por
+// vez, del bot/timeout (mismo ritmo de resolverTurnosBotConDelay que
+// cualquier otro turno de bot — ver bots.ts).
+export function aplicarTomar(partida: PartidaState, usuarioId: string): Resultado {
+  if (partida.fase !== 'jugando') return { ok: false, error: 'La mano no está en juego' };
+
+  const seat = seatDe(partida, usuarioId);
+  if (seat === -1) return { ok: false, error: 'No perteneces a esta partida' };
+  if (seat !== partida.turno) return { ok: false, error: 'No es tu turno' };
+
+  if (partida.maxJugadores !== 2) return { ok: false, error: 'Solo se puede tomar del pozo en partidas 1vs1' };
+  if (partida.pozo.length === 0) return { ok: false, error: 'El pozo está vacío' };
+
+  const ext = getExtremos(partida.tablero);
+  if (!ext) return { ok: false, error: 'No puedes tomar del pozo antes de la salida' };
+  const tieneJugada = (partida.manos[seat] ?? []).some(p => {
+    const o = puedeJugar(p, ext);
+    return o.izq || o.der;
+  });
+  if (tieneJugada) return { ok: false, error: 'Tienes una ficha jugable, no puedes tomar del pozo' };
+
+  const [robada, ...pozo] = partida.pozo;
+  const manos = partida.manos.map((h, i) => i === seat ? [...h, robada] : h);
+  return { ok: true, partida: { ...partida, manos, pozo } };
 }
 
 // ── "Listo" entre manos: cuando todos confirman, se reparte la próxima ──

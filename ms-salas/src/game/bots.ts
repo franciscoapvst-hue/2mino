@@ -5,7 +5,7 @@
 // derecha) y pasa automáticamente si no tiene ninguna.
 
 import {
-  aplicarJugada, aplicarPase, marcarListo, getExtremos, puedeJugar,
+  aplicarJugada, aplicarPase, aplicarTomar, marcarListo, getExtremos, puedeJugar,
 } from './logic';
 import type { PartidaState, Pieza } from './logic';
 
@@ -82,16 +82,19 @@ function resolverUnPasoBot(
 
     const numeroMano = partida.numeroMano;
     const pieza = elegirJugadaBot(partida, seat);
-    const resultado = pieza
-      ? aplicarJugada(partida, asiento.usuario_id, pieza)
-      : aplicarPase(partida, asiento.usuario_id);
+    // 1vs1 sin jugada: toma UNA ficha del pozo por paso (no un loop) —
+    // mismo ritmo de BOT_MOVE_DELAY_MS que cualquier otro paso de esta
+    // cadena (ver resolverTurnosBotConDelay), así que un bot que tiene que
+    // robar varias se ve robar de a una, no todas de golpe. Recién cuando
+    // el pozo se vacía (o con 4 jugadores, que nunca tiene pozo) cae a
+    // aplicarPase de verdad.
+    const accion: 'jugar' | 'tomar' | 'pasar' =
+      pieza ? 'jugar' : partida.maxJugadores === 2 && partida.pozo.length > 0 ? 'tomar' : 'pasar';
+    const resultado =
+      accion === 'jugar'  ? aplicarJugada(partida, asiento.usuario_id, pieza!) :
+      accion === 'tomar'  ? aplicarTomar(partida, asiento.usuario_id) :
+                             aplicarPase(partida, asiento.usuario_id);
     if (!resultado.ok) return null; // no debería ocurrir; corta por seguridad
-
-    // 1vs1: aplicarPase pudo robar del pozo y encontrar una ficha jugable
-    // sin pasar de verdad (turno sigue en este mismo asiento, `pasadas`
-    // no cambia) — no es un "pasar" real, no se loguea como movimiento
-    // (mismo criterio que la ruta POST /juego/pasar en juegos.ts).
-    const pasoDeVerdad = !!pieza || resultado.partida.pasadas !== partida.pasadas;
 
     // Si fue forzado por tiempo (no por ser bot), avisar al frontend cuál
     // asiento se quedó sin tiempo — mismo mecanismo que "pasó a todos".
@@ -99,14 +102,17 @@ function resolverUnPasoBot(
       ? { ...resultado.partida, ultimoEvento: { tipo: 'tiempo_agotado' as const, seat } }
       : resultado.partida;
 
+    // "tomar" no se loguea como movimiento (no hay narración de robo en
+    // el replay, ver aplicarTomar en logic.ts) — mismo criterio que la
+    // ruta POST /juego/tomar en juegos.ts.
     return {
       partida: partidaFinal,
-      movimiento: pasoDeVerdad ? {
+      movimiento: accion === 'tomar' ? null : {
         numeroMano, seat,
-        tipo:  pieza ? 'jugar' : 'pasar',
+        tipo:  accion,
         pieza: pieza ?? null,
         lado:  pieza ? resultado.partida.ultimaJugada?.lado ?? null : null,
-      } : null,
+      },
       forzadoPorTiempo: tiempoAgotado,
     };
   }

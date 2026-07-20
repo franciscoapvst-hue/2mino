@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   crearSet, getExtremos, puedeJugar, esCapicua, equipoDe,
-  abrirTablero, crearPartida, aplicarJugada, aplicarPase, marcarListo, aplicarAbandono,
+  abrirTablero, crearPartida, aplicarJugada, aplicarPase, aplicarTomar, marcarListo, aplicarAbandono,
   PUNTOS_CAPICUA,
   type Val, type Pieza, type Asiento, type PartidaState,
 } from './logic';
@@ -439,34 +439,16 @@ describe('aplicarPase', () => {
 });
 
 // ── Robo del pozo en 1vs1 (docs/PENDIENTES_JUEGO.md §3) ────────────
-describe('aplicarPase — robo del pozo en 1vs1', () => {
-  it('sin jugada y con una ficha jugable en el pozo: roba y NO pasa (mismo turno)', () => {
+describe('aplicarPase — no deja pasar si hay pozo por tomar (1vs1)', () => {
+  it('sin jugada y con pozo disponible: rechaza pasar (hay que tomar primero)', () => {
     const p = partida({
       manos: [[pz(0, 0)], [pz(1, 1)]],
-      pozo: [pz(6, 6), pz(2, 5)], // la primera no entra, la segunda sí (conecta con el 2)
+      pozo: [pz(6, 6)],
       tablero: [abrirTablero(pz(2, 3))],
       turno: 0, pasadas: 0,
     });
-    const s = ok(aplicarPase(p, 'u0'));
-    expect(s.turno).toBe(0);   // sigue siendo su turno
-    expect(s.pasadas).toBe(0); // no fue un pase real
-    expect(s.pozo).toEqual([]);
-    expect(s.manos[0]).toHaveLength(3);
-    expect(s.manos[0]).toContainEqual(pz(2, 5));
-  });
-
-  it('sin jugada y sin nada jugable en el pozo: vacía el pozo y pasa de verdad', () => {
-    const p = partida({
-      manos: [[pz(0, 0)], [pz(1, 1)]],
-      pozo: [pz(6, 6), pz(5, 5)], // ninguna conecta con los extremos 2/3
-      tablero: [abrirTablero(pz(2, 3))],
-      turno: 0, pasadas: 0, ultimoQueJugo: 1,
-    });
-    const s = ok(aplicarPase(p, 'u0'));
-    expect(s.turno).toBe(1);   // ahí sí pasa de verdad
-    expect(s.pasadas).toBe(1);
-    expect(s.pozo).toEqual([]);
-    expect(s.manos[0]).toHaveLength(3); // se queda con lo robado en la mano
+    const r = aplicarPase(p, 'u0');
+    expect(r.ok).toBe(false);
   });
 
   it('pozo vacío: pasa directo, comportamiento de siempre', () => {
@@ -482,20 +464,80 @@ describe('aplicarPase — robo del pozo en 1vs1', () => {
     expect(s.manos[0]).toEqual([pz(0, 0)]);
   });
 
-  it('4 jugadores: nunca roba del pozo, aunque tenga fichas', () => {
+  it('4 jugadores: pasa normal aunque "pozo" tuviera algo (nunca debería, pero no debe bloquear)', () => {
     const p = partida({
       maxJugadores: 4,
       asientos: asientos(4),
       manos: [[pz(0, 0)], [pz(1, 2)], [pz(1, 3)], [pz(1, 4)]],
-      pozo: [pz(2, 5)], // conectaría con el 2 si robara — no debe pasar con 4P
+      pozo: [pz(2, 5)],
       tablero: [abrirTablero(pz(2, 3))],
       turno: 0, pasadas: 0, ultimoQueJugo: 3,
     });
     const s = ok(aplicarPase(p, 'u0'));
     expect(s.turno).toBe(1);
     expect(s.pasadas).toBe(1);
-    expect(s.pozo).toEqual([pz(2, 5)]); // intacto
-    expect(s.manos[0]).toEqual([pz(0, 0)]); // sin cambios
+  });
+});
+
+describe('aplicarTomar', () => {
+  it('roba UNA ficha del pozo, sin importar si es jugable, y no avanza el turno', () => {
+    const p = partida({
+      manos: [[pz(0, 0)], [pz(1, 1)]],
+      pozo: [pz(6, 6), pz(2, 5)], // toma la primera (6-6), aunque no sea jugable
+      tablero: [abrirTablero(pz(2, 3))],
+      turno: 0, pasadas: 0,
+    });
+    const s = ok(aplicarTomar(p, 'u0'));
+    expect(s.turno).toBe(0);     // sigue siendo su turno
+    expect(s.pasadas).toBe(0);
+    expect(s.pozo).toEqual([pz(2, 5)]); // solo se fue la primera
+    expect(s.manos[0]).toEqual([pz(0, 0), pz(6, 6)]);
+  });
+
+  it('rechaza tomar si ya tiene una ficha jugable', () => {
+    const p = partida({
+      manos: [[pz(3, 5)], []],
+      pozo: [pz(6, 6)],
+      tablero: [abrirTablero(pz(2, 3))],
+      turno: 0,
+    });
+    const r = aplicarTomar(p, 'u0');
+    expect(r.ok).toBe(false);
+  });
+
+  it('rechaza tomar con el pozo vacío', () => {
+    const p = partida({
+      manos: [[pz(0, 0)], [pz(1, 1)]],
+      pozo: [],
+      tablero: [abrirTablero(pz(2, 3))],
+      turno: 0,
+    });
+    const r = aplicarTomar(p, 'u0');
+    expect(r.ok).toBe(false);
+  });
+
+  it('rechaza tomar con 4 jugadores', () => {
+    const p = partida({
+      maxJugadores: 4,
+      asientos: asientos(4),
+      manos: [[pz(0, 0)], [pz(1, 2)], [pz(1, 3)], [pz(1, 4)]],
+      pozo: [pz(2, 5)],
+      tablero: [abrirTablero(pz(2, 3))],
+      turno: 0,
+    });
+    const r = aplicarTomar(p, 'u0');
+    expect(r.ok).toBe(false);
+  });
+
+  it('rechaza tomar fuera de turno', () => {
+    const p = partida({
+      manos: [[pz(0, 0)], [pz(1, 1)]],
+      pozo: [pz(6, 6)],
+      tablero: [abrirTablero(pz(2, 3))],
+      turno: 1,
+    });
+    const r = aplicarTomar(p, 'u0');
+    expect(r.ok).toBe(false);
   });
 });
 

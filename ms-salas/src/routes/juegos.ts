@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { pool } from '../db/pool';
 import {
-  crearPartida, aplicarJugada, aplicarPase, marcarListo, aplicarAbandono, vistaPublica, equipoDe,
+  crearPartida, aplicarJugada, aplicarPase, aplicarTomar, marcarListo, aplicarAbandono, vistaPublica, equipoDe,
   PUNTOS_PASO_A_TODOS, PUNTOS_CAPICUA,
 } from '../game/logic';
 import type { PartidaState, Pieza } from '../game/logic';
@@ -401,16 +401,51 @@ export async function juegosRoutes(app: FastifyInstance) {
 
     if (!resultado.ok) return reply.code(400).send({ error: resultado.error });
 
-    // 1vs1: si aplicarPase robó del pozo y encontró una ficha jugable,
-    // corta ahí SIN pasar de verdad (turno no avanza, `pasadas` no se
-    // toca) — no se loguea como pase. `pasadas` (no `turno`) es la señal
-    // confiable: una tranca cierra la mano sin cambiar `turno` pero
-    // siempre incrementa `pasadas` antes (ver aplicarPase en logic.ts).
-    const pasoDeVerdad = resultado.partida.pasadas !== partida.pasadas;
-    const movimientos: MovimientoInput[] = seat === -1 || !pasoDeVerdad ? [] : [{
+    const movimientos: MovimientoInput[] = seat === -1 ? [] : [{
       numeroMano: numeroManoAntes, seat, tipo: 'pasar', pieza: null, lado: null,
     }];
     await guardarMovimientos(juego.sala_id, movimientos);
+    await guardarPartida(juego.id, juego.sala_id, resultado.partida);
+    resolverBotsEnSegundoPlano(juego.id, juego.sala_id, resultado.partida);
+    return reply.send(vistaPublica(resultado.partida, req.body.usuario_id));
+  });
+
+  // ── POST /salas/:id/juego/tomar ───────────────────
+  // Toma UNA ficha del pozo (1vs1, docs/PENDIENTES_JUEGO.md §3) — no
+  // avanza el turno; el cliente decide si tomar de nuevo (llamando otra
+  // vez) según si la ficha que le tocó es jugable o no. No se loguea en
+  // partida_movimientos (no hay narración de "robó" en el replay, mismo
+  // criterio simplificado que ya se usaba antes de este endpoint).
+  app.post<{
+    Params: { id: string };
+    Body:   { usuario_id: string };
+  }>('/salas/:id/juego/tomar', {
+    schema: {
+      tags:    ['juego'],
+      summary: 'Tomar una ficha del pozo (1vs1, solo si no hay ficha jugable)',
+      params: {
+        type: 'object',
+        properties: { id: { type: 'string', format: 'uuid' } },
+      },
+      body: {
+        type: 'object',
+        required: ['usuario_id'],
+        properties: { usuario_id: { type: 'string', format: 'uuid' } },
+      },
+      response: {
+        200: { ...PartidaPublicaSchema },
+        400: { ...ErrorSchema },
+        404: { ...ErrorSchema },
+      },
+    },
+  }, async (req, reply) => {
+    const juego = await getJuegoActivo(req.params.id);
+    if (!juego) return reply.code(404).send({ error: 'No hay partida para esta sala' });
+
+    const partida = parsePartida(juego);
+    const resultado = aplicarTomar(partida, req.body.usuario_id);
+    if (!resultado.ok) return reply.code(400).send({ error: resultado.error });
+
     await guardarPartida(juego.id, juego.sala_id, resultado.partida);
     resolverBotsEnSegundoPlano(juego.id, juego.sala_id, resultado.partida);
     return reply.send(vistaPublica(resultado.partida, req.body.usuario_id));

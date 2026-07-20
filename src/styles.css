@@ -1588,6 +1588,7 @@ button:active { transform: scale(0.97); }
 }
 
 .my-hand-zone {
+  position: relative; /* ancla al pozo (docs/PENDIENTES_JUEGO.md §3), a un lado */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1596,13 +1597,22 @@ button:active { transform: scale(0.97); }
   border-top: 1px solid var(--border);
   background: rgba(8, 3, 26, 0.6);
 }
+.hand-and-pool {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 14px;
+  width: 100%;
+}
 .my-hand {
   display: flex;
   gap: 6px;
   flex-wrap: nowrap;       /* una sola fila — la escala evita el overflow */
   justify-content: center;
   align-items: flex-end;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
 }
 /* Reorden táctil: sin esto el navegador interpreta el arrastre horizontal
    sobre una ficha como scroll y nunca llegan los touchmove. La pantalla
@@ -1628,6 +1638,76 @@ button:active { transform: scale(0.97); }
 .btn-pasar:disabled {
   opacity: 0.35;
   cursor: default;
+}
+
+/* ── Pozo (1vs1) — stack de fichas restantes, a un lado de la mano ─── */
+.pool-stack {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 10px;
+  transition: background .15s;
+}
+.pool-stack-pile {
+  position: relative;
+  width: 32px;
+  height: 58px;
+}
+.pool-stack-tile {
+  position: absolute !important;
+  inset: 0;
+}
+.pool-stack-count {
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  min-width: 1.2em;
+  text-align: center;
+}
+.pool-stack-empty {
+  font-size: .68rem;
+  line-height: 1.2;
+  color: var(--text-dim);
+  text-align: center;
+  opacity: 0.6;
+}
+.pool-clickable {
+  cursor: pointer;
+}
+.pool-clickable:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.pool-clickable .pool-stack-count {
+  color: var(--amber, #ef9f2e);
+}
+.pool-clickable:hover .pool-stack-tile:first-child {
+  transform: translateY(-3px);
+}
+.pool-tomando {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+/* Ficha fantasma viajando del pozo a la mano — posición inicial fija
+   (medida real vía getBoundingClientRect en GameBoard) y --dx/--dy la
+   llevan hasta la mano con una curva de easing "cae y frena". */
+.ficha-volando {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  animation: volarDelPozo .32s cubic-bezier(.2, .7, .3, 1) forwards;
+}
+@keyframes volarDelPozo {
+  from { transform: translate(0, 0) scale(1);    opacity: 1; }
+  to   { transform: translate(var(--dx), var(--dy)) scale(0.8); opacity: 0.5; }
+}
+
+@media (max-width: 480px) {
+  .pool-stack { padding: 4px; }
+  .pool-stack-pile { width: 26px; height: 46px; }
 }
 
 /* ── Resultado final ──────────────────────────────── */

@@ -334,6 +334,8 @@ export const api = {
       }),
     pasar: (salaId: string) =>
       req<PartidaPublica>(`/salas/${salaId}/juego/pasar`, { method: 'POST', body: '{}' }),
+    tomar: (salaId: string) =>
+      req<PartidaPublica>(`/salas/${salaId}/juego/tomar`, { method: 'POST', body: '{}' }),
     listo: (salaId: string) =>
       req<PartidaPublica>(`/salas/${salaId}/juego/listo`, { method: 'POST', body: '{}' }),
     abandonar: (salaId: string) =>
