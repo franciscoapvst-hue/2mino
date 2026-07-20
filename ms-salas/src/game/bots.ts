@@ -156,16 +156,24 @@ export const BOT_MOVE_DELAY_MS = 1_500;
 
 /**
  * Igual que resolverTurnosBot, pero de a un paso por vez con un delay real
- * entre cada uno. `onPaso` se llama después de cada paso (antes del
- * delay) para que el caller persista ese estado intermedio — así el
- * polling del cliente lo va mostrando progresivamente en vez de saltar
- * directo al estado final.
+ * ANTES de cada jugada de bot — nunca dispara instantáneo, ni siquiera el
+ * primer paso de la cadena (antes esperaba solo ENTRE pasos, así que el
+ * primero de cada cadena nueva salía sin delay: justo después de que el
+ * humano juega, o después de un pase forzado por tiempo, el próximo bot
+ * respondía en el poll siguiente en vez de a los 1.5s reales — se veía
+ * como una ráfaga instantánea seguida recién ahí del ritmo correcto).
+ * `onPaso` se llama después de cada paso (después del delay, si aplica)
+ * para que el caller persista ese estado intermedio — así el polling del
+ * cliente lo va mostrando progresivamente en vez de saltar directo al
+ * estado final.
  *
- * Si el paso fue un turno forzado por tiempo agotado (no un bot), corta
- * la cadena ahí — sin esto, el turno siguiente (típicamente un bot) se
- * resolvería en el mismo ciclo ~1.5s después y pisaría `ultimoEvento:
- * tiempo_agotado` antes de que el polling del cliente (cada 2s) llegue a
- * verlo. El próximo trigger (poll o acción) retoma desde ahí.
+ * El paso forzado por tiempo agotado (un HUMANO, no un bot) no espera
+ * este delay — ya esperó su propio límite de tiempo — y corta la cadena
+ * ahí mismo: sin esto, el turno siguiente (típicamente un bot) se
+ * resolvería en el mismo ciclo y pisaría `ultimoEvento: tiempo_agotado`
+ * antes de que el polling del cliente (cada 2s) llegue a verlo. El
+ * próximo trigger (poll o acción) retoma desde ahí — y ese bot sí espera
+ * su 1.5s como cualquier otro.
  */
 export async function resolverTurnosBotConDelay(
   partida: PartidaState,
@@ -175,10 +183,12 @@ export async function resolverTurnosBotConDelay(
   for (let iter = 0; iter < 200; iter++) {
     const paso = resolverUnPasoBot(actual);
     if (!paso) break;
+    if (!paso.forzadoPorTiempo) {
+      await new Promise(resolve => setTimeout(resolve, BOT_MOVE_DELAY_MS));
+    }
     actual = paso.partida;
     await onPaso(actual, paso.movimiento);
     if (paso.forzadoPorTiempo) break;
-    await new Promise(resolve => setTimeout(resolve, BOT_MOVE_DELAY_MS));
   }
   return actual;
 }
