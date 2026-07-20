@@ -5,7 +5,7 @@
 // derecha) y pasa automáticamente si no tiene ninguna.
 
 import {
-  aplicarJugada, aplicarPase, marcarListo, getExtremos, puedeJugar,
+  aplicarJugada, aplicarPase, aplicarTomar, marcarListo, getExtremos, puedeJugar,
 } from './logic';
 import type { PartidaState, Pieza } from './logic';
 
@@ -82,9 +82,18 @@ function resolverUnPasoBot(
 
     const numeroMano = partida.numeroMano;
     const pieza = elegirJugadaBot(partida, seat);
-    const resultado = pieza
-      ? aplicarJugada(partida, asiento.usuario_id, pieza)
-      : aplicarPase(partida, asiento.usuario_id);
+    // 1vs1 sin jugada: toma UNA ficha del pozo por paso (no un loop) —
+    // mismo ritmo de BOT_MOVE_DELAY_MS que cualquier otro paso de esta
+    // cadena (ver resolverTurnosBotConDelay), así que un bot que tiene que
+    // robar varias se ve robar de a una, no todas de golpe. Recién cuando
+    // el pozo se vacía (o con 4 jugadores, que nunca tiene pozo) cae a
+    // aplicarPase de verdad.
+    const accion: 'jugar' | 'tomar' | 'pasar' =
+      pieza ? 'jugar' : partida.maxJugadores === 2 && partida.pozo.length > 0 ? 'tomar' : 'pasar';
+    const resultado =
+      accion === 'jugar'  ? aplicarJugada(partida, asiento.usuario_id, pieza!) :
+      accion === 'tomar'  ? aplicarTomar(partida, asiento.usuario_id) :
+                             aplicarPase(partida, asiento.usuario_id);
     if (!resultado.ok) return null; // no debería ocurrir; corta por seguridad
 
     // Si fue forzado por tiempo (no por ser bot), avisar al frontend cuál
@@ -93,11 +102,14 @@ function resolverUnPasoBot(
       ? { ...resultado.partida, ultimoEvento: { tipo: 'tiempo_agotado' as const, seat } }
       : resultado.partida;
 
+    // "tomar" no se loguea como movimiento (no hay narración de robo en
+    // el replay, ver aplicarTomar en logic.ts) — mismo criterio que la
+    // ruta POST /juego/tomar en juegos.ts.
     return {
       partida: partidaFinal,
-      movimiento: {
+      movimiento: accion === 'tomar' ? null : {
         numeroMano, seat,
-        tipo:  pieza ? 'jugar' : 'pasar',
+        tipo:  accion,
         pieza: pieza ?? null,
         lado:  pieza ? resultado.partida.ultimaJugada?.lado ?? null : null,
       },
