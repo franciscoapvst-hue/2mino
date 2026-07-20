@@ -2,10 +2,10 @@ import Fastify from 'fastify';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { runMigrations } from './db/pool';
-import { salasRoutes, limpiarSalasIncompletas } from './routes/salas';
+import { salasRoutes, limpiarSalasIncompletas, limpiarPartidasAbandonadas } from './routes/salas';
 import { juegosRoutes } from './routes/juegos';
 import { rankedRoutes } from './routes/ranked';
-import { matchmakingRoutes } from './routes/matchmaking';
+import { matchmakingRoutes, limpiarColaExpirada } from './routes/matchmaking';
 import { historialRoutes } from './routes/historial';
 import { reglasRoutes } from './routes/reglas';
 import { torneosRoutes } from './routes/torneos';
@@ -62,14 +62,33 @@ async function start() {
     await app.listen({ port, host: '0.0.0.0' });
     app.log.info(`Swagger UI → http://localhost:${port}/docs`);
 
-    // Cada minuto, borra salas 'esperando' que no se llenaron en 5 min y
-    // 'cancelada' viejas (ver limpiarSalasIncompletas() en routes/salas.ts).
+    // Cada minuto: salas 'esperando' que no se llenaron en 5 min y
+    // 'cancelada' viejas (limpiarSalasIncompletas), partidas 'en_juego'
+    // sin ningún movimiento en 30 min (limpiarPartidasAbandonadas — las
+    // marca 'cancelada', el propio limpiarSalasIncompletas las termina de
+    // borrar 5 min después) y tickets de cola con más de 3 min esperando
+    // sin emparejar (limpiarColaExpirada). Ver comentarios en
+    // routes/salas.ts y routes/matchmaking.ts — los tres nacieron de
+    // basura real encontrada en producción (partidas de hasta 10 días
+    // "en_juego", un ticket de cola de 10 días esperando).
     setInterval(async () => {
       try {
-        const borradas = await limpiarSalasIncompletas();
-        if (borradas > 0) app.log.info(`Limpieza: ${borradas} sala(s) incompleta(s) borrada(s)`);
+        const salasIncompletas = await limpiarSalasIncompletas();
+        if (salasIncompletas > 0) app.log.info(`Limpieza: ${salasIncompletas} sala(s) incompleta(s) borrada(s)`);
       } catch (err) {
         app.log.error(err, 'Error en limpieza de salas incompletas');
+      }
+      try {
+        const partidasAbandonadas = await limpiarPartidasAbandonadas();
+        if (partidasAbandonadas > 0) app.log.info(`Limpieza: ${partidasAbandonadas} partida(s) abandonada(s) cancelada(s)`);
+      } catch (err) {
+        app.log.error(err, 'Error en limpieza de partidas abandonadas');
+      }
+      try {
+        const colaExpirada = await limpiarColaExpirada();
+        if (colaExpirada > 0) app.log.info(`Limpieza: ${colaExpirada} ticket(s) de cola expirado(s) borrado(s)`);
+      } catch (err) {
+        app.log.error(err, 'Error en limpieza de cola expirada');
       }
     }, 60_000);
   } catch (err) {
