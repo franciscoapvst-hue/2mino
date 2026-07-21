@@ -28,10 +28,10 @@ export default function AvatarPicker({ actual, onClose, onElegir }: Props) {
       <div className="avatar-picker" onClick={e => e.stopPropagation()}>
         <h3>Elige tu foto de perfil</h3>
 
-        {error && <div className="game-error-banner">⚠ {error}</div>}
+        {error && <div className="avatar-picker-error">⚠ {error}</div>}
 
         {avatarOptions.length === 0 ? (
-          <p className="ranked-cola-meta">Todavía no hay fotos de perfil disponibles.</p>
+          <p className="avatar-picker-empty">Todavía no hay fotos de perfil disponibles.</p>
         ) : (
           <div className="avatar-grid">
             {avatarOptions.map(a => (
@@ -42,13 +42,13 @@ export default function AvatarPicker({ actual, onClose, onElegir }: Props) {
                 onClick={() => elegir(a.file)}
               >
                 <img src={a.url} alt="" />
-                {guardando === a.file && <span className="avatar-option-loading" />}
+                {guardando === a.file && <span className="avatar-option-loading"><span className="avatar-option-spinner" /></span>}
               </button>
             ))}
           </div>
         )}
 
-        <button className="btn-salir" onClick={onClose}>Cerrar</button>
+        <button className="avatar-picker-close" onClick={onClose}>Cerrar</button>
       </div>
     </div>
   );
