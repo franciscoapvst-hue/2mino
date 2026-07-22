@@ -1,0 +1,408 @@
+/* ═══════════════════════════════════════════════════════
+   AppShell — shell a nivel de app con sidebar persistente
+   docs/PLAN_ESCRITORIO.md (S1). El sidebar se muestra en toda
+   la app autenticada, incluida la partida; en PC es una columna
+   fija, en móvil colapsa a un drawer.
+   ═══════════════════════════════════════════════════════ */
+
+.app-shell-root {
+  /* Mismos tokens que .dash — los reusan componentes compartidos que
+     se montan acá (InboxPopover, AvatarPicker) y el propio sidebar. */
+  --d-bg:        #0a0f0d;
+  --d-surface:   #111815;
+  --d-surface-2: #0e1512;
+  --d-ink:       #f2ede3;
+  --d-muted:     #b6beb4;
+  --d-border:    rgba(242, 237, 227, 0.10);
+  --d-border-hi: rgba(242, 237, 227, 0.18);
+  --amber:       #ef9f2e;
+  --amber-hi:    #f7ad3f;
+  --amber-ink:   #201400;
+  --teal:        #34d3b4;
+
+  min-height: 100vh;
+  background: var(--d-bg);
+  color: var(--d-ink);
+}
+.app-shell-root.is-light {
+  --d-bg:        #f4f4f2;
+  --d-surface:   #ffffff;
+  --d-surface-2: #fbfbfa;
+  --d-ink:       #16211d;
+  --d-muted:     #566159;
+  --d-border:    rgba(20, 30, 26, 0.10);
+  --d-border-hi: rgba(20, 30, 26, 0.16);
+  --teal:        #0f8f78;
+}
+
+/* ── Layout móvil (base, mobile-first): topbar + drawer ── */
+.app-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 54px;
+  padding: 0 14px;
+  background: color-mix(in srgb, var(--d-bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--d-border);
+}
+.app-topbar-burger {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 38px;
+  height: 38px;
+  padding: 0 9px;
+  border: 1px solid var(--d-border);
+  border-radius: 10px;
+  background: var(--d-surface);
+  cursor: pointer;
+}
+.app-topbar-burger span {
+  display: block;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--d-ink);
+}
+.app-topbar-brand {
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  font-size: 1.05rem;
+  color: var(--d-ink);
+}
+.app-topbar-brand span { color: var(--amber); }
+
+/* El aside fijo se oculta en móvil (se usa el drawer). */
+.app-shell-aside { display: none; }
+
+/* Drawer móvil */
+.app-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+}
+.app-drawer-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+}
+.app-drawer-panel {
+  position: relative;
+  width: min(248px, 80vw);
+  height: 100%;
+  animation: drawerIn .18s cubic-bezier(.2, .7, .2, 1) both;
+}
+@keyframes drawerIn {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-drawer-panel { animation: none; }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Sidebar
+   ═══════════════════════════════════════════════════════ */
+.app-sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 100vh;
+  padding: 16px 12px;
+  background: var(--d-surface-2);
+  border-right: 1px solid var(--d-border);
+}
+@media (max-width: 1023px) {
+  .app-sidebar { min-height: 100%; }
+}
+
+.asb-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 4px;
+  margin-bottom: 14px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.asb-brand-tile { width: 22px; filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.35)); }
+.asb-wordmark {
+  font-weight: 800;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+  color: var(--d-ink);
+}
+.asb-wordmark span { color: var(--amber); }
+
+.asb-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.asb-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--d-muted);
+  font-size: 0.97rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background .14s, color .14s;
+}
+.asb-item:hover {
+  background: color-mix(in srgb, var(--d-ink) 9%, transparent);
+  color: var(--d-ink);
+}
+.asb-item.is-active {
+  background: color-mix(in srgb, var(--amber) 16%, transparent);
+  color: var(--d-ink);
+}
+.asb-item.is-active .asb-item-label { font-weight: 700; }
+/* Columna de ícono de ancho FIJO — es lo que alinea todas las etiquetas
+   sin importar si el ícono es un raster colorido o un glifo de línea. */
+.asb-item-icon {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--d-muted);
+}
+.asb-item.is-active .asb-item-icon { color: var(--amber); }
+.asb-item-icon img { width: 30px; height: 30px; object-fit: contain; }
+.asb-item-icon .nav-tile { width: 26px; }
+.asb-item-icon svg { width: 22px; height: 22px; }
+.asb-item-label { flex: 1 1 auto; min-width: 0; }
+
+/* Saldo — tarjeta llamativa (no solo un número chico junto al ícono):
+   "Doblones" como etiqueta en mayúsculas arriba, el número grande y en
+   ámbar abajo. Mismo patrón visual que un stat destacado, no un simple
+   renglón de nav. */
+.asb-saldo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--d-border);
+  border-radius: 12px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--amber) 14%, var(--d-surface)), var(--d-surface));
+  cursor: pointer;
+  transition: border-color .14s, transform .14s;
+}
+.asb-saldo:hover { border-color: var(--amber); transform: translateY(-1px); }
+.asb-saldo-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+}
+.asb-saldo-icon img { width: 28px; height: 28px; object-fit: contain; }
+/* Adelanto visual de "comprar doblones" (Etapa F) — un + pequeño en la
+   esquina del ícono, mismo lenguaje que un badge de notificación pero en
+   ámbar/borde en vez de relleno sólido, para que se lea como "sumar"
+   y no como una alerta. */
+.asb-saldo-plus {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 15px;
+  height: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--amber);
+  color: var(--amber-ink);
+  border: 2px solid var(--d-surface);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.asb-saldo-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+.asb-saldo-label {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--d-muted);
+}
+.asb-saldo-num {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--amber);
+  font-family: 'Space Grotesk', Inter, sans-serif;
+}
+
+/* Pie */
+.asb-foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--d-border);
+}
+.asb-foot-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--d-muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background .14s, color .14s;
+}
+.asb-foot-btn:hover {
+  background: color-mix(in srgb, var(--d-ink) 9%, transparent);
+  color: var(--d-ink);
+}
+/* Mismo hueco fijo que los ítems de nav → íconos y etiquetas alineados. */
+.asb-foot-icon {
+  flex: 0 0 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.asb-foot-icon img { width: 28px; height: 28px; object-fit: contain; }
+.asb-bell-badge {
+  position: absolute;
+  left: 30px;
+  top: 5px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--amber);
+  color: var(--amber-ink);
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 16px;
+  text-align: center;
+}
+
+.asb-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  margin-top: 4px;
+  border: 1px solid var(--d-border);
+  border-radius: 12px;
+  background: var(--d-surface);
+  cursor: pointer;
+  transition: border-color .14s;
+}
+.asb-user:hover { border-color: var(--d-border-hi); }
+.asb-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--amber);
+  color: var(--amber-ink);
+  font-weight: 800;
+}
+.asb-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.asb-user-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  text-align: left;
+}
+.asb-username {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--d-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.asb-segmento {
+  font-size: 0.74rem;
+  color: var(--d-muted);
+  text-transform: capitalize;
+}
+.asb-logout {
+  margin-top: 6px;
+  padding: 9px 12px;
+  border: 1px solid var(--d-border);
+  border-radius: 10px;
+  background: none;
+  color: var(--d-muted);
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color .14s, color .14s;
+}
+.asb-logout:hover { border-color: var(--amber); color: var(--d-ink); }
+
+/* ── Layout de PC: sidebar fijo + contenido ───────────
+   Mobile-first: estas reglas van al FINAL para ganarle por orden de
+   fuente a las base (móvil) con igual especificidad. */
+@media (min-width: 1024px) {
+  .app-shell-root {
+    display: grid;
+    grid-template-columns: 248px minmax(0, 1fr);
+  }
+  .app-topbar { display: none; }
+  .app-shell-aside {
+    display: block;
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100vh;
+  }
+  .app-shell-main { min-width: 0; }
+}
+
+/* ── Popover de bandeja anclado al botón del sidebar ───
+   InboxPopover es position:fixed y por defecto (social.css) se ancla
+   arriba a la derecha. Ahora el botón vive abajo en el sidebar, así que
+   en PC lo traemos al costado del sidebar, cerca del disparador. En móvil
+   se mantiene la regla de social.css (arriba, full-width). */
+@media (min-width: 1024px) {
+  .app-shell-root .inbox-popover {
+    top: auto;
+    right: auto;
+    left: 256px;
+    bottom: 16px;
+  }
+}

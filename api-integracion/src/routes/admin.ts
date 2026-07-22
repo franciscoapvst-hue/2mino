@@ -76,6 +76,40 @@ const UsuarioCompletoSchema = {
   },
 } as const;
 
+const TiendaItemSchema = {
+  type: 'object',
+  properties: {
+    id:         { type: 'string', format: 'uuid' },
+    categoria:  { type: 'string', enum: ['ficha', 'tablero', 'avatar', 'marco_avatar'] },
+    clave:      { type: 'string' },
+    nombre:     { type: 'string' },
+    precio:     { type: 'integer' },
+    disponible: { type: 'boolean' },
+    orden:      { type: 'integer' },
+    created_at: { type: 'string', format: 'date-time' },
+  },
+} as const;
+
+const BilleteraSchema = {
+  type: 'object',
+  properties: {
+    usuario_id: { type: 'string', format: 'uuid' },
+    saldo:      { type: 'integer' },
+    updated_at: { type: 'string', format: 'date-time' },
+  },
+} as const;
+
+const InventarioItemSchema = {
+  type: 'object',
+  properties: {
+    item_id:     { type: 'string', format: 'uuid' },
+    categoria:   { type: 'string' },
+    clave:       { type: 'string' },
+    nombre:      { type: 'string' },
+    comprado_at: { type: 'string', format: 'date-time' },
+  },
+} as const;
+
 const SegmentoSchema = {
   type: 'object',
   properties: {
@@ -542,4 +576,157 @@ export async function adminRoutes(app: FastifyInstance) {
       return reply.code(status).send(data);
     },
   );
+
+  // ── Tienda / cosméticos (docs/PLAN_COSMETICOS.md) ───────────────
+  // Proxies a ms-usuarios (dueño de tienda_items, ver routes/tienda.ts).
+  // GET trae TODO el catálogo (incluso disponible=false) — a diferencia
+  // de GET /tienda/items del jugador, que solo ve lo disponible.
+
+  // ── GET /admin/tienda/items ─────────────────────
+  app.get('/admin/tienda/items', {
+    preHandler: requireAdmin,
+    schema: {
+      tags:     ['admin'],
+      summary:  'Listar todo el catálogo de cosméticos (incluso deshabilitados)',
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: { description: 'Catálogo completo', type: 'array', items: TiendaItemSchema },
+        ...AuthErrors,
+      },
+    },
+  }, async (_req, reply) => {
+    const { status, data } = await callMs('/tienda/items?todos=true', 'GET');
+    return reply.code(status).send(data);
+  });
+
+  // ── POST /admin/tienda/items ────────────────────
+  app.post<{ Body: { categoria: string; clave: string; nombre: string; precio: number; orden?: number } }>(
+    '/admin/tienda/items',
+    {
+      preHandler: requireAdmin,
+      schema: {
+        tags:     ['admin'],
+        summary:  'Crear un ítem de catálogo',
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: 'object',
+          required: ['categoria', 'clave', 'nombre', 'precio'],
+          properties: {
+            categoria: { type: 'string', enum: ['ficha', 'tablero', 'avatar', 'marco_avatar'] },
+            clave:     { type: 'string', minLength: 1, maxLength: 40, example: 'ficha_zafiro' },
+            nombre:    { type: 'string', minLength: 1, maxLength: 60, example: 'Zafiro' },
+            precio:    { type: 'integer', minimum: 0 },
+            orden:     { type: 'integer', minimum: 0 },
+          },
+        },
+        response: {
+          201: { description: 'Ítem creado', ...TiendaItemSchema },
+          409: { description: 'Ya existe un ítem con esa clave', ...ErrorSchema },
+          ...AuthErrors,
+        },
+      },
+    },
+    async (req, reply) => {
+      const { status, data } = await callMs('/tienda/items', 'POST', req.body);
+      return reply.code(status).send(data);
+    },
+  );
+
+  // ── PATCH /admin/tienda/items/:id ───────────────
+  app.patch<{
+    Params: { id: string };
+    Body: { nombre?: string; precio?: number; disponible?: boolean; orden?: number };
+  }>('/admin/tienda/items/:id', {
+    preHandler: requireAdmin,
+    schema: {
+      tags:     ['admin'],
+      summary:  'Editar nombre/precio/disponibilidad/orden de un ítem',
+      security: [{ bearerAuth: [] }],
+      params: UuidParamSchema,
+      body: {
+        type: 'object',
+        properties: {
+          nombre:     { type: 'string', minLength: 1, maxLength: 60 },
+          precio:     { type: 'integer', minimum: 0 },
+          disponible: { type: 'boolean' },
+          orden:      { type: 'integer', minimum: 0 },
+        },
+      },
+      response: {
+        200: { description: 'Ítem actualizado',   ...TiendaItemSchema },
+        404: { description: 'Ítem no encontrado', ...ErrorSchema },
+        ...AuthErrors,
+      },
+    },
+  }, async (req, reply) => {
+    const { status, data } = await callMs(`/tienda/items/${req.params.id}`, 'PATCH', req.body);
+    return reply.code(status).send(data);
+  });
+
+  // ── GET /admin/usuarios/:id/inventario ──────────
+  // Qué cosméticos posee un usuario cualquiera — a diferencia de GET
+  // /inventario (jugador, resuelve del JWT su propio id), acá el admin
+  // pide por :id. Mismo endpoint interno de ms-usuarios que ya usa el
+  // jugador, solo que sin pasar por el JWT del usuario.
+  app.get<{ Params: { id: string } }>('/admin/usuarios/:id/inventario', {
+    preHandler: requireAdmin,
+    schema: {
+      tags:     ['admin'],
+      summary:  'Cosméticos que posee un usuario',
+      security: [{ bearerAuth: [] }],
+      params:   UuidParamSchema,
+      response: {
+        200: { description: 'Inventario', type: 'array', items: InventarioItemSchema },
+        ...AuthErrors,
+      },
+    },
+  }, async (req, reply) => {
+    const { status, data } = await callMs(`/usuarios/${req.params.id}/inventario`, 'GET');
+    return reply.code(status).send(data);
+  });
+
+  // ── GET /admin/usuarios/:id/billetera ───────────
+  app.get<{ Params: { id: string } }>('/admin/usuarios/:id/billetera', {
+    preHandler: requireAdmin,
+    schema: {
+      tags:     ['admin'],
+      summary:  'Saldo de doblones de un usuario',
+      security: [{ bearerAuth: [] }],
+      params:   UuidParamSchema,
+      response: {
+        200: { description: 'Saldo', ...BilleteraSchema },
+        ...AuthErrors,
+      },
+    },
+  }, async (req, reply) => {
+    const { status, data } = await callMs(`/usuarios/${req.params.id}/billetera`, 'GET');
+    return reply.code(status).send(data);
+  });
+
+  // ── POST /admin/usuarios/:id/ajuste-saldo ───────
+  // Dar o quitar doblones manualmente (ej. dar saldo de prueba a una
+  // cuenta QA, o corregir un error) — motivo 'ajuste_admin' en
+  // billetera_movimientos, misma auditoría que cualquier otro movimiento.
+  app.post<{ Params: { id: string }; Body: { monto: number } }>('/admin/usuarios/:id/ajuste-saldo', {
+    preHandler: requireAdmin,
+    schema: {
+      tags:     ['admin'],
+      summary:  'Ajustar el saldo de doblones de un usuario',
+      security: [{ bearerAuth: [] }],
+      params: UuidParamSchema,
+      body: {
+        type: 'object',
+        required: ['monto'],
+        properties: { monto: { type: 'integer', example: 100 } },
+      },
+      response: {
+        200: { description: 'Saldo actualizado', ...BilleteraSchema },
+        400: { description: 'El ajuste dejaría el saldo negativo', ...ErrorSchema },
+        ...AuthErrors,
+      },
+    },
+  }, async (req, reply) => {
+    const { status, data } = await callMs(`/usuarios/${req.params.id}/billetera/ajuste`, 'POST', req.body);
+    return reply.code(status).send(data);
+  });
 }

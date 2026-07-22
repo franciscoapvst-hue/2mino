@@ -9,6 +9,8 @@ import { salasGatewayRoutes } from './routes/salas';
 import { rankedGatewayRoutes } from './routes/ranked';
 import { socialGatewayRoutes } from './routes/social';
 import { adminRoutes } from './routes/admin';
+import { tiendaGatewayRoutes } from './routes/tienda';
+import { torneosGatewayRoutes } from './routes/torneos';
 
 const app = Fastify({
   logger: true,
@@ -59,6 +61,7 @@ app.register(swagger, {
       { name: 'juego',    description: 'Estado y movimientos de la partida' },
       { name: 'ranked',   description: 'ELO, leaderboard y matchmaking' },
       { name: 'social',   description: 'Amigos, bandeja de entrada, chat de partida' },
+      { name: 'tienda',   description: 'Cosméticos: billetera, catálogo, inventario' },
       { name: 'admin',    description: 'Back Office — requiere JWT con segmento admin' },
       { name: 'system',   description: 'Estado del servicio' },
     ],
@@ -90,6 +93,8 @@ app.register(frontendRoutes);
 app.register(salasGatewayRoutes);
 app.register(rankedGatewayRoutes);
 app.register(socialGatewayRoutes);
+app.register(tiendaGatewayRoutes);
+app.register(torneosGatewayRoutes);
 app.register(adminRoutes);
 
 app.get('/health', {

@@ -1,50 +1,44 @@
 import { useEffect, useState } from 'react';
-import type { ReactNode } from 'react';
 import { api, type AuthUser, type UserConfig, type Sala } from '../api';
-import { SunIcon, MoonIcon, BellIcon, PeopleIcon } from './icons';
 import GameIcon, { type GameIconName } from './GameIcons';
-import { Bone } from './DominoStage';
-import { avatarUrl } from '../avatars';
 import { rangoDeElo, progresoRango } from '../ranks';
-import AvatarPicker from './AvatarPicker';
-import InboxPopover from './social/InboxPopover';
 import AdSlot from './AdSlot';
-import { usePoll } from '../hooks/usePoll';
+import Footer from './Footer';
+import TorneoBanner from './TorneoBanner';
+import PartidasRecientes from './PartidasRecientes';
+import StatsFila from './StatsFila';
 
 type Props = {
   user:          AuthUser;
   config:        UserConfig;
   dark:          boolean;
-  onToggleTheme: () => void;
-  onLogout:      () => void;
   onGoToSalas:   () => void;
   onGoToRanked:  () => void;
   onGoToCasual:  () => void;
-  onPieceDemo:   () => void;
-  onAvatarChange: (avatar: string) => void;
-  onGoToAmigos:      () => void;
-  onGoToLeaderboard: () => void;
-  onGoToHistorial:   () => void;
   onGoToTorneos:     () => void;
-  onUnirseSala:      (codigo: string) => void;
-  /** Sube cada vez que llega `notificacion_nueva` por el WS de sociales. */
-  notifVersion?: number;
   /** Partida en_juego detectada al iniciar sesión — null si no hay ninguna. */
   salaParaReintegrar?:   Sala | null;
   onReintegrarSala?:     () => void;
   onDescartarReintegro?: () => void;
 };
 
-// ── Tarjeta de modo secundario (casual / salas) ────
-// El ícono va grande y sin chip de color detrás: estos íconos ya traen su
-// propio color, un chip teal/gris pelearía con ellos.
-function PlayCard({ icono, title, desc, action, accent, onClick }: {
+// ── Tarjeta de modo de juego ────────────────────────
+// Las tres (ranked/casual/salas) comparten el mismo tamaño de card en una
+// sola fila — antes ranked era un banner enorme aparte, lo que empujaba
+// todo lo demás fuera de la pantalla en PC (docs/PLAN_ESCRITORIO.md,
+// Etapa 2: "above-the-fold"). El ícono ya trae su propio color, un chip
+// detrás pelearía con él.
+function PlayCard({ icono, title, desc, action, accent, onClick, disabled }: {
   icono: GameIconName; title: string; desc: string; action: string;
-  accent: 'teal' | 'neutral'; onClick: () => void;
+  accent: 'amber' | 'teal' | 'neutral'; onClick: () => void; disabled?: boolean;
 }) {
   return (
-    <button className={`dash-card dash-card-${accent}`} onClick={onClick}>
-      <span className="dash-card-icon"><GameIcon name={icono} size={48} /></span>
+    <button
+      className={`dash-card dash-card-${accent}${disabled ? ' dash-card-disabled' : ''}`}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      <span className="dash-card-icon"><GameIcon name={icono} size={44} /></span>
       <span className="dash-card-body">
         <span className="dash-card-title">{title}</span>
         <span className="dash-card-desc">{desc}</span>
@@ -55,16 +49,20 @@ function PlayCard({ icono, title, desc, action, accent, onClick }: {
 }
 
 // ── Dashboard / Lobby ─────────────────────────────
+// El nav superior (tema, fichas, amigos, bandeja, saldo, avatar, salir)
+// se mudó al sidebar global (AppShell) — docs/PLAN_ESCRITORIO.md, S1. Acá
+// queda sólo el CONTENIDO del lobby, que vive dentro del shell.
+//
+// Etapa 2 (above-the-fold): se sacó la sección "Comunidad" (leaderboard +
+// historial) y los chips de "Modos" — el sidebar ya cubre esa navegación,
+// duplicarla como cards grandes no dejaba espacio para lo nuevo (última
+// partida, stats, banner de torneos) sin scroll en 1366×768.
 export default function Dashboard({
-  user, config, dark, onToggleTheme, onLogout, onGoToSalas, onGoToRanked, onGoToCasual, onPieceDemo, onAvatarChange,
-  onGoToAmigos, onGoToLeaderboard, onGoToHistorial, onGoToTorneos, onUnirseSala, notifVersion,
+  user, config, dark, onGoToSalas, onGoToRanked, onGoToCasual,
+  onGoToTorneos,
   salaParaReintegrar, onReintegrarSala, onDescartarReintegro,
 }: Props) {
   const [elo, setElo] = useState<number | null>(null);
-  const [avatarAbierto, setAvatarAbierto] = useState(false);
-  const [inboxAbierto, setInboxAbierto] = useState(false);
-  const [noLeidas, setNoLeidas] = useState(0);
-  const foto = avatarUrl(user.avatar);
 
   useEffect(() => {
     api.ranked.me()
@@ -72,78 +70,11 @@ export default function Dashboard({
       .catch(() => setElo(null)); // sin ranked aún: no romper el lobby
   }, []);
 
-  useEffect(() => {
-    api.social.noLeidasCount().then(r => setNoLeidas(r.count)).catch(() => {});
-  }, [inboxAbierto, notifVersion]); // notifVersion: refetch inmediato al llegar notificacion_nueva por WS
-
-  // Poll de 30s como red de seguridad si el WS se cayó — el WS es la vía
-  // rápida (ver useSocialSocket), esto no debería disparar en el camino feliz.
-  usePoll(async () => {
-    const r = await api.social.noLeidasCount();
-    setNoLeidas(r.count);
-  }, 30_000);
-
   const rango = elo !== null ? rangoDeElo(elo) : null;
   const prog  = elo !== null ? progresoRango(elo) : null;
 
   return (
     <div className={`dash${dark ? '' : ' is-light'}`}>
-
-      {/* ── Nav ─────────────────────────────────── */}
-      <nav className="dash-nav">
-        <div className="dash-brand">
-          <Bone a={6} b={6} className="dash-brand-tile" />
-          <span className="dash-wordmark"><span>2</span>mino</span>
-        </div>
-
-        <div className="dash-nav-right">
-          <button
-            className="dash-icon-btn"
-            onClick={onToggleTheme}
-            aria-label={dark ? 'Modo claro' : 'Modo oscuro'}
-          >
-            {dark ? <SunIcon /> : <MoonIcon />}
-          </button>
-
-          <button className="dash-icon-btn dash-pieces" onClick={onPieceDemo} title="Ver fichas">
-            <Bone a={3} b={5} className="dash-pieces-tile" />
-          </button>
-
-          <button className="dash-icon-btn" onClick={onGoToAmigos} aria-label="Amigos" title="Amigos">
-            <PeopleIcon />
-          </button>
-
-          <button
-            className="dash-icon-btn dash-bell-btn"
-            onClick={() => setInboxAbierto(o => !o)}
-            aria-label="Bandeja de entrada"
-            title="Bandeja de entrada"
-          >
-            <BellIcon />
-            {noLeidas > 0 && <span className="dash-bell-badge">{noLeidas > 9 ? '9+' : noLeidas}</span>}
-          </button>
-
-          <button
-            className="dash-user"
-            onClick={() => setAvatarAbierto(true)}
-            title="Cambiar foto de perfil"
-          >
-            <span className="dash-avatar">
-              {foto ? <img src={foto} alt="" /> : user.username[0].toUpperCase()}
-            </span>
-            <span className="dash-user-meta">
-              <span className="dash-username">@{user.username}</span>
-              <span className="dash-segmento">{config.segmento}</span>
-            </span>
-          </button>
-
-          <button className="dash-logout" onClick={onLogout}>Salir</button>
-        </div>
-
-        {inboxAbierto && (
-          <InboxPopover onClose={() => setInboxAbierto(false)} onUnirseSala={onUnirseSala} />
-        )}
-      </nav>
 
       {salaParaReintegrar && (
         <div className="rejoin-banner">
@@ -212,53 +143,27 @@ export default function Dashboard({
           </aside>
         </section>
 
-        {/* Elige cómo jugar */}
+        {/* Elige cómo jugar — ranked/casual/salas en una sola fila */}
         <h2 className="dash-section-title">Elige cómo jugar</h2>
-
-        {/* Ranked destacado — bloqueado para invitados (la barrera real
-            está en api-integracion/src/routes/ranked.ts, esto es solo
-            para no mostrar un botón que termina en 403). */}
-        {config.segmento === 'invitado' ? (
-          <div className="dash-featured dash-featured-disabled">
-            <Bone a={6} b={6} className="dash-featured-tile dash-featured-tile-a" />
-            <Bone a={5} b={4} className="dash-featured-tile dash-featured-tile-b" />
-            <div className="dash-featured-content">
-              <span className="dash-featured-kicker">
-                <GameIcon name="ranked" size={40} /> Competitivo
-              </span>
-              <h3>Partida Ranked</h3>
-              <p>Creá una cuenta para jugar ranked y subir de ELO.</p>
-            </div>
-          </div>
-        ) : (
-          <button className="dash-featured" onClick={onGoToRanked}>
-            <Bone a={6} b={6} className="dash-featured-tile dash-featured-tile-a" />
-            <Bone a={5} b={4} className="dash-featured-tile dash-featured-tile-b" />
-            <div className="dash-featured-content">
-              <span className="dash-featured-kicker">
-                <GameIcon name="ranked" size={40} /> Competitivo
-              </span>
-              <h3>Partida Ranked</h3>
-              <p>Cada mano cuenta hacia tu ELO. Sube de rango y demuestra quién manda en la mesa.</p>
-            </div>
-            <div className="dash-featured-action">
-              {rango && (
-                <span className="dash-featured-rank">
-                  {rango.url && <img src={rango.url} alt="" />}
-                  <span>{elo} ELO</span>
-                </span>
-              )}
-              <span className="dash-featured-cta">Buscar ranked →</span>
-            </div>
-          </button>
-        )}
-
-        {/* Casual + Salas */}
-        <div className="dash-row">
+        <div className="dash-row dash-row-3">
+          {/* Ranked bloqueado para invitados — la barrera real está en
+              api-integracion/src/routes/ranked.ts, esto es solo para no
+              mostrar un botón que termina en 403. */}
+          <PlayCard
+            icono="ranked"
+            title="Ranked"
+            desc={config.segmento === 'invitado'
+              ? 'Creá una cuenta para jugar ranked y subir de ELO.'
+              : 'Cada mano cuenta hacia tu ELO. Sube de rango.'}
+            action="Buscar ranked"
+            accent="amber"
+            onClick={onGoToRanked}
+            disabled={config.segmento === 'invitado'}
+          />
           <PlayCard
             icono="casual"
-            title="Partida Casual"
-            desc="Juega sin presión. Practica y diviértete sin afectar tu ranking."
+            title="Casual"
+            desc="Juega sin presión, sin afectar tu ranking."
             action="Buscar partida"
             accent="teal"
             onClick={onGoToCasual}
@@ -266,74 +171,26 @@ export default function Dashboard({
           <PlayCard
             icono="salas"
             title="Salas Abiertas"
-            desc="Explora partidas en curso, únete a una sala o crea la tuya con amigos."
+            desc="Únete a una sala o crea la tuya con amigos."
             action="Ver salas"
             accent="neutral"
             onClick={onGoToSalas}
           />
         </div>
 
-        {/* Torneos — detrás del flag torneos_habilitado (§7.4 de
-            docs/CASOS_DE_USO_BACKOFFICE.md). El backend real de flags
-            todavía no existe (ver docs/PLAN_TORNEOS.md §0 prerrequisitos),
-            así que por ahora se muestra siempre: reemplazar este `true`
-            por `config.opciones?.torneos_habilitado` cuando el Back
-            Office pueda apagarlo de verdad. */}
-        {true && (
-          <div className="dash-row dash-row-solo">
-            <PlayCard
-              icono="torneos"
-              title="Torneos"
-              desc="Inscribite en pareja, compite por fases y sube en el ranking del torneo."
-              action="Ver torneos"
-              accent="teal"
-              onClick={onGoToTorneos}
-            />
-          </div>
-        )}
+        {/* Torneo abierto (punto 13) — no renderiza nada si no hay ninguno */}
+        <TorneoBanner onClick={onGoToTorneos} />
 
-        {/* Comunidad: leaderboard + historial */}
-        <h2 className="dash-section-title">Comunidad</h2>
-        <div className="dash-row">
-          <PlayCard
-            icono="leaderboard"
-            title="Leaderboard"
-            desc="Top 100 jugadores por ELO. Mira su historial, capicúas y tranques."
-            action="Ver leaderboard"
-            accent="teal"
-            onClick={onGoToLeaderboard}
-          />
-          <PlayCard
-            icono="historial"
-            title="Historial de partidas"
-            desc="Repasa tus últimas partidas y reproduce cómo fue cada mano."
-            action="Ver historial"
-            accent="neutral"
-            onClick={onGoToHistorial}
-          />
-        </div>
+        {/* Contadores (Etapa 3) */}
+        <StatsFila />
 
-        {/* Modos disponibles */}
-        <div className="dash-modes">
-          <span className="dash-modes-label">Modos</span>
-          {config.modos_juego.map(m => (
-            <span key={m} className="dash-chip">{m}</span>
-          ))}
-        </div>
+        {/* Últimas partidas (Etapa 3, ampliada) — no renderiza nada sin historial */}
+        <PartidasRecientes />
 
         <AdSlot slot={import.meta.env.VITE_ADSENSE_SLOT_DASHBOARD} />
       </main>
 
-      {avatarAbierto && (
-        <AvatarPicker
-          actual={user.avatar}
-          onClose={() => setAvatarAbierto(false)}
-          onElegir={async (avatar) => {
-            await api.setAvatar(avatar);
-            onAvatarChange(avatar);
-          }}
-        />
-      )}
+      <Footer />
     </div>
   );
 }

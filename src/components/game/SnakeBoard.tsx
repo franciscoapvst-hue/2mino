@@ -12,6 +12,7 @@
  */
 import type { Val, Pieza, FichaTablero } from '../../api';
 import DominoPiece from './DominoPiece';
+import type { SkinFicha } from '../../skins';
 
 const HW0 = 100, HH0 = 54;
 const VW0 = 54,  VH0 = 100;
@@ -204,6 +205,9 @@ export type SnakeBoardProps = {
    *  donde de verdad se puede jugar (canIzq/canDer ya vienen evaluados
    *  contra las reglas reales, no "siempre ambos lados" al arrastrar). */
   piezaFantasma:  Pieza | null;
+  /** Skin de ficha equipada (docs/PLAN_COSMETICOS.md) — se aplica igual a
+   *  las fichas ya puestas y a las fantasma, para que se vean consistentes. */
+  skinFicha?:     SkinFicha;
   canIzq:         boolean;
   canDer:         boolean;
   sobreIzq:       boolean;
@@ -230,7 +234,7 @@ function fichaFantasma(pieza: Pieza, valorExtremo: Val, lado: 'izq' | 'der'): Fi
 }
 
 export default function SnakeBoard({
-  tablero, containerWidth, nuevaFichaIdx, piezaFantasma,
+  tablero, containerWidth, nuevaFichaIdx, piezaFantasma, skinFicha = 'clasica',
   canIzq, canDer, sobreIzq, sobreDer,
   onPlayIzq, onPlayDer,
   onDragOverIzq, onDragOverDer, onDragLeave,
@@ -295,6 +299,7 @@ export default function SnakeBoard({
           key={i}
           a={p.a} b={p.b}
           orient={p.orient}
+          skin={skinFicha}
           placing={p.placing}
           style={{ position: 'absolute', left: p.x, top: p.y, width: p.w, height: p.h }}
         />
@@ -310,7 +315,7 @@ export default function SnakeBoard({
           onDragLeave={onDragLeave}
           aria-label="Jugar por la izquierda"
         >
-          <DominoPiece a={fantasmaIzq.a} b={fantasmaIzq.b} orient={fantasmaIzq.orient} ghost style={{ width: '100%', height: '100%' }} />
+          <DominoPiece a={fantasmaIzq.a} b={fantasmaIzq.b} orient={fantasmaIzq.orient} skin={skinFicha} ghost style={{ width: '100%', height: '100%' }} />
         </div>
       )}
 
@@ -324,7 +329,7 @@ export default function SnakeBoard({
           onDragLeave={onDragLeave}
           aria-label="Jugar por la derecha"
         >
-          <DominoPiece a={fantasmaDer.a} b={fantasmaDer.b} orient={fantasmaDer.orient} ghost style={{ width: '100%', height: '100%' }} />
+          <DominoPiece a={fantasmaDer.a} b={fantasmaDer.b} orient={fantasmaDer.orient} skin={skinFicha} ghost style={{ width: '100%', height: '100%' }} />
         </div>
       )}
     </div>

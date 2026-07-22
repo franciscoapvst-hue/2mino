@@ -1,10 +1,10 @@
-import { useRef, useCallback, useState } from 'react';
+import { useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bone } from './DominoStage';
+import Footer from './Footer';
 import { SunIcon, MoonIcon } from './icons';
 import GameIcon from './GameIcons';
 import { todosLosRangos } from '../ranks';
-import { api, tokenStore, type AuthUser, type UserConfig } from '../api';
 import amigosImg  from '../assets/iconos/amigos.webp';
 import bandejaImg from '../assets/iconos/bandeja.webp';
 
@@ -49,33 +49,13 @@ function HBone({ a, b, className = '' }: { a: number; b: number; className?: str
 type Props = {
   dark: boolean;
   onToggleTheme: () => void;
-  onSuccess: (user: AuthUser, config: UserConfig) => void;
 };
 
 // Landing pública — lo primero que ve alguien sin sesión. Login/Register/
 // Forgot siguen siendo pantallas propias (LoginScreen, etc); esta solo
 // vende el juego y navega ahí directo.
-export default function LandingScreen({ dark, onToggleTheme, onSuccess }: Props) {
+export default function LandingScreen({ dark, onToggleTheme }: Props) {
   const navigate = useNavigate();
-  const [guestLoading, setGuestLoading] = useState(false);
-  const [guestError,   setGuestError]   = useState<string | null>(null);
-
-  // Cuenta efímera (mismo endpoint/flujo que el botón de LoginScreen) —
-  // se ofrece acá también para que probar el juego no obligue a pasar
-  // primero por login/registro.
-  async function handleGuestClick() {
-    setGuestError(null);
-    setGuestLoading(true);
-    try {
-      const authRes = await api.jugarInvitado();
-      tokenStore.set(authRes.token, false);
-      const config = await api.getPreferencias();
-      onSuccess(authRes.user, config);
-    } catch (err: unknown) {
-      setGuestError(err instanceof Error ? err.message : 'No se pudo iniciar como invitado');
-      setGuestLoading(false);
-    }
-  }
   // Mismo parallax de fichas con el mouse que ya usa DominoStage (login) —
   // reimplementado acá porque el hero tiene su propia escena/tiles.
   const sceneRef = useRef<HTMLDivElement>(null);
@@ -132,22 +112,13 @@ export default function LandingScreen({ dark, onToggleTheme, onSuccess }: Props)
             Encuentra partida en segundos y deja que tu rango hable por ti.
           </p>
           <div className="ld-hero-actions">
-            <button className="ld-btn-primary" onClick={() => navigate('/register')}>
+            {/* Un solo botón grande: adentro (LoginScreen) ya se puede crear
+                cuenta, seguir con Google o entrar como invitado — no hace
+                falta triplicar esas rutas acá en el hero. */}
+            <button className="ld-btn-primary ld-btn-hero" onClick={() => navigate('/login')}>
               Jugar gratis ahora
             </button>
-            <button className="ld-btn-ghost" onClick={() => navigate('/login')}>
-              Ya tengo cuenta
-            </button>
           </div>
-          <button
-            type="button"
-            className="ld-guest-cta"
-            onClick={handleGuestClick}
-            disabled={guestLoading}
-          >
-            {guestLoading ? 'Entrando…' : 'Jugar como invitado'}
-          </button>
-          {guestError && <p className="ld-guest-err" role="alert">⚠ {guestError}</p>}
           <p className="ld-hero-note">
             Sin descargas: juegas desde el navegador, en el celular o en la computadora.
           </p>
@@ -357,21 +328,16 @@ export default function LandingScreen({ dark, onToggleTheme, onSuccess }: Props)
       {/* ── 8 · CTA final ────────────────────────────── */}
       <section className="ld-final-cta">
         <h2 className="ld-h2">¿Listo para sentarte a la mesa?</h2>
-        <button className="ld-btn-primary ld-btn-lg" onClick={() => navigate('/register')}>
+        {/* Mismo criterio que el hero: un solo botón a /login (ahí ya se
+            crea cuenta, se sigue con Google o se entra de invitado) — la
+            nota de "¿ya tienes cuenta?" quedaba redundante apuntando al
+            mismo lugar. */}
+        <button className="ld-btn-primary ld-btn-lg" onClick={() => navigate('/login')}>
           Jugar gratis ahora
         </button>
-        <p className="ld-final-note">
-          ¿Ya tienes cuenta?{' '}
-          <button type="button" className="ld-link" onClick={() => navigate('/login')}>
-            Inicia sesión
-          </button>
-        </p>
       </section>
 
-      <footer className="ld-footer">
-        <Bone a={3} b={3} className="ld-footer-bone" />
-        <span>© {new Date().getFullYear()} 2mino</span>
-      </footer>
+      <Footer />
     </div>
   );
 }

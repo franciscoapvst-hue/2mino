@@ -127,3 +127,16 @@
 @media (max-width: 520px) {
   .bo-detail-grid { grid-template-columns: 1fr; }
 }
+
+/* ── Sección Cosméticos (docs/PLAN_COSMETICOS.md) ─────────────── */
+.bo-modal-section {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.bo-modal-section-title {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  font-family: var(--font-ui);
+  color: var(--ink);
+}

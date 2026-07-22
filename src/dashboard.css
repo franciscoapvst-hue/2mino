@@ -77,6 +77,25 @@
 .dash-icon-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 .dash-pieces-tile { width: 15px; }
 
+/* Saldo de doblones — junto al avatar, lleva a la Tienda
+   (docs/PLAN_COSMETICOS.md §7). */
+.dash-saldo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border-radius: 20px;
+  border: 1px solid var(--d-border);
+  background: var(--d-surface);
+  color: var(--amber-hi);
+  font-weight: 700;
+  font-size: 0.86rem;
+  cursor: pointer;
+  transition: border-color .16s ease, transform .16s ease;
+}
+.dash-saldo:hover { border-color: var(--amber); transform: translateY(-1px); }
+.dash-saldo:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
 .dash-user {
   display: flex;
   align-items: center;
@@ -132,7 +151,7 @@
 .dash-body {
   max-width: 1000px;
   margin: 0 auto;
-  padding: 44px 24px 64px;
+  padding: 28px 24px 32px;
 }
 
 /* ── Banner: partida en curso al iniciar sesión ───── */
@@ -184,7 +203,7 @@
   justify-content: space-between;
   gap: 28px;
   flex-wrap: wrap;
-  margin-bottom: 44px;
+  margin-bottom: 24px;
 }
 .dash-hello { font-size: 0.95rem; color: var(--d-muted); }
 .dash-greeting h1 {
@@ -406,6 +425,7 @@
 }
 .dash-card-teal:hover    { border-color: var(--teal); }
 .dash-card-neutral:hover { border-color: var(--d-border-hi); }
+.dash-card-amber:hover   { border-color: var(--amber); }
 .dash-card-title {
   font-family: 'Space Grotesk', Inter, sans-serif;
   font-size: 1.05rem;
@@ -414,7 +434,167 @@
 }
 .dash-card-desc { font-size: 0.86rem; line-height: 1.5; color: var(--d-muted); flex: 1; }
 .dash-card-cta { font-size: 0.86rem; font-weight: 700; color: var(--d-ink); }
-.dash-card-teal .dash-card-cta { color: var(--teal); }
+.dash-card-teal  .dash-card-cta { color: var(--teal); }
+.dash-card-amber .dash-card-cta { color: var(--amber); }
+/* Ranked deshabilitado para invitados — mismo trato que tenía el viejo
+   .dash-featured-disabled, ahora sobre la card compacta. */
+.dash-card-disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.dash-card-disabled:hover { transform: none; }
+
+/* Fila de 3 (ranked/casual/salas) — cards un poco más compactas que las
+   de 2, para dejar lugar al banner de torneos y a última partida/stats
+   sin scroll (docs/PLAN_ESCRITORIO.md, Etapa 2). */
+.dash-row-3 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px; }
+.dash-row-3 .dash-card { padding: 18px; gap: 8px; }
+.dash-row-3 .dash-card-icon { width: 48px; height: 48px; }
+.dash-row-3 .dash-card-icon .game-icon { width: 38px; height: 38px; }
+
+/* ── Banner de torneos (punto 13) ─────────────────
+   Mismo lenguaje visual que el viejo .dash-featured (fieltro + ámbar),
+   pero más bajo — el foco above-the-fold ahora es "elige cómo jugar". */
+.dash-torneo-banner {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  text-align: left;
+  padding: 18px 24px;
+  margin-bottom: 24px;
+  border-radius: 18px;
+  border: 1px solid rgba(239, 159, 46, 0.32);
+  cursor: pointer;
+  color: #f4ecdd;
+  background:
+    radial-gradient(120% 140% at 8% 0%, rgba(239, 159, 46, 0.22) 0%, transparent 48%),
+    radial-gradient(120% 160% at 100% 100%, rgba(23, 165, 138, 0.14) 0%, transparent 55%),
+    linear-gradient(135deg, #10221c 0%, #0a1612 60%, #081210 100%);
+  transition: transform .18s ease, box-shadow .2s ease, border-color .18s ease;
+}
+.dash-torneo-banner:hover {
+  transform: translateY(-2px);
+  border-color: var(--amber);
+  box-shadow: 0 18px 40px -18px rgba(239, 159, 46, 0.5);
+}
+.dash-torneo-icon { flex-shrink: 0; display: flex; }
+.dash-torneo-icon .game-icon { width: 56px; height: 56px; object-fit: contain; }
+.dash-torneo-body { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.dash-torneo-kicker {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--amber-hi);
+}
+.dash-torneo-nombre { font-family: 'Space Grotesk', Inter, sans-serif; font-size: 1.05rem; font-weight: 700; }
+.dash-torneo-fecha { font-size: 0.86rem; color: rgba(244, 236, 221, 0.72); }
+.dash-torneo-cta {
+  flex-shrink: 0;
+  padding: 10px 18px;
+  border-radius: 10px;
+  background: var(--amber);
+  color: var(--amber-ink);
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+/* ── Última partida + stats (Etapa 3) ─────────────── */
+/* auto-fit (no fracciones fijas): si no hay "última partida" todavía
+   (cuenta nueva), el único hijo (stats) estira a todo el ancho en vez de
+   quedar angosto con un hueco vacío al lado. */
+.dash-row-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.dash-lastgame {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+  padding: 16px 20px;
+  border-radius: 16px;
+  border: 1px solid var(--d-border);
+  background: var(--d-surface);
+  color: var(--d-ink);
+  cursor: pointer;
+  transition: border-color .18s ease, transform .18s ease;
+}
+.dash-lastgame:hover { border-color: var(--d-border-hi); transform: translateY(-2px); }
+.dash-lastgame-result {
+  flex-shrink: 0;
+  padding: 5px 11px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.dash-lastgame-result.is-win  { background: color-mix(in srgb, var(--teal) 20%, transparent); color: var(--teal); }
+.dash-lastgame-result.is-loss { background: color-mix(in srgb, #ff8080 18%, transparent); color: #ff8080; }
+.dash-lastgame-body { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.dash-lastgame-rival { font-weight: 700; font-size: 0.94rem; }
+.dash-lastgame-meta {
+  font-size: 0.78rem;
+  color: var(--d-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-lastgame-elo { flex-shrink: 0; font-weight: 700; font-size: 0.86rem; }
+.dash-lastgame-elo.is-win  { color: var(--teal); }
+.dash-lastgame-elo.is-loss { color: #ff8080; }
+.dash-lastgame-cta { flex-shrink: 0; font-size: 0.82rem; font-weight: 700; color: var(--d-muted); }
+
+.dash-stats-fila {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: 10px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  border-radius: 16px;
+  border: 1px solid var(--d-border);
+  background: var(--d-surface);
+}
+.dash-stat { display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+.dash-stat-value {
+  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--d-ink);
+}
+.dash-stat-label {
+  font-size: 0.68rem;
+  color: var(--d-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* ── Últimas partidas (preview, chess.com-style) ──────
+   Reusa .history-row (social.css) para cada fila — misma estética que
+   el historial completo, sin duplicar estilos. */
+.dash-partidas { margin-bottom: 20px; }
+.dash-partidas-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.dash-section-title-tight { margin-bottom: 0; }
+.dash-partidas-vertodas {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--teal);
+  cursor: pointer;
+}
+.dash-partidas-vertodas:hover { text-decoration: underline; }
+.dash-partidas-list { display: flex; flex-direction: column; gap: 8px; }
 
 /* Modos disponibles */
 .dash-modes { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -474,6 +654,7 @@
    (el menos crítico) para no empujar "Salir" fuera de la pantalla. */
 @media (max-width: 480px) {
   .dash-pieces { display: none; }
+  .dash-saldo { display: none; } /* visible igual dentro de la Tienda */
   .dash-nav { gap: 6px; }
   .dash-icon-btn { width: 34px; height: 34px; }
 }

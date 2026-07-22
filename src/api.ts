@@ -140,6 +140,31 @@ export type AuthResponse = {
   user: AuthUser;
 };
 
+// ── Cosméticos (docs/PLAN_COSMETICOS.md) ───────────
+export type TiendaItem = {
+  id:          string;
+  categoria:   'ficha' | 'tablero' | 'avatar' | 'marco_avatar';
+  clave:       string;
+  nombre:      string;
+  precio:      number;
+  orden:       number;
+  ya_comprado: boolean;
+};
+
+export type Billetera = {
+  usuario_id: string;
+  saldo:      number;
+  updated_at: string;
+};
+
+export type InventarioItem = {
+  item_id:     string;
+  categoria:   string;
+  clave:       string;
+  nombre:      string;
+  comprado_at: string;
+};
+
 // ── Social: amigos, bandeja, leaderboard extendido, historial, chat ──
 // Tipos según docs/CASOS_DE_USO_SOCIAL.md, servidos por ms-social/ms-salas
 // vía el gateway.
@@ -196,6 +221,19 @@ export type PartidaHistorial = {
   capicua:         boolean;
   tranque:         boolean;
   delta_elo:       number | null;
+};
+
+export type TorneoProximo = {
+  id:                string;
+  nombre:            string;
+  estado:            string;
+  modo:              'clasico' | 'rapido';
+  max_equipos:       number;
+  equipos_inscritos: number;
+  cuota_monto:       number;
+  moneda:            string;
+  fecha_inicio:      string;
+  fecha_fin:         string;
 };
 
 export type ChatMensaje = {
@@ -442,5 +480,24 @@ export const api = {
   historial: {
     misPartidas: () => req<PartidaHistorial[]>('/salas/mis-partidas'),
     replay: (salaId: string) => req<ReplayData>(`/salas/${salaId}/replay`),
+  },
+
+  // ── Tienda / cosméticos (ms-usuarios) ────────────────────────────
+  tienda: {
+    items: () => req<TiendaItem[]>('/tienda/items'),
+    inventario: () => req<InventarioItem[]>('/inventario'),
+    comprar: (itemId: string) =>
+      req<{ item_id: string; saldo: number }>(`/tienda/items/${itemId}/comprar`, { method: 'POST', body: '{}' }),
+  },
+
+  billetera: {
+    saldo: () => req<Billetera>('/billetera'),
+  },
+
+  // ── Torneos: solo el resumen para el banner del dashboard (ms-salas) —
+  // el resto del flujo de torneos del jugador todavía es mock en el
+  // frontend (docs/PLAN_ESCRITORIO.md, Etapa 4).
+  torneos: {
+    proximo: () => req<TorneoProximo | null>('/torneos/proximo'),
   },
 };

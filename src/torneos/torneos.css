@@ -1,8 +1,9 @@
 /* ═══════════════════════════════════════════════════════
    Torneos — mismo sistema visual que Dashboard/Salas/Matchmaking:
    fieltro + ámbar + teal, Space Grotesk para títulos. Namespaced .tor-.
-   Dark por defecto — el toggle claro/oscuro se agrega cuando este
-   frontend deje de ser mock y quede colgado del theme global de App.tsx.
+   Modo claro/oscuro sigue el mismo mecanismo que game.css/dashboard.css:
+   `<html>` recibe la clase `.light` global (App.tsx), acá solo se
+   sobreescriben los tokens de color — cero props nuevas.
    ═══════════════════════════════════════════════════════ */
 
 .tor-shell {
@@ -26,6 +27,16 @@
     var(--tor-bg);
   color: var(--tor-ink);
   font-family: 'Inter', system-ui, sans-serif;
+}
+:root.light .tor-shell {
+  --tor-bg:        #f4f4f2;
+  --tor-surface:   #ffffff;
+  --tor-surface-2: #fbfbfa;
+  --tor-ink:       #16211d;
+  --tor-muted:     #566159;
+  --tor-border:    rgba(20, 30, 26, 0.10);
+  --tor-border-hi: rgba(20, 30, 26, 0.16);
+  --tor-teal:      #0f8f78;
 }
 
 /* .btn-primary global (styles.css) es el botón violeta/gradiente heredado

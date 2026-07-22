@@ -411,6 +411,35 @@ export async function torneosRoutes(app: FastifyInstance) {
     return reply.send(rows[0]);
   });
 
+  // ── GET /torneos/proximo — público, para el banner del dashboard ──
+  // A diferencia del resto de este archivo (solo admin, red interna vía
+  // /admin/torneos/*), esta ruta la expone el gateway sin requireAdmin
+  // (docs/PLAN_ESCRITORIO.md, Etapa 4): cualquier jugador logueado puede
+  // ver cuándo es el próximo torneo abierto. Por eso filtra 'publico' —
+  // uno 'privado' en inscripción no debe promocionarse en el dashboard.
+  app.get('/torneos/proximo', {
+    schema: {
+      tags:    ['torneos'],
+      summary: 'Próximo torneo público abierto a inscripción (o null)',
+      response: {
+        200: { oneOf: [TorneoResumenSchema, { type: 'null' }] },
+      },
+    },
+  }, async (_req, reply) => {
+    const { rows } = await pool.query(
+      `SELECT t.id, t.nombre, t.estado, t.modo, t.visibilidad, t.max_equipos,
+              t.cuota_monto, t.moneda, t.fecha_inicio, t.fecha_fin, t.created_at,
+              COUNT(e.id) FILTER (WHERE e.estado = 'completo')::int AS equipos_inscritos
+       FROM torneos t
+       LEFT JOIN torneo_equipos e ON e.torneo_id = t.id
+       WHERE t.estado = 'inscripcion' AND t.visibilidad = 'publico'
+       GROUP BY t.id
+       ORDER BY t.fecha_inicio ASC
+       LIMIT 1`,
+    );
+    return reply.send(rows[0] ?? null);
+  });
+
   // ── GET /torneos — listado admin ────────────────
   app.get('/torneos', {
     schema: {

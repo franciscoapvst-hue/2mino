@@ -1,6 +1,6 @@
 import type {
   AdminSession, FeatureFlag, ReglaJuego, Segmento, Usuario, UsuarioCompleto,
-  TorneoDetalle, TorneoInput, TorneoResumen,
+  TorneoDetalle, TorneoInput, TorneoResumen, TiendaItem, Billetera, InventarioItem,
 } from './types';
 import { apiUrl } from './env';
 
@@ -122,6 +122,30 @@ export async function toggleSegmentoEstado(id: string, activo: boolean): Promise
   });
 }
 
+// ── Tienda / cosméticos — real, contra api-integracion ─────────────
+export async function listTiendaItems(): Promise<TiendaItem[]> {
+  return adminFetch<TiendaItem[]>('/admin/tienda/items');
+}
+
+export async function createTiendaItem(input: {
+  categoria: TiendaItem['categoria']; clave: string; nombre: string; precio: number;
+}): Promise<TiendaItem> {
+  return adminFetch<TiendaItem>('/admin/tienda/items', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateTiendaItem(
+  id: string,
+  input: { nombre?: string; precio?: number; disponible?: boolean },
+): Promise<TiendaItem> {
+  return adminFetch<TiendaItem>(`/admin/tienda/items/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
 // ── §3 Usuarios — real, contra api-integracion ─────────────────────
 // ms-usuarios devuelve snake_case (segmento_id) — se mapea acá al
 // camelCase que ya esperan las vistas, sin tocarlas.
@@ -222,4 +246,20 @@ export async function getUsuarioCompleto(id: string): Promise<UsuarioCompleto> {
     segmento: u.segmento, segmentoConfig: u.segmento_config,
     elo: u.elo, partidas: u.partidas, ganadas: u.ganadas,
   };
+}
+
+// ── Cosméticos de un usuario (docs/PLAN_COSMETICOS.md) — mismo modal ──
+export async function getUsuarioInventario(id: string): Promise<InventarioItem[]> {
+  return adminFetch<InventarioItem[]>(`/admin/usuarios/${id}/inventario`);
+}
+
+export async function getUsuarioBilletera(id: string): Promise<Billetera> {
+  return adminFetch<Billetera>(`/admin/usuarios/${id}/billetera`);
+}
+
+export async function ajustarSaldoUsuario(id: string, monto: number): Promise<Billetera> {
+  return adminFetch<Billetera>(`/admin/usuarios/${id}/ajuste-saldo`, {
+    method: 'POST',
+    body: JSON.stringify({ monto }),
+  });
 }

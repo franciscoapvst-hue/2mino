@@ -14,7 +14,9 @@ function formatFecha(iso: string): string {
     d.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
 }
 
-function HistoryRow({ p, onVerReplay }: { p: PartidaHistorial; onVerReplay: (id: string) => void }) {
+// Exportado: lo reusa PartidasRecientes.tsx (preview del dashboard) para
+// no duplicar el look de cada fila.
+export function HistoryRow({ p, onVerReplay }: { p: PartidaHistorial; onVerReplay: (id: string) => void }) {
   return (
     <button className={`history-row${p.gano ? ' history-row-win' : ' history-row-loss'}`} onClick={() => onVerReplay(p.sala_id)}>
       <span className={`history-result-pill${p.gano ? ' is-win' : ' is-loss'}`}>

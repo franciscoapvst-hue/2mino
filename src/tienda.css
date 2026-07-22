@@ -1,0 +1,225 @@
+/* ═══════════════════════════════════════════════════════
+   Tienda de cosméticos (TiendaView) — Etapa 3 de
+   docs/PLAN_COSMETICOS.md. Reusa los tokens --d-*/--amber/--teal
+   de dashboard.css (se renderiza dentro de .dash, los hereda).
+   ═══════════════════════════════════════════════════════ */
+
+.tienda-saldo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border-radius: 20px;
+  border: 1px solid var(--d-border);
+  background: var(--d-surface);
+  color: var(--amber-hi);
+  font-weight: 700;
+  font-size: 0.86rem;
+}
+.tienda-saldo img { width: 20px; height: 20px; object-fit: contain; }
+
+.tienda-section-title {
+  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--d-ink);
+  margin-bottom: 16px;
+}
+
+.tienda-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.tienda-item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--d-border);
+  background: var(--d-surface);
+}
+
+/* Preview compartido tienda/inventario (CosmeticoPreview) — muestra el
+   cosmético real: mini-ficha dibujada, swatch de tablero, imagen de avatar. */
+.cosmetico-preview {
+  position: relative;
+  height: 88px;
+  border-radius: 10px;
+  border: 1px solid var(--d-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+/* Fondo cálido neutro para que la ficha (de cualquier skin) resalte —
+   un tablero de fieltro tenue, no blanco plano. */
+.cosmetico-preview-ficha {
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(239, 159, 46, 0.10), transparent 60%),
+    var(--d-surface-2, #0d1512);
+}
+.cosmetico-preview-tablero { /* el color de la mesa va inline */ }
+/* Tablero de imagen: la textura real (con su logo) como fondo del preview. */
+.cosmetico-preview-tablero-img {
+  background-size: cover;
+  background-position: center;
+}
+.cosmetico-preview-avatar { background: var(--d-surface-2, #0d1512); }
+.cosmetico-preview-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.cosmetico-preview-fallback { font-size: 1.6rem; font-weight: 800; color: var(--d-muted); }
+
+.tienda-item-body { display: flex; flex-direction: column; gap: 2px; }
+.tienda-item-nombre { font-weight: 600; color: var(--d-ink); font-size: 0.92rem; }
+.tienda-item-precio {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--amber-hi);
+}
+.tienda-item-precio img { width: 18px; height: 18px; object-fit: contain; }
+.tienda-item-gratis { font-size: 0.78rem; font-weight: 600; color: var(--teal); }
+
+.tienda-item-btn {
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--d-border);
+  background: transparent;
+  color: var(--d-ink);
+  font-weight: 600;
+  font-size: 0.86rem;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease;
+}
+.tienda-item-btn:hover:not(:disabled) { border-color: var(--amber); }
+.tienda-item-btn:disabled { cursor: default; opacity: 0.55; }
+.tienda-item-btn-confirmar {
+  border-color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 16%, transparent);
+  color: var(--amber-hi);
+}
+
+.tienda-item-equipada {
+  padding: 9px 14px;
+  border-radius: 10px;
+  text-align: center;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--teal);
+  background: color-mix(in srgb, var(--teal) 12%, transparent);
+}
+
+.tienda-item-error {
+  font-size: 0.78rem;
+  color: #ff8080;
+}
+
+/* ── Modal de compra exitosa (CompraExitosaModal) ─────────────────
+   Celebración cálida en estilo de marca: brillo ámbar/teal detrás del
+   ítem, entrada con un pop suave. NADA de tragamonedas. */
+.compra-modal {
+  position: relative;
+  width: min(360px, 90vw);
+  background: var(--d-surface);
+  border: 1px solid var(--d-border);
+  border-radius: 22px;
+  padding: 30px 26px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  box-shadow: 0 26px 70px -22px rgba(0, 0, 0, 0.6);
+  animation: compraPop 0.34s cubic-bezier(0.2, 0.9, 0.25, 1.1) both;
+}
+/* Halo cálido detrás del ítem — se expande una vez al abrir. */
+.compra-modal-glow {
+  position: absolute;
+  top: -20%;
+  left: 50%;
+  width: 260px;
+  height: 260px;
+  transform: translateX(-50%);
+  background: radial-gradient(circle, rgba(239, 159, 46, 0.28), rgba(52, 211, 180, 0.10) 45%, transparent 70%);
+  pointer-events: none;
+  animation: compraGlow 0.7s ease-out both;
+}
+.compra-modal-preview {
+  position: relative;
+  z-index: 1;
+  width: 160px;
+  animation: compraRise 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.compra-modal-preview .cosmetico-preview { height: 104px; }
+.compra-modal-titulo {
+  position: relative;
+  z-index: 1;
+  margin-top: 6px;
+  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--amber-hi);
+}
+.compra-modal-nombre {
+  position: relative;
+  z-index: 1;
+  font-size: 0.95rem;
+  color: var(--d-muted);
+  margin-bottom: 14px;
+}
+.compra-modal-acciones {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+.compra-modal-equipar {
+  flex: 1;
+  padding: 11px 14px;
+  border-radius: 11px;
+  border: none;
+  background: linear-gradient(135deg, var(--amber-hi), var(--amber));
+  color: var(--amber-ink);
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+.compra-modal-equipar:hover:not(:disabled) { filter: brightness(1.06); }
+.compra-modal-equipar:disabled { opacity: 0.7; cursor: default; }
+.compra-modal-seguir {
+  flex: 1;
+  padding: 11px 14px;
+  border-radius: 11px;
+  border: 1px solid var(--d-border);
+  background: transparent;
+  color: var(--d-ink);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.compra-modal-seguir:hover { border-color: var(--teal); }
+
+@keyframes compraPop {
+  from { opacity: 0; transform: scale(0.92) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes compraGlow {
+  from { opacity: 0; transform: translateX(-50%) scale(0.4); }
+  to   { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+@keyframes compraRise {
+  from { opacity: 0; transform: translateY(14px) scale(0.9); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .compra-modal,
+  .compra-modal-glow,
+  .compra-modal-preview { animation: none; }
+}

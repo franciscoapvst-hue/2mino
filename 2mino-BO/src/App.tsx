@@ -8,6 +8,7 @@ import UsuariosView from './views/UsuariosView';
 import SegmentosView from './views/SegmentosView';
 import ReglasJuegoView from './views/ReglasJuegoView';
 import TorneosView from './views/TorneosView';
+import TiendaView from './views/TiendaView';
 
 export default function App() {
   const [session, setSession] = useState<AdminSession | null>(null);
@@ -37,6 +38,7 @@ export default function App() {
       {view === 'segmentos' && <SegmentosView />}
       {view === 'reglas' && <ReglasJuegoView />}
       {view === 'torneos' && <TorneosView />}
+      {view === 'tienda' && <TiendaView />}
     </Shell>
   );
 }

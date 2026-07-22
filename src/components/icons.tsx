@@ -263,6 +263,20 @@ export function XIcon() {
   );
 }
 
+// Doblones (moneda de cosméticos) — un mini-tile de dominó con 3 pips en
+// diagonal, no un ícono de moneda/$ genérico (PRODUCT.md: nada que huela
+// a casino). Mismo motivo que ya usan CasualIcon/RankedIcon.
+export function DoblonIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="3" y="3" width="18" height="18" rx="5" fill="currentColor" opacity=".18" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="8.5"  cy="8.5"  r="1.8" fill="currentColor" />
+      <circle cx="12"   cy="12"   r="1.8" fill="currentColor" />
+      <circle cx="15.5" cy="15.5" r="1.8" fill="currentColor" />
+    </svg>
+  );
+}
+
 export function SearchIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">

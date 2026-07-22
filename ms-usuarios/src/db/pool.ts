@@ -121,6 +121,88 @@ const SCHEMA = `
   -- corre antes de que ms-salas haya creado ranked_ratings todavía (el
   -- orden de arranque de los contenedores no está garantizado). Para
   -- cuando el Back Office de verdad la use, todo el stack ya está arriba.
+  -- ── Cosméticos (docs/PLAN_COSMETICOS.md) ──────────────────────────
+  -- Saldo del jugador. Fila 1:1 con usuarios, separada para no tocar esa
+  -- tabla con algo que cambia mucho más seguido.
+  CREATE TABLE IF NOT EXISTS billeteras (
+    usuario_id  UUID        PRIMARY KEY REFERENCES usuarios(id) ON DELETE CASCADE,
+    saldo       INT         NOT NULL DEFAULT 0 CHECK (saldo >= 0), -- doblones, entero (sin centavos: no es dinero real)
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  -- Historial de movimientos — ningún UPDATE de saldo a mano en otro lado:
+  -- todo movimiento pasa por una fila acá + el UPDATE del saldo, en la
+  -- misma transacción. Así el saldo siempre es auditable/reconstruible.
+  CREATE TABLE IF NOT EXISTS billetera_movimientos (
+    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    usuario_id  UUID        NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    monto       INT         NOT NULL,           -- positivo = ingreso, negativo = gasto
+    motivo      VARCHAR(30) NOT NULL,           -- 'partida_completada','racha_diaria','compra_item','ajuste_admin'
+    ref         VARCHAR(60),                    -- partida_id / item_id / lo que corresponda, según motivo
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+  CREATE INDEX IF NOT EXISTS idx_billetera_mov_usuario ON billetera_movimientos (usuario_id);
+
+  -- Catálogo de cosméticos. v1 solo categoria='ficha'; el resto ya
+  -- modelado para no rehacer la tabla cuando lleguen tableros/avatares.
+  CREATE TABLE IF NOT EXISTS tienda_items (
+    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    categoria   VARCHAR(20) NOT NULL CHECK (categoria IN ('ficha','tablero','avatar','marco_avatar')),
+    clave       VARCHAR(40) UNIQUE NOT NULL,    -- 'ficha_ambar', 'ficha_carey' — la variante que lee el frontend
+    nombre      VARCHAR(60) NOT NULL,           -- nombre mostrado en la tienda
+    precio      INT         NOT NULL CHECK (precio >= 0),
+    disponible  BOOLEAN     NOT NULL DEFAULT true, -- retirar de la tienda sin borrar (quien ya lo tiene, lo conserva)
+    orden       INT         NOT NULL DEFAULT 0,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  -- Qué compró cada jugador. Un ítem comprado es para siempre (no hay
+  -- "alquiler" ni expiración en v1).
+  CREATE TABLE IF NOT EXISTS inventario (
+    usuario_id  UUID        NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    item_id     UUID        NOT NULL REFERENCES tienda_items(id) ON DELETE CASCADE,
+    comprado_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (usuario_id, item_id)
+  );
+
+  -- Seed a mano (sin panel admin todavía, igual que los segmentos hoy):
+  -- la ficha y el tablero "clásicos" son gratis (se entregan solos al
+  -- registrarse, ver otorgarItemsGratis() en routes/tienda.ts) + skins
+  -- pagas de ejemplo de cada categoría.
+  INSERT INTO tienda_items (categoria, clave, nombre, precio, orden) VALUES
+    ('ficha',   'clasica',   'Clásica',   0,  0),
+    ('ficha',   'ambar',     'Ámbar',     50, 1),
+    ('ficha',   'carey',     'Carey',     50, 2),
+    ('ficha',   'oscura',    'Oscura',    60, 3),
+    ('ficha',   'nocturna',  'Nocturna',  75, 4),
+    ('ficha',   'numeros',   'Números',   50, 5),
+    ('tablero', 'clasico',    'Clásico',    0,  0),
+    ('tablero', 'roble',      'Roble',      40, 1),
+    ('tablero', 'esmeralda',  'Esmeralda',  40, 2),
+    -- Premium con textura de mesa real (imagen, docs/PLAN_COSMETICOS Etapa B)
+    ('tablero', 'fieltro',    'Fieltro',    70, 3),
+    ('tablero', 'caoba',      'Caoba',      80, 4),
+    ('tablero', 'travertino', 'Travertino', 90, 5),
+    ('tablero', 'baldosa',    'Baldosa',    80, 6),
+    ('tablero', 'cuero',      'Cuero',      90, 7),
+    ('tablero', 'onix',       'Ónix',      100, 8),
+    ('tablero', 'petroleo',   'Petróleo',   70, 9),
+    ('tablero', 'arce',       'Arce',       80, 10)
+  ON CONFLICT (clave) DO NOTHING;
+
+  -- Backfill: usuarios creados antes de que existiera este otorgamiento
+  -- automático (ver otorgarItemsGratis() en routes/tienda.ts, llamado solo
+  -- en las 3 altas nuevas) también reciben los ítems gratis. Idempotente —
+  -- ON CONFLICT hace que correr esto de nuevo en cada arranque no repita
+  -- nada una vez que ya se otorgó. Por precio=0 en vez de por clave: así
+  -- cualquier ítem gratis nuevo que se agregue acá (ej. un tablero
+  -- "clásico" agregado después de la ficha) se otorga solo, sin tocar
+  -- este bloque de nuevo.
+  INSERT INTO inventario (usuario_id, item_id)
+  SELECT u.id, t.id FROM usuarios u, tienda_items t
+  WHERE t.precio = 0
+  ON CONFLICT DO NOTHING;
+
   CREATE OR REPLACE FUNCTION usuario_completo(p_usuario_id UUID)
   RETURNS TABLE (
     id              UUID,
