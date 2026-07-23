@@ -447,6 +447,53 @@ Verificado en BO real: abrir el detalle de `tester` muestra su saldo e
 inventario reales; ajustar +25 se refleja al toque sin recargar la
 página.
 
+### Etapa D — Pantalla de Inventario ("Mis cosméticos") — ✅ hecho
+
+Separa "lo que tengo" (acá) de "lo que puedo comprar" (Tienda) — antes solo
+existía la Tienda, con "Equipar" mezclado entre los ítems comprables.
+
+- [x] `src/components/InventarioView.tsx` (nuevo): tres secciones por tipo
+      de cosmético (Fichas/Tableros/Avatares). Cada segmento se distingue por
+      su **encabezado** — ícono de categoría (`FichaIcon`/`TableroIcon`/
+      `AvatarIcon`) + título + conteo + regla — no por contenedores de
+      colores. Un único acento ámbar mantiene la pantalla cohesionada con la
+      Tienda, con teal reservado para el estado "Equipada" (PRODUCT.md:
+      cálido, nítido, restringido). **Nota:** la primera versión usaba un
+      color de acento por sección + franja lateral (`border-left`), que
+      rompía el tema cálido y violaba el ban de side-stripes de `impeccable`;
+      se rehízo. Reusa `CosmeticoPreview`, `skinFichaDe`/`skinTableroDe`, y
+      los botones `.tienda-item-btn`/`.tienda-item-equipada` (sin duplicar
+      estilos).
+- [x] Sección Avatares: los avatares **todavía no pasan por
+      `tienda_items`** (eso es la Etapa E) — hoy son todos gratis para
+      todos, así que el inventario muestra el catálogo completo de
+      `avatarOptions` como si ya fueran "poseídos". Cuando Etapa E migre
+      avatares al catálogo real, esta sección pasa a filtrar por lo
+      efectivamente comprado, sin cambiar la estructura de 3 secciones.
+- [x] `src/App.tsx`: ruta `/inventario` (dentro del shell con sidebar) +
+      `InventarioRoute` (mismo patrón que `TiendaRoute`, más
+      `onAvatarChange` para el equipar de avatar, que llama a
+      `api.setAvatar` — no pasa por `opciones` como ficha/tablero).
+- [x] `src/components/AppSidebar.tsx`: entrada de nav "Inventario" junto a
+      "Tienda" — con un ícono de línea temporal (`InventarioIcon`,
+      `icons.tsx`) hasta que se genere el ícono colorido correspondiente
+      (mismo criterio que ya se usó para Tienda/Ver fichas).
+- [x] `src/inventario.css` (nuevo).
+
+Motion (tras `find-animation-opportunities`, en `tienda.css`, compartido con
+la Tienda): (1) al equipar, la píldora "Equipada" entra con un pop-fade
+(`@starting-style` + `transition` de 160ms) como acuse de la acción; (2)
+`.tienda-item-btn:active` da feedback de presión (`scale(0.97)`, 140ms). Ambos
+con fallback `prefers-reduced-motion` (se conserva el fundido, se quita la
+escala).
+
+Verificado en navegador (cuenta `cosmtest1`): las 3 secciones se distinguen
+por ícono + encabezado + regla (sin franjas laterales — computed
+`border-left-width: 0px`), tarjetas idénticas a la Tienda (1px, radio 16px),
+acento ámbar uniforme; equipar un avatar actualiza al instante el avatar del
+sidebar (confirma que `onAvatarChange`/`setSession` propaga bien), responsive
+sin scroll horizontal en 375px, y modo claro sin romper nada.
+
 ### Etapa 5 — v2, aparte (no arrancar sin cerrar 1-4)
 
 Cosméticos que se desbloquean por rango en vez de comprarse (Oro/

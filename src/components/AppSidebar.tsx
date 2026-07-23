@@ -4,6 +4,7 @@ import type { AuthUser, UserConfig } from '../api';
 import { Bone } from './DominoStage';
 import { avatarUrl } from '../avatars';
 import GameIcon, { type GameIconName } from './GameIcons';
+import { InventarioIcon } from './icons';
 
 // ── Barra lateral global (shell a nivel de app) ───────────────────
 // Vive dentro de AppShell y se muestra en TODA la app autenticada,
@@ -62,6 +63,7 @@ export default function AppSidebar({
     { to: '/history', label: 'Historial', img: 'historial',
       match: p => p === '/history' || p.startsWith('/replay') },
     { to: '/tienda', label: 'Tienda', img: 'tienda' },
+    { to: '/inventario', label: 'Inventario', svg: <InventarioIcon /> },
     { to: '/piece-demo', label: 'Ver fichas', svg: <Bone a={3} b={5} className="nav-tile" /> },
   ];
 

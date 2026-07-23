@@ -19,7 +19,7 @@
 .tienda-saldo img { width: 20px; height: 20px; object-fit: contain; }
 
 .tienda-section-title {
-  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-family: 'Segoe UI', Inter, sans-serif;
   font-size: 1rem;
   font-weight: 700;
   color: var(--d-ink);
@@ -93,9 +93,12 @@
   font-weight: 600;
   font-size: 0.86rem;
   cursor: pointer;
-  transition: border-color .15s ease, background .15s ease;
+  transition: border-color .15s ease, background .15s ease, transform .14s ease-out;
 }
 .tienda-item-btn:hover:not(:disabled) { border-color: var(--amber); }
+/* Feedback de presión (find-animation-opportunities #2): la única confirmación
+   táctil al equipar/comprar. Sutil, dentro del presupuesto de 100–160ms. */
+.tienda-item-btn:active:not(:disabled) { transform: scale(0.97); }
 .tienda-item-btn:disabled { cursor: default; opacity: 0.55; }
 .tienda-item-btn-confirmar {
   border-color: var(--amber);
@@ -111,6 +114,13 @@
   font-weight: 600;
   color: var(--teal);
   background: color-mix(in srgb, var(--teal) 12%, transparent);
+  /* Confirmación de equipado (find-animation-opportunities #1): al reemplazar
+     el botón, la píldora entra con un pop-fade — el único acuse de que la
+     acción tomó. Se monta nueva en cada equipado, así que dispara una vez. */
+  transition: opacity .16s ease-out, transform .16s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@starting-style {
+  .tienda-item-equipada { opacity: 0; transform: scale(0.94); }
 }
 
 .tienda-item-error {
@@ -159,7 +169,7 @@
   position: relative;
   z-index: 1;
   margin-top: 6px;
-  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-family: 'Segoe UI', Inter, sans-serif;
   font-size: 1.3rem;
   font-weight: 800;
   color: var(--amber-hi);
@@ -222,4 +232,14 @@
   .compra-modal,
   .compra-modal-glow,
   .compra-modal-preview { animation: none; }
+
+  /* Feedback de equipado/presión sin desplazamiento: se conserva el fundido,
+     se elimina la escala. */
+  .tienda-item-equipada { transition: opacity .16s ease-out; }
+  .tienda-item-btn:active:not(:disabled) { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  @starting-style {
+    .tienda-item-equipada { transform: none; }
+  }
 }

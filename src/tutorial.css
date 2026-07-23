@@ -99,7 +99,7 @@
 .tut-dot.is-active { background: var(--amber, #ef9f2e); width: 18px; border-radius: 4px; }
 
 .tut-coach h2 {
-  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-family: 'Segoe UI', Inter, sans-serif;
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--g-ink, #f2ede3);
@@ -164,7 +164,7 @@
 .onb-mark-tile { width: 40px; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.3)); }
 
 .onb-shell h1 {
-  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-family: 'Segoe UI', Inter, sans-serif;
   font-size: clamp(1.5rem, 4vw, 2rem);
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -193,7 +193,7 @@
 .onb-option:hover:not(:disabled) { border-color: var(--amber); transform: translateY(-2px); }
 .onb-option:disabled { opacity: 0.6; cursor: default; }
 .onb-option-title {
-  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-family: 'Segoe UI', Inter, sans-serif;
   font-weight: 700;
   font-size: 1.05rem;
 }

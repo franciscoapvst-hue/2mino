@@ -54,7 +54,7 @@
 
 .mm-mode-body { flex: 1; min-width: 0; }
 .mm-mode-body h3 {
-  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-family: 'Segoe UI', Inter, sans-serif;
   font-size: 1rem;
   font-weight: 700;
   color: var(--d-ink);
@@ -93,7 +93,7 @@
 
 .mm-cola h3 {
   position: relative;
-  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-family: 'Segoe UI', Inter, sans-serif;
   font-size: 1.2rem;
   font-weight: 700;
   color: var(--d-ink);
@@ -124,7 +124,7 @@
 }
 .mm-party-code-row { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
 .mm-party-code {
-  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-family: 'Segoe UI', Inter, sans-serif;
   font-size: 1.6rem;
   font-weight: 700;
   letter-spacing: 0.06em;

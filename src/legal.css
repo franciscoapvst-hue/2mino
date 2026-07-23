@@ -41,14 +41,14 @@
 .legal-back:hover { border-color: var(--amber); }
 
 .legal-page h1 {
-  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-family: 'Segoe UI', Inter, sans-serif;
   font-size: 1.6rem;
   font-weight: 800;
 }
 .legal-updated { margin-top: 6px; font-size: 0.82rem; color: var(--lg-muted); }
 .legal-page h2 {
   margin-top: 28px;
-  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-family: 'Segoe UI', Inter, sans-serif;
   font-size: 1.1rem;
   font-weight: 700;
 }

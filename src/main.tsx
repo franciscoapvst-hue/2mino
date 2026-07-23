@@ -10,6 +10,7 @@ import './app-shell.css';
 import './social.css';
 import './salas.css';
 import './tienda.css';
+import './inventario.css';
 import './matchmaking.css';
 import './game.css';
 import './tutorial.css';

@@ -25,6 +25,7 @@ import TorneoDetalleView from './torneos/TorneoDetalleView';
 import TorneoInscripcionForm from './torneos/TorneoInscripcionForm';
 import TorneoUnirseView from './torneos/TorneoUnirseView';
 import TiendaView from './components/TiendaView';
+import InventarioView from './components/InventarioView';
 import { api, tokenStore, type AuthUser, type UserConfig, type Sala } from './api';
 import { useSocialSocket } from './hooks/useSocialSocket';
 import { sounds } from './game/sounds';
@@ -295,6 +296,22 @@ function TiendaRoute() {
       dark={dark}
       config={session.config}
       onConfigChange={(config) => setSession(sess => sess && { ...sess, config })}
+      onBack={() => navigate('/home')}
+    />
+  );
+}
+
+function InventarioRoute() {
+  const { session, dark, setSession } = useApp();
+  const navigate = useNavigate();
+  if (!session) return null;
+  return (
+    <InventarioView
+      dark={dark}
+      user={session.user}
+      config={session.config}
+      onConfigChange={(config) => setSession(sess => sess && { ...sess, config })}
+      onAvatarChange={(avatar) => setSession(sess => sess && { ...sess, user: { ...sess.user, avatar } })}
       onBack={() => navigate('/home')}
     />
   );
@@ -607,6 +624,7 @@ export default function App() {
           <Route path="/tournaments/:torneoId/enroll" element={<TorneoEnrollRoute />} />
           <Route path="/tournaments/:torneoId/join" element={<TorneoJoinRoute />} />
           <Route path="/tienda" element={<TiendaRoute />} />
+          <Route path="/inventario" element={<InventarioRoute />} />
           {/* Con sesión, "Ver fichas" cuelga del shell como cualquier otra
               sección (mismo Outlet persistente) — si viviera afuera, entrar
               acá remontaría el shell y el sidebar desaparecería un instante. */}

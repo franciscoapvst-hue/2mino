@@ -32,7 +32,7 @@
 }
 
 .landing h1, .landing h2, .landing h3, .landing h4 {
-  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-family: 'Segoe UI', Inter, sans-serif;
   text-wrap: balance;
 }
 .ld-h2 {
@@ -58,7 +58,7 @@
 .ld-nav-brand { display: flex; align-items: center; gap: 10px; }
 .ld-nav-bone { width: 20px; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.35)); }
 .ld-nav-word {
-  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-family: 'Segoe UI', Inter, sans-serif;
   font-weight: 700;
   font-size: 1.3rem;
   letter-spacing: -0.02em;
@@ -79,6 +79,10 @@
   transition: border-color .16s ease, transform .16s ease;
 }
 .ld-theme:hover { border-color: var(--amber); transform: translateY(-1px); }
+.ld-theme:active {
+  transform: scale(0.93);
+  transition: transform 160ms ease-out;
+}
 .ld-theme:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 
 .ld-nav-login {
@@ -106,6 +110,10 @@
   transition: background .16s ease, transform .16s ease;
 }
 .ld-nav-cta:hover { background: var(--amber-hi); transform: translateY(-1px); }
+.ld-nav-cta:active {
+  transform: scale(0.97);
+  transition: transform 160ms ease-out;
+}
 .ld-nav-cta:focus-visible { outline: 2px solid var(--l-ink); outline-offset: 2px; }
 
 /* ── Hero ────────────────────────────────────────── */
@@ -145,7 +153,7 @@
 
 .ld-hero-content { position: relative; z-index: 1; max-width: 640px; }
 .ld-eyebrow {
-  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-family: 'Segoe UI', Inter, sans-serif;
   font-weight: 600;
   font-size: 1rem;
   letter-spacing: 0.02em;
@@ -223,6 +231,10 @@
   transform: translateY(-1px);
   box-shadow: 0 12px 28px -8px color-mix(in srgb, var(--amber) 80%, transparent);
 }
+.ld-btn-primary:active {
+  transform: scale(0.97);
+  transition: transform 160ms ease-out;
+}
 .ld-btn-primary:focus-visible { outline: 2px solid #f4ecdd; outline-offset: 2px; }
 .ld-btn-lg { padding: 16px 32px; font-size: 1.05rem; }
 /* Único CTA del hero (antes convivía con "Ya tengo cuenta" + "Jugar como
@@ -242,6 +254,10 @@
   transition: border-color .16s ease, background .16s ease, transform .16s ease;
 }
 .ld-btn-ghost:hover { border-color: #f4ecdd; background: rgba(244, 236, 221, 0.06); transform: translateY(-1px); }
+.ld-btn-ghost:active {
+  transform: scale(0.97);
+  transition: transform 160ms ease-out;
+}
 .ld-btn-ghost:focus-visible { outline: 2px solid #f4ecdd; outline-offset: 2px; }
 
 /* ── Secciones (ancho común) ─────────────────────── */
@@ -290,7 +306,7 @@
   border-radius: 20px;
   background: var(--amber);
   color: var(--amber-ink);
-  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-family: 'Segoe UI', Inter, sans-serif;
   font-weight: 700;
   font-size: 0.78rem;
   letter-spacing: 0.02em;
@@ -434,7 +450,7 @@
   gap: 7px;
   font-weight: 700;
   font-size: 1.5rem;
-  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-family: 'Segoe UI', Inter, sans-serif;
   color: var(--amber);
 }
 .ld-featured-kicker .game-icon { width: 56px; height: 56px; object-fit: contain; margin-right: 2px; }
@@ -634,6 +650,49 @@
     .ld-htile-3 { transform: rotate(10deg)  translate(calc(var(--px) * 16px), calc(var(--py) * 22px)); }
     .ld-htile-4 { transform: rotate(-18deg) translate(calc(var(--px) * 28px), calc(var(--py) * 14px)); }
   }
+}
+
+/* ── Scroll-reveal (secciones bajo el hero) ─────────
+   Mismo keyframe ldRise que ya usa el hero (arriba) — misma curva y
+   personalidad, solo disparado por scroll en vez de por mount. */
+.ld-reveal { opacity: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .ld-reveal.is-visible {
+    animation: ldRise .6s cubic-bezier(.2, .7, .2, 1) both;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ld-reveal { opacity: 1; }
+}
+
+/* Stagger: modos de juego (3 cards) — narran una secuencia de opciones */
+.ld-mode-row .ld-mode-card { opacity: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .ld-modes.is-visible .ld-mode-row .ld-mode-card {
+    animation: ldRise .5s cubic-bezier(.2, .7, .2, 1) both;
+  }
+  .ld-modes.is-visible .ld-mode-row .ld-mode-card:nth-child(1) { animation-delay: .05s; }
+  .ld-modes.is-visible .ld-mode-row .ld-mode-card:nth-child(2) { animation-delay: .11s; }
+  .ld-modes.is-visible .ld-mode-row .ld-mode-card:nth-child(3) { animation-delay: .17s; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ld-mode-row .ld-mode-card { opacity: 1; }
+}
+
+/* Stagger: progresión de rangos (5 items) — narran una escalera */
+.ld-ranks-strip .ld-rank { opacity: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .ld-ranks.is-visible .ld-ranks-strip .ld-rank {
+    animation: ldRise .5s cubic-bezier(.2, .7, .2, 1) both;
+  }
+  .ld-ranks.is-visible .ld-ranks-strip .ld-rank:nth-child(1) { animation-delay: .05s; }
+  .ld-ranks.is-visible .ld-ranks-strip .ld-rank:nth-child(2) { animation-delay: .11s; }
+  .ld-ranks.is-visible .ld-ranks-strip .ld-rank:nth-child(3) { animation-delay: .17s; }
+  .ld-ranks.is-visible .ld-ranks-strip .ld-rank:nth-child(4) { animation-delay: .23s; }
+  .ld-ranks.is-visible .ld-ranks-strip .ld-rank:nth-child(5) { animation-delay: .29s; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ld-ranks-strip .ld-rank { opacity: 1; }
 }
 
 /* ── Responsive ──────────────────────────────────── */

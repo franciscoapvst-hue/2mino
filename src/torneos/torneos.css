@@ -26,7 +26,7 @@
     radial-gradient(90% 60% at 96% 4%, rgba(23, 165, 138, 0.08) 0%, transparent 50%),
     var(--tor-bg);
   color: var(--tor-ink);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Segoe UI', system-ui, sans-serif;
 }
 :root.light .tor-shell {
   --tor-bg:        #f4f4f2;
@@ -72,7 +72,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-family: 'Segoe UI', Inter, sans-serif;
   font-weight: 700;
   font-size: 1.05rem;
   color: var(--tor-ink);
@@ -106,7 +106,7 @@
 
 .tor-card-top { display: flex; gap: 8px; flex-wrap: wrap; }
 .tor-card-title {
-  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-family: 'Segoe UI', Inter, sans-serif;
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--tor-ink);
@@ -156,7 +156,7 @@
 }
 .tor-panel-mine { border-color: color-mix(in srgb, var(--tor-amber) 35%, var(--tor-border)); }
 .tor-panel-title {
-  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-family: 'Segoe UI', Inter, sans-serif;
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--tor-ink);
@@ -200,7 +200,7 @@
    romper el layout del panel (imágenes/tablas se acotan al ancho). */
 .tor-info-html { font-size: 0.92rem; line-height: 1.6; color: var(--tor-muted); }
 .tor-info-html img, .tor-info-html table { max-width: 100%; }
-.tor-info-html h1, .tor-info-html h2, .tor-info-html h3 { color: var(--tor-ink); font-family: 'Space Grotesk', Inter, sans-serif; }
+.tor-info-html h1, .tor-info-html h2, .tor-info-html h3 { color: var(--tor-ink); font-family: 'Segoe UI', Inter, sans-serif; }
 
 /* ── Código de equipo ────────────────────────────── */
 .tor-codigo-box {
@@ -215,7 +215,7 @@
 }
 .tor-codigo-label { font-size: 0.8rem; color: var(--tor-muted); }
 .tor-codigo-valor {
-  font-family: 'Space Grotesk', monospace;
+  font-family: 'Segoe UI', monospace;
   font-size: 1.6rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -286,7 +286,7 @@
   font-size: 0.92rem;
 }
 .tor-input:focus-visible { outline: none; border-color: var(--tor-amber); }
-.tor-input-codigo { text-align: center; letter-spacing: 0.15em; font-family: 'Space Grotesk', monospace; font-weight: 700; text-transform: uppercase; }
+.tor-input-codigo { text-align: center; letter-spacing: 0.15em; font-family: 'Segoe UI', monospace; font-weight: 700; text-transform: uppercase; }
 .tor-form-error { color: var(--tor-err); font-size: 0.85rem; margin: 0; }
 .tor-form-submit { width: 100%; justify-content: center; margin-top: 4px; }
 .tor-form-submit:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -365,7 +365,7 @@
   background: var(--tor-surface-2);
   font-size: 0.95rem;
 }
-.tor-pago-resumen strong { font-size: 1.3rem; color: var(--tor-amber); font-family: 'Space Grotesk', sans-serif; }
+.tor-pago-resumen strong { font-size: 1.3rem; color: var(--tor-amber); font-family: 'Segoe UI', sans-serif; }
 .tor-politica { font-size: 0.8rem; padding: 10px 12px; background: var(--tor-surface-2); border-radius: 8px; }
 .tor-aviso-azul { font-size: 0.82rem; color: var(--tor-teal); margin: 0; }
 .tor-mock-note { font-size: 0.75rem; color: var(--tor-muted); font-style: italic; text-align: center; margin: 4px 0 0; }

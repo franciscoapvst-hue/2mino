@@ -94,7 +94,7 @@
 .game-nav .btn-back:hover { border-color: var(--amber); color: var(--g-ink); }
 
 .game-room-code {
-  font-family: 'Space Grotesk', Inter, sans-serif !important;
+  font-family: 'Segoe UI', Inter, sans-serif !important;
   font-size: 0.8rem !important;
   font-weight: 600;
   letter-spacing: 0.04em !important;
@@ -261,7 +261,7 @@
   box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.5) !important;
 }
 .game-result-card h2 {
-  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-family: 'Segoe UI', Inter, sans-serif;
   color: var(--g-ink) !important;
 }
 .result-points { color: var(--amber) !important; }

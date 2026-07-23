@@ -10,16 +10,23 @@ const MAX_PREVIEW = 3;
 // chess.com se quiere una lista corta con link a "ver todas"). Reusa
 // el mismo HistoryRow que ya pinta el historial completo, para no
 // tener dos estéticas distintas de "fila de partida" en la app.
-export default function PartidasRecientes() {
+//
+// `partidas` opcional: el Dashboard ya trae el historial (para calcular la
+// racha), así que se lo pasa y evitamos un segundo fetch. Sin prop, cae al
+// fetch propio (sigue usable de forma independiente).
+export default function PartidasRecientes({ partidas: partidasProp }: { partidas?: PartidaHistorial[] | null } = {}) {
   const navigate = useNavigate();
-  const [partidas, setPartidas] = useState<PartidaHistorial[] | null>(null);
+  const [partidasFetched, setPartidasFetched] = useState<PartidaHistorial[] | null>(null);
+  const controlado = partidasProp !== undefined;
 
   useEffect(() => {
+    if (controlado) return; // el padre provee los datos
     api.historial.misPartidas()
-      .then(setPartidas)
-      .catch(() => setPartidas([]));
-  }, []);
+      .then(setPartidasFetched)
+      .catch(() => setPartidasFetched([]));
+  }, [controlado]);
 
+  const partidas = controlado ? partidasProp : partidasFetched;
   if (!partidas || partidas.length === 0) return null;
 
   return (
