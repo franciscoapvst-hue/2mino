@@ -121,16 +121,19 @@ export default function DominoPiece({
 
   // Descriptor de la skin equipada — define fondo, pips (color y si son
   // puntos o números) y el borde en estado normal. Los estados semánticos
-  // (jugable/seleccionado/ghost/disabled) pisan el borde igual para todas
-  // las skins; faceDown/disabled ignoran la skin (dorso/apagado fijos).
+  // (jugable/seleccionado/ghost) pisan el borde igual para todas las skins.
+  // La skin se muestra SIEMPRE (jugable o no): una ficha no jugable NO
+  // reemplaza fondo/pips por gris (eso hacía desaparecer los pips de skins
+  // claras como 'oscura'), solo se atenúa entera vía `opacity` del CSS
+  // (.dp-disabled). Únicamente faceDown ignora la skin (muestra el dorso).
   const def = SKIN_FICHA[skin] ?? SKIN_FICHA.clasica;
 
   // Borde: el de la skin en normal, verde en jugable, violeta en
-  // seleccionado, ámbar punteado en preview (ghost, zonas de drop).
+  // seleccionado, ámbar punteado en preview (ghost, zonas de drop). El
+  // estado disabled usa el borde de la skin (atenuado por el opacity del CSS).
   const stroke  = ghost    ? 'var(--amber, #ef9f2e)'
                 : selected ? '#7c3aed'
                 : playable ? '#16a34a'
-                : disabled ? '#d1d5db'
                 :            def.stroke;
   const strokeW = ghost ? 2 : selected ? 2.5 : 1.5;
 
@@ -138,9 +141,9 @@ export default function DominoPiece({
   // ghost se atenúa entero vía opacity del wrapper (.dp-ghost), no
   // mezclando alpha acá: si no, el color semitransparente sobre el fondo
   // oscuro de la mesa se ve sucio en vez de "la ficha real, más tenue".
-  const fillFace = faceDown  ? '#1e1b4b'  // dorso oscuro
-                 : disabled  ? '#f3f4f6'  // apagado (mismo para toda skin)
-                 :             def.fillFace;
+  // disabled también se atenúa por opacity (.dp-disabled), sin tocar el color.
+  const fillFace = faceDown ? '#1e1b4b'      // dorso oscuro (único caso que ignora la skin)
+                 :            def.fillFace;
 
   const [dX1, dY1, dX2, dY2] = isV
     ? [PAD, PAD + F, PAD + F, PAD + F]

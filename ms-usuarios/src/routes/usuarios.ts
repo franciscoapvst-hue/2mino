@@ -673,11 +673,25 @@ export async function usuariosRoutes(app: FastifyInstance) {
         },
         response: {
           200: { description: 'Avatar actualizado',    ...UserSchema },
+          403: { description: 'No poseés ese avatar',  ...ErrorSchema },
           404: { description: 'Usuario no encontrado', ...ErrorSchema },
         },
       },
     },
     async (req, reply) => {
+      // Gated por posesión (docs/PLAN_COSMETICOS.md Etapa E): solo se puede
+      // equipar un avatar que esté en el inventario del usuario. Los 8
+      // actuales son gratis (otorgados a todos, ver seed en db/pool.ts), así
+      // que hoy esto no bloquea a nadie existente — empieza a importar
+      // cuando se agreguen avatares pagos nuevos al catálogo.
+      const { rows: poseido } = await pool.query(
+        `SELECT 1 FROM inventario inv
+         JOIN tienda_items t ON t.id = inv.item_id
+         WHERE inv.usuario_id = $1 AND t.categoria = 'avatar' AND t.clave = $2`,
+        [req.params.id, req.body.avatar],
+      );
+      if (!poseido.length) return reply.code(403).send({ error: 'No poseés ese avatar' });
+
       const { rows } = await pool.query(
         `UPDATE usuarios SET avatar = $1, updated_at = NOW() WHERE id = $2
          RETURNING id, username, email, segmento_id, avatar, created_at, updated_at`,

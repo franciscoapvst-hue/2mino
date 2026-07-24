@@ -54,7 +54,7 @@ export default function TorneoInscripcionForm({ torneoId, onVolver, onListo }: P
       return;
     }
     if (torneo!.reglamentoPdfUrl && !aceptaPoliticas) {
-      setError('Tenés que aceptar las políticas del torneo para continuar.');
+      setError('Tienes que aceptar las políticas del torneo para continuar.');
       return;
     }
     if (torneo!.cuotaMonto > 0) {
@@ -103,7 +103,7 @@ export default function TorneoInscripcionForm({ torneoId, onVolver, onListo }: P
           <form className="tor-panel" onSubmit={handleSubmitForm}>
             <h2 className="tor-panel-title">Tus datos</h2>
             <p className="tor-panel-text">
-              Vas a crear el equipo — luego compartís un código con tu compañero para completarlo.
+              Vas a crear el equipo — luego compartes un código con tu compañero para completarlo.
             </p>
             <label className="tor-field">
               <span className="tor-field-label">Nombre del equipo (opcional)</span>

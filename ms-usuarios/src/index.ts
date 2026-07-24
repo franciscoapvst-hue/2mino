@@ -4,6 +4,7 @@ import swaggerUi from '@fastify/swagger-ui';
 import { runMigrations } from './db/pool';
 import { usuariosRoutes, limpiarInvitadosAbandonados } from './routes/usuarios';
 import { tiendaRoutes } from './routes/tienda';
+import { internoRoutes } from './routes/interno';
 
 const app = Fastify({
   logger: true,
@@ -43,6 +44,7 @@ app.register(swaggerUi, {
 // ── Rutas ─────────────────────────────────────────
 app.register(usuariosRoutes);
 app.register(tiendaRoutes);
+app.register(internoRoutes);
 
 app.get('/health', {
   schema: {

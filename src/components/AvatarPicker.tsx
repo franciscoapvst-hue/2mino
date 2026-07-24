@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { api } from '../api';
 import { avatarOptions } from '../avatars';
 
 type Props = {
@@ -7,9 +8,22 @@ type Props = {
   onElegir: (avatar: string) => Promise<void>;
 };
 
+// Gated por posesión (docs/PLAN_COSMETICOS.md Etapa E): solo se ofrecen los
+// avatares que el usuario ya tiene en su inventario — hoy los 8 originales
+// son gratis para todos, así que en la práctica esto no oculta nada todavía;
+// empieza a filtrar de verdad cuando se agreguen avatares pagos nuevos.
 export default function AvatarPicker({ actual, onClose, onElegir }: Props) {
+  const [poseidos, setPoseidos] = useState<Set<string> | null>(null);
   const [guardando, setGuardando] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.tienda.inventario()
+      .then(items => setPoseidos(new Set(items.filter(i => i.categoria === 'avatar').map(i => i.clave))))
+      .catch(() => setPoseidos(new Set())); // fallo de red: mejor mostrar vacío que ofrecer algo no poseído
+  }, []);
+
+  const opciones = poseidos === null ? null : avatarOptions.filter(a => poseidos.has(a.file));
 
   async function elegir(file: string) {
     setGuardando(file);
@@ -30,11 +44,13 @@ export default function AvatarPicker({ actual, onClose, onElegir }: Props) {
 
         {error && <div className="avatar-picker-error">⚠ {error}</div>}
 
-        {avatarOptions.length === 0 ? (
-          <p className="avatar-picker-empty">Todavía no hay fotos de perfil disponibles.</p>
+        {opciones === null ? (
+          <p className="avatar-picker-empty">Cargando…</p>
+        ) : opciones.length === 0 ? (
+          <p className="avatar-picker-empty">Todavía no tienes ninguna foto de perfil. Consigue una en la Tienda.</p>
         ) : (
           <div className="avatar-grid">
-            {avatarOptions.map(a => (
+            {opciones.map(a => (
               <button
                 key={a.file}
                 className={`avatar-option${a.file === actual ? ' avatar-option-selected' : ''}`}

@@ -18,17 +18,17 @@ export default function PrivacidadView() {
 
         <p>
           En 2mino nos tomamos en serio la privacidad de quienes juegan. Este documento
-          explica qué datos recolectamos, para qué los usamos y qué control tenés sobre
+          explica qué datos recolectamos, para qué los usamos y qué control tienes sobre
           ellos.
         </p>
 
         <h2>Qué datos recolectamos</h2>
         <ul>
           <li><strong>Cuenta:</strong> nombre de usuario, correo electrónico y contraseña (guardada de forma cifrada, nunca en texto plano).</li>
-          <li><strong>Perfil:</strong> el avatar que elegís y, si jugás como invitado, un usuario y cuenta temporales que se borran al cerrar sesión.</li>
+          <li><strong>Perfil:</strong> el avatar que eliges y, si juegas como invitado, un usuario y cuenta temporales que se borran al cerrar sesión.</li>
           <li><strong>Actividad de juego:</strong> tus partidas, resultado, ELO, capicúas, trancas e historial — es lo que alimenta el leaderboard y tu perfil.</li>
           <li><strong>Cosméticos:</strong> tu saldo de doblones y qué ítems compraste o equipaste (fichas, tableros). Los doblones no son dinero real y no se pueden retirar.</li>
-          <li><strong>Técnicos:</strong> la sesión (token de acceso) y, si tenés anuncios activados, las cookies que use Google AdSense para mostrarlos (ver más abajo).</li>
+          <li><strong>Técnicos:</strong> la sesión (token de acceso) y, si tienes anuncios activados, las cookies que use Google AdSense para mostrarlos (ver más abajo).</li>
         </ul>
 
         <h2>Qué NO recolectamos</h2>
@@ -42,7 +42,7 @@ export default function PrivacidadView() {
           <li>Operar el juego: matchmaking, salas, torneos, chat de partida.</li>
           <li>Mostrar tu progreso: rango, estadísticas, historial y repeticiones.</li>
           <li>Seguridad: evitar trampas, cuentas duplicadas o abuso del sistema.</li>
-          <li>Publicidad: si tenés anuncios activados (Google AdSense), Google puede usar cookies para mostrar anuncios relevantes. Podés gestionar tus preferencias de anuncios desde <a href="https://adssettings.google.com" target="_blank" rel="noreferrer">Google Ads Settings</a>.</li>
+          <li>Publicidad: si tienes anuncios activados (Google AdSense), Google puede usar cookies para mostrar anuncios relevantes. Puedes gestionar tus preferencias de anuncios desde <a href="https://adssettings.google.com" target="_blank" rel="noreferrer">Google Ads Settings</a>.</li>
         </ul>
 
         <h2>Con quién compartimos datos</h2>
@@ -54,7 +54,7 @@ export default function PrivacidadView() {
 
         <h2>Tus derechos</h2>
         <p>
-          Podés pedir que eliminemos tu cuenta y tus datos asociados escribiendo a{' '}
+          Puedes pedir que eliminemos tu cuenta y tus datos asociados escribiendo a{' '}
           <a href="mailto:soporte@2mino.online">soporte@2mino.online</a>. Las cuentas de
           invitado son efímeras: se eliminan automáticamente al cerrar sesión.
         </p>

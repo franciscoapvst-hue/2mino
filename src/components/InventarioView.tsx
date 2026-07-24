@@ -2,14 +2,13 @@ import { useEffect, useState } from 'react';
 import { api, type AuthUser, type UserConfig, type InventarioItem } from '../api';
 import PageHeader from './social/PageHeader';
 import CosmeticoPreview from './CosmeticoPreview';
-import { FichaIcon, TableroIcon, AvatarIcon } from './icons';
+import GameIcon from './GameIcons';
 import { skinFichaDe, skinTableroDe } from '../skins';
-import { avatarOptions } from '../avatars';
 
 const ICONO_SECCION = {
-  ficha:   <FichaIcon />,
-  tablero: <TableroIcon />,
-  avatar:  <AvatarIcon />,
+  ficha:   <GameIcon name="ficha"   size={30} />,
+  tablero: <GameIcon name="tablero" size={30} />,
+  avatar:  <GameIcon name="avatar"  size={30} />,
 } as const;
 
 type Props = {
@@ -21,9 +20,9 @@ type Props = {
   onBack: () => void;
 };
 
-// Una fila del inventario, sea un ítem real de tienda_items (ficha/tablero)
-// o un avatar (todavía no pasa por tienda_items — Etapa E lo migrará; hoy
-// son todos gratis, así que "poseerlos" es tenerlos en avatarOptions).
+// Una fila del inventario — ficha/tablero/avatar son todos ítems reales de
+// tienda_items desde la Etapa E (avatares incluidos: los 8 originales son
+// gratis, avatares nuevos entran pagos).
 type Fila = { clave: string; nombre: string; categoria: 'ficha' | 'tablero' | 'avatar' };
 
 function InventarioCard({ fila, equipada, equipando, onEquipar }: {
@@ -60,7 +59,7 @@ function InventarioSeccion({ tipo, titulo, filas, equipadaClave, equipandoClave,
         <span className="inv-section-count">{filas.length}</span>
       </div>
       {filas.length === 0 ? (
-        <p className="inv-section-empty">Todavía no tenés ninguno.</p>
+        <p className="inv-section-empty">Todavía no tienes ninguno.</p>
       ) : (
         <div className="inv-grid">
           {filas.map(f => (
@@ -133,15 +132,14 @@ export default function InventarioView({ dark, user, config, onConfigChange, onA
     .map(i => ({ clave: i.clave, nombre: i.nombre, categoria: 'ficha' as const })) ?? [];
   const tableros: Fila[] = items?.filter(i => i.categoria === 'tablero')
     .map(i => ({ clave: i.clave, nombre: i.nombre, categoria: 'tablero' as const })) ?? [];
-  // Avatares: todavía no pasan por tienda_items (Etapa E) — hoy son todos
-  // gratis para todos, así que "el inventario" es el catálogo completo.
-  const avatares: Fila[] = avatarOptions.map(a => ({ clave: a.file, nombre: '', categoria: 'avatar' as const }));
+  const avatares: Fila[] = items?.filter(i => i.categoria === 'avatar')
+    .map(i => ({ clave: i.clave, nombre: i.nombre, categoria: 'avatar' as const })) ?? [];
 
   return (
     <div className={`dash social-page${dark ? '' : ' is-light'}`}>
       <PageHeader
         title="Mis cosméticos"
-        subtitle="Lo que ya tenés, agrupado por tipo"
+        subtitle="Lo que ya tienes, agrupado por tipo"
         onBack={onBack}
       />
 

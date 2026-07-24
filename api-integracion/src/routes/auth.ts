@@ -403,6 +403,7 @@ export async function authRoutes(app: FastifyInstance) {
         response: {
           200: { description: 'Avatar actualizado',       ...UserSchema },
           401: { description: 'Token ausente o inválido', ...ErrorSchema },
+          403: { description: 'No poseés ese avatar',     ...ErrorSchema },
         },
       },
     },

@@ -1,5 +1,7 @@
 import { FastifyInstance } from 'fastify';
+import crypto from 'crypto';
 import { pool } from '../db/pool';
+import { crearOrden, capturarOrden, verificarWebhookSignature } from '../paypal';
 
 // ── Schemas reutilizables ─────────────────────────
 const ItemSchema = {
@@ -54,6 +56,17 @@ const ItemAdminSchema = {
 const ErrorSchema = {
   type: 'object',
   properties: { error: { type: 'string' } },
+} as const;
+
+const DoblonPaqueteSchema = {
+  type: 'object',
+  properties: {
+    id:         { type: 'string', format: 'uuid' },
+    nombre:     { type: 'string' },
+    doblones:   { type: 'integer' },
+    precio_usd: { type: 'string' },
+    orden:      { type: 'integer' },
+  },
 } as const;
 
 // Se llama al crear un usuario nuevo (registro, Google, invitado) — así
@@ -402,5 +415,164 @@ export async function tiendaRoutes(app: FastifyInstance) {
     } finally {
       client.release();
     }
+  });
+
+  // ── GET /billetera/doblones/paquetes ────────────
+  app.get('/billetera/doblones/paquetes', {
+    schema: {
+      tags:    ['tienda'],
+      summary: 'Catálogo de paquetes de doblones (comprar con PayPal)',
+      response: { 200: { description: 'Paquetes', type: 'array', items: DoblonPaqueteSchema } },
+    },
+  }, async (_req, reply) => {
+    const { rows } = await pool.query(
+      `SELECT id, nombre, doblones, precio_usd, orden FROM doblon_paquetes
+       WHERE disponible = true ORDER BY orden`,
+    );
+    return reply.send(rows);
+  });
+
+  // ── POST /billetera/doblones/orden ──────────────
+  // Crea la fila `doblon_compras` (id generado acá, ANTES de llamar a
+  // PayPal) y la usa como reference_id de la orden — así el webhook puede
+  // cruzarla sin depender de que la captura directa haya llegado primero.
+  app.post<{ Body: { usuarioId: string; paqueteId: string } }>('/billetera/doblones/orden', {
+    schema: {
+      tags:    ['tienda'],
+      summary: 'Crear una orden de PayPal para comprar un paquete de doblones',
+      body: {
+        type: 'object',
+        required: ['usuarioId', 'paqueteId'],
+        properties: {
+          usuarioId: { type: 'string', format: 'uuid' },
+          paqueteId: { type: 'string', format: 'uuid' },
+        },
+      },
+      response: {
+        200: { description: 'Orden creada', type: 'object', properties: { orderId: { type: 'string' } } },
+        404: { description: 'Paquete no encontrado', ...ErrorSchema },
+      },
+    },
+  }, async (req, reply) => {
+    const { usuarioId, paqueteId } = req.body;
+    const { rows: paqueteRows } = await pool.query(
+      `SELECT id, doblones, precio_usd FROM doblon_paquetes WHERE id = $1 AND disponible = true`,
+      [paqueteId],
+    );
+    if (!paqueteRows.length) return reply.code(404).send({ error: 'Paquete no encontrado' });
+    const paquete = paqueteRows[0];
+
+    const compraId = crypto.randomUUID();
+    const { orderId } = await crearOrden(Number(paquete.precio_usd), compraId);
+    await pool.query(
+      `INSERT INTO doblon_compras (id, usuario_id, paquete_id, doblones, precio_usd, paypal_order_id)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [compraId, usuarioId, paquete.id, paquete.doblones, paquete.precio_usd, orderId],
+    );
+    return reply.send({ orderId });
+  });
+
+  // Acredita una compra 'iniciado' → captura contra PayPal + suma el saldo,
+  // en una sola transacción con lock de fila. Idempotente: si ya estaba
+  // 'aprobado' (la captura directa y el webhook pueden llegar los dos),
+  // no hace nada — usado por el endpoint de captura Y por el webhook.
+  async function acreditarCompra(paypalOrderId: string): Promise<{ saldo: number; doblones: number } | null> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { rows: compraRows } = await client.query(
+        `SELECT id, usuario_id, doblones FROM doblon_compras
+         WHERE paypal_order_id = $1 AND estado = 'iniciado' FOR UPDATE`,
+        [paypalOrderId],
+      );
+      if (!compraRows.length) {
+        await client.query('ROLLBACK');
+        return null; // ya procesada (o no existe) — no-op idempotente
+      }
+      const compra = compraRows[0];
+
+      const { capturaId, respuesta } = await capturarOrden(paypalOrderId);
+
+      const { rowCount } = await client.query(
+        `UPDATE doblon_compras SET estado = 'aprobado', paypal_capture_id = $1, paypal_respuesta = $2, updated_at = NOW()
+         WHERE id = $3 AND estado = 'iniciado'`,
+        [capturaId, JSON.stringify(respuesta), compra.id],
+      );
+      if (rowCount === 0) {
+        await client.query('ROLLBACK');
+        return null; // carrera con otra llamada — la otra ya acreditó
+      }
+
+      await client.query(
+        `INSERT INTO billeteras (usuario_id) VALUES ($1) ON CONFLICT DO NOTHING`,
+        [compra.usuario_id],
+      );
+      const { rows: saldoRows } = await client.query(
+        `UPDATE billeteras SET saldo = saldo + $1, updated_at = NOW()
+         WHERE usuario_id = $2 RETURNING saldo`,
+        [compra.doblones, compra.usuario_id],
+      );
+      await client.query(
+        `INSERT INTO billetera_movimientos (usuario_id, monto, motivo, ref)
+         VALUES ($1, $2, 'compra_doblones', $3)`,
+        [compra.usuario_id, compra.doblones, compra.id],
+      );
+
+      await client.query('COMMIT');
+      return { saldo: saldoRows[0].saldo, doblones: compra.doblones };
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  // ── POST /billetera/doblones/:orderId/capturar ──
+  // El frontend llama esto al disparar onApprove del SDK — nunca se confía
+  // en el evento del navegador solo (PLAN_TORNEOS §5.3).
+  app.post<{ Params: { orderId: string }; Body: { usuarioId: string } }>('/billetera/doblones/:orderId/capturar', {
+    schema: {
+      tags:    ['tienda'],
+      summary: 'Capturar el pago y acreditar los doblones',
+      params: { type: 'object', properties: { orderId: { type: 'string' } } },
+      body: {
+        type: 'object',
+        required: ['usuarioId'],
+        properties: { usuarioId: { type: 'string', format: 'uuid' } },
+      },
+      response: {
+        200: { description: 'Acreditado', type: 'object', properties: { saldo: { type: 'integer' }, doblones: { type: 'integer' } } },
+        404: { description: 'Orden no encontrada o ya procesada', ...ErrorSchema },
+      },
+    },
+  }, async (req, reply) => {
+    const resultado = await acreditarCompra(req.params.orderId);
+    if (!resultado) return reply.code(404).send({ error: 'Orden no encontrada o ya procesada' });
+    return reply.send(resultado);
+  });
+
+  // ── POST /interno/paypal/webhook ────────────────
+  // Respaldo por si el jugador cierra la pestaña justo después de aprobar,
+  // antes de que /capturar complete (PLAN_TORNEOS §5.3). Verificación de
+  // firma OBLIGATORIA antes de procesar nada. No expuesto con JWT — lo
+  // llama PayPal directamente vía el gateway (ms-usuarios no tiene puerto
+  // público), verificado por firma en su lugar.
+  //
+  // El gateway reenvía los headers `paypal-*` (necesarios para verificar la
+  // firma) empaquetados en el body, ya que `callMs()` solo reenvía JSON —
+  // ver api-integracion/src/routes/tienda.ts.
+  app.post<{ Body: { headers: Record<string, string | undefined>; event: unknown } }>('/interno/paypal/webhook', {
+    schema: { tags: ['tienda'], summary: 'Webhook de PayPal (verificado por firma, no por JWT)' },
+  }, async (req, reply) => {
+    const { headers, event } = req.body;
+    const ok = await verificarWebhookSignature(headers, event);
+    if (!ok) return reply.code(400).send({ error: 'Firma de webhook inválida' });
+
+    const evento = event as { resource?: { supplementary_data?: { related_ids?: { order_id?: string } }; id?: string } };
+    const orderId = evento.resource?.supplementary_data?.related_ids?.order_id ?? evento.resource?.id;
+    if (orderId) await acreditarCompra(orderId).catch(() => {}); // idempotente; un fallo acá no debe reintentar infinito vía 5xx
+
+    return reply.code(200).send({ recibido: true });
   });
 }

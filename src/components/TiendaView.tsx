@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, ApiError, type TiendaItem, type UserConfig } from '../api';
+import { api, ApiError, type TiendaItem, type DoblonPaquete, type UserConfig } from '../api';
 import PageHeader from './social/PageHeader';
 import GameIcon from './GameIcons';
 import CosmeticoPreview from './CosmeticoPreview';
@@ -9,7 +9,11 @@ import { skinFichaDe, skinTableroDe } from '../skins';
 type Props = {
   dark:   boolean;
   config: UserConfig;
+  avatarActual: string | null | undefined;
+  /** Feature flag comprar_doblones_habilitado (BO): oculta la sección de paquetes. */
+  comprarDoblonesHabilitado: boolean;
   onConfigChange: (config: UserConfig) => void;
+  onAvatarChange: (avatar: string) => void;
   onBack: () => void;
 };
 
@@ -99,19 +103,74 @@ function ItemCard({ item, saldo, equipada, onComprado, onEquipar }: {
   );
 }
 
-export default function TiendaView({ dark, config, onConfigChange, onBack }: Props) {
+// Comprar doblones con dinero real (docs/PLAN_COSMETICOS.md Etapa F). El
+// flujo real es PayPal Orders API v2 (crear orden → aprobar en PayPal →
+// capturar) vía el SDK de botones de PayPal — pero mientras no haya
+// credenciales Sandbox configuradas (ENABLE_PAGOS=false en el backend), no
+// tiene sentido cargar ese SDK acá: crearOrden()/capturar() ya devuelven un
+// resultado simulado end-to-end (mismo criterio que ENABLE_EMAIL). Por eso
+// el botón dice "(modo simulado)" en vez de fingir un pago real.
+//
+// TODO cuando haya credenciales reales: reemplazar este botón por el SDK de
+// PayPal (`<script src="https://www.paypal.com/sdk/js?client-id=...">` +
+// `PayPal.Buttons({...}).render(...)`), disparando capturar() recién en su
+// callback `onApprove` en vez de inmediatamente después de crearOrden().
+function PaqueteCard({ paquete, onComprado }: {
+  paquete: DoblonPaquete;
+  onComprado: (saldo: number, doblones: number) => void;
+}) {
+  const [comprando, setComprando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function comprar() {
+    setComprando(true);
+    setError(null);
+    try {
+      const { orderId } = await api.billetera.doblones.crearOrden(paquete.id);
+      const { saldo, doblones } = await api.billetera.doblones.capturar(orderId);
+      onComprado(saldo, doblones);
+    } catch (e: unknown) {
+      setError(e instanceof ApiError ? e.message : 'No se pudo completar la compra');
+    } finally {
+      setComprando(false);
+    }
+  }
+
+  return (
+    <div className="tienda-item">
+      <div className="cosmetico-preview doblon-paquete-preview">
+        <GameIcon name="doblon" size={44} />
+      </div>
+      <div className="tienda-item-body">
+        <span className="tienda-item-nombre">{paquete.nombre}</span>
+        <span className="tienda-item-precio"><GameIcon name="doblon" size={18} /> {paquete.doblones}</span>
+      </div>
+      <button className="tienda-item-btn" onClick={comprar} disabled={comprando}>
+        {comprando ? 'Procesando…' : `US$${paquete.precio_usd} (modo simulado)`}
+      </button>
+      {error && <p className="tienda-item-error">⚠ {error}</p>}
+    </div>
+  );
+}
+
+export default function TiendaView({ dark, config, avatarActual, comprarDoblonesHabilitado, onConfigChange, onAvatarChange, onBack }: Props) {
   const [items, setItems] = useState<TiendaItem[] | null>(null);
   const [saldo, setSaldo] = useState<number | null>(null);
+  const [paquetes, setPaquetes] = useState<DoblonPaquete[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Ítem recién comprado — dispara el modal de "¡ya es tuyo!".
   const [recienComprado, setRecienComprado] = useState<TiendaItem | null>(null);
   const [equipandoModal, setEquipandoModal] = useState(false);
 
   useEffect(() => {
-    Promise.all([api.tienda.items(), api.billetera.saldo()])
-      .then(([i, b]) => { setItems(i); setSaldo(b.saldo); })
+    Promise.all([api.tienda.items(), api.billetera.saldo(), api.billetera.doblones.paquetes()])
+      .then(([i, b, p]) => { setItems(i); setSaldo(b.saldo); setPaquetes(p); })
       .catch(() => setError('No se pudo cargar la tienda'));
   }, []);
+
+  function handleDoblonesComprados(nuevoSaldo: number) {
+    setSaldo(nuevoSaldo);
+  }
 
   function handleComprado(item: TiendaItem, nuevoSaldo: number) {
     setSaldo(nuevoSaldo);
@@ -120,8 +179,16 @@ export default function TiendaView({ dark, config, onConfigChange, onBack }: Pro
   }
 
   // Equipar guarda en `opciones` sin pisar otras claves — mismo merge
-  // no-destructivo que ya usa App.tsx: guardarOpcionesTutorial().
+  // no-destructivo que ya usa App.tsx: guardarOpcionesTutorial(). Avatar es
+  // la excepción: no vive en `opciones`, tiene su propio endpoint
+  // (api.setAvatar → columna usuarios.avatar, gated por posesión desde la
+  // Etapa E) — mismo criterio que InventarioView.
   async function handleEquipar(item: TiendaItem) {
+    if (item.categoria === 'avatar') {
+      await api.setAvatar(item.clave);
+      onAvatarChange(item.clave);
+      return;
+    }
     const campo = item.categoria === 'ficha' ? 'skin_ficha' : 'skin_tablero';
     const opciones = { ...(config.opciones ?? {}), [campo]: item.clave };
     const nuevo = await api.putPreferencias({ opciones });
@@ -189,6 +256,31 @@ export default function TiendaView({ dark, config, onConfigChange, onBack }: Pro
                 />
               ))}
             </div>
+
+            <h2 className="tienda-section-title">Avatares</h2>
+            <div className="tienda-grid">
+              {items?.filter(i => i.categoria === 'avatar').map(i => (
+                <ItemCard
+                  key={i.id}
+                  item={i}
+                  saldo={saldo}
+                  equipada={i.clave === avatarActual}
+                  onComprado={handleComprado}
+                  onEquipar={handleEquipar}
+                />
+              ))}
+            </div>
+
+            {comprarDoblonesHabilitado && paquetes && paquetes.length > 0 && (
+              <>
+                <h2 className="tienda-section-title">Comprar doblones</h2>
+                <div className="tienda-grid">
+                  {paquetes.map(p => (
+                    <PaqueteCard key={p.id} paquete={p} onComprado={handleDoblonesComprados} />
+                  ))}
+                </div>
+              </>
+            )}
           </>
         )}
       </main>

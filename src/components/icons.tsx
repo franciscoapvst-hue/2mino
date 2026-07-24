@@ -3,55 +3,6 @@
 // SunIcon, MoonIcon, DominoTile) estaban duplicados en App/Dashboard/
 // SalasView/GameBoard. Aquí viven una sola vez.
 
-// Temporal — placeholder de línea para "Inventario" en el sidebar hasta que
-// se genere el ícono colorido (mismo criterio que ya se usó para Tienda/Ver
-// fichas antes de tener sus webp finales). Un pequeño cofre/organizador.
-export function InventarioIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="8" width="18" height="12" rx="2" />
-      <path d="M3 8l2-4h14l2 4" />
-      <path d="M9 12h6" />
-    </svg>
-  );
-}
-
-// Íconos de categoría para los encabezados del Inventario. De línea, mismo
-// grosor que el resto — distinguen cada segmento (ficha/tablero/avatar) sin
-// recurrir a colores por sección (PRODUCT.md: cálido y restringido).
-export function FichaIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="7" y="2.5" width="10" height="19" rx="2.5" />
-      <line x1="7" y1="12" x2="17" y2="12" />
-      <circle cx="12" cy="7" r="1.2" fill="currentColor" stroke="none" />
-      <circle cx="12" cy="17" r="1.2" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-export function TableroIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4.5" width="18" height="15" rx="3" />
-      <path d="M3 11h18M9.5 4.5v15" />
-    </svg>
-  );
-}
-
-export function AvatarIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4.5 20.5a7.5 7.5 0 0 1 15 0" />
-    </svg>
-  );
-}
-
 export function BackIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none"

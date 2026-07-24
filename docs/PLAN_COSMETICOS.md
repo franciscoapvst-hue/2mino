@@ -274,24 +274,61 @@ usuario nuevo (registro) la recibe automático al verificar el email,
 billetera se crea on-demand con saldo 0, y el borrado real de un usuario
 con inventario ya no viola FK (cascada limpia).
 
-### Etapa 2 — Otorgar doblones al jugar (depende de 1)
+### Etapa 2 — Otorgar doblones al jugar (depende de 1) — ✅ hecho
 
-- [ ] `ms-usuarios/src/routes/interno.ts` (nuevo, no expuesto en
+- [x] `ms-usuarios/src/routes/interno.ts` (nuevo, no expuesto en
       gateway): `POST /interno/billetera/:usuarioId/otorgar`
-      `{ monto, motivo, ref }` — transacción: `INSERT
-      billetera_movimientos` + `UPDATE billeteras SET saldo = saldo +
-      monto`. Idempotente si `ref` viene seteado (`UNIQUE
-      (usuario_id, motivo, ref)` o `ON CONFLICT DO NOTHING` según motivo).
-- [ ] `ms-salas/src/routes/juegos.ts`: en el bloque `terminada` de
-      `guardarPartida` (línea ~37, junto al ELO/historial), agregar la
-      llamada fire-and-forget a `/interno/billetera/.../otorgar` con el
-      monto según §4 (partida completada + bonus ranked). Mismo criterio
-      de "un email caído no rompe una jugada" que ya usa
-      `avisarPartidaActualizada`.
-- [ ] Bonus "primera partida del día": mismo endpoint, `motivo
-      ='racha_diaria'`, `ref = fecha de hoy (YYYY-MM-DD)` — el `UNIQUE`
+      `{ monto, motivo, ref }` — transacción con un CTE: `INSERT
+      billetera_movimientos` (con `ON CONFLICT DO NOTHING`) + `UPDATE
+      billeteras SET saldo = saldo + monto` **solo si el INSERT insertó de
+      verdad** (`WHERE EXISTS (SELECT 1 FROM ins)`) — así un reintento no
+      suma saldo dos veces. Registrado en `index.ts` (`internoRoutes`).
+      Devuelve `{ saldo, otorgado }` (`otorgado=false` = no-op idempotente).
+- [x] Idempotencia por índice: `db/pool.ts` gana un índice único PARCIAL
+      `idx_billetera_mov_idem ON billetera_movimientos (usuario_id, motivo,
+      ref) WHERE ref IS NOT NULL`. Parcial a propósito: `ajuste_admin` va
+      sin `ref` y debe poder repetirse; `compra_item`/`compra_doblones` ya
+      eran únicos de hecho, así que el índice no los rompe.
+- [x] `ms-salas/src/http.ts`: helper `otorgarDoblones()` fire-and-forget a
+      ms-usuarios (nuevo env `MS_USUARIOS_URL`, wireado en
+      `docker-compose.yml`). Mismo criterio de "un servicio caído no rompe
+      la jugada" que `avisarPartidaActualizada`; a diferencia del poke,
+      este SÍ manda body → SÍ manda `Content-Type` (ver nota de
+      `callService` en ARQUITECTURA.md: el bug era mandarlo SIN body).
+- [x] `ms-salas/src/routes/juegos.ts`: `otorgarDoblonesPorPartida()` en el
+      bloque `terminada` de `guardarPartida` (junto al ELO/historial),
+      espeja la iteración de asientos de `guardarResultados`. Montos según
+      §4: `partida_completada`=5 (gane o pierda, `ref`=sala_id),
+      `ranked_ganado`=+5 extra para el ganador en ranked (`ref`=sala_id).
+      **Bots excluidos** con `esBot()` — sus `BOT_IDS` no existen en
+      `usuarios` y romperían la FK de `billetera_movimientos`.
+- [x] Bonus "primera partida del día": mismo endpoint, `motivo
+      ='racha_diaria'`, `ref = fecha de hoy (YYYY-MM-DD)` — el índice único
       lo vuelve automáticamente "una vez por día" sin lógica de fechas
-      en el código.
+      en el código. Aplica a todo jugador humano que cierra partida (casual
+      o ranked).
+
+**Nota sobre abandono**: el jugador que ABANDONA no cobra ningún doblón —
+`otorgarDoblonesPorPartida` saltea el asiento `partida.abandonadoPorSeat`
+(seteado por `aplicarAbandono`). Esto cierra el abandono-farming (arrancar
+y abandonar en loop para farmear). El rival que se quedó sí cobra normal
+(partida completada + ranked ganado si aplica): jugó y ganó de verdad.
+
+**Verificado en Docker** (`tsc --noEmit` limpio en ambos servicios +):
+migración corre limpia y crea `idx_billetera_mov_idem`; el endpoint
+`otorgar` es idempotente por `(usuario_id, motivo, ref)` — otorgar dos
+veces con el mismo `ref` devuelve `otorgado:false` y NO mueve el saldo,
+con `ref` distinto sí suma (probado con `partida_completada` y
+`racha_diaria`); el ledger de `billetera_movimientos` registra monto/
+motivo/ref correctos; ms-salas alcanza a ms-usuarios por la red Docker
+(`MS_USUARIOS_URL=http://ms-usuarios:4000`); y otorgar a un `BOT_ID`
+devuelve 500 (la FK a `usuarios` lo rechaza) — confirma por qué la
+exclusión de bots con `esBot()` es necesaria. Datos de prueba limpiados
+después. No se jugó una partida completa de punta a punta (el objetivo
+mínimo es 100 pts, no es práctico de scriptear) — pero el call site
+(`otorgarDoblonesPorPartida`) es una iteración directa que espeja a
+`guardarResultados`, ya probado, y todos sus componentes se ejercitaron
+por separado.
 
 ### Etapa 3 — Comprar (depende de 1) — ✅ hecho
 
@@ -384,9 +421,19 @@ Verificado en Docker + navegador, partida real 1v1 entre dos cuentas:
 equipar Ámbar (ficha) + Esmeralda (tablero) desde la Tienda, entrar a una
 sala, jugar la apertura — `data-tablero="esmeralda"` en el `.game-shell`
 real (`--g-bg: #071a16`), ficha de la mano y ficha ya puesta en el
-tablero ambas con `fill="#fdf3e2"` (ámbar), estados `disabled`/`faceDown`
-siguen ignorando la skin (gris/dorso oscuro) como estaba diseñado.
-`PieceDemo` (Ver fichas) también muestra la skin equipada.
+tablero ambas con `fill="#fdf3e2"` (ámbar). `PieceDemo` (Ver fichas)
+también muestra la skin equipada.
+
+**Corrección posterior (estado `disabled`)**: la primera versión hacía que
+las fichas NO jugables ignoraran la skin (fondo gris `#f3f4f6` + pips grises
+fijos). Esto rompía con skins de pips claros (`oscura`, pips hueso `#f2ede3`):
+sobre el fondo gris casi blanco los pips desaparecían y la ficha se veía EN
+BLANCO. Por decisión de diseño, la skin ahora se muestra SIEMPRE (jugable o
+no) — `DominoPiece` solo usa `def.fillFace`/`def.pipColor`/`def.stroke`, y el
+estado no-jugable se indica únicamente con `opacity: 0.35` (`.dp-disabled`
+en `styles.css`). Solo `faceDown` sigue ignorando la skin (muestra el dorso).
+Verificado en `PieceDemo` con la skin `oscura`: la ficha "Deshabilitada"
+muestra la skin real atenuada, no un rectángulo en blanco.
 
 ### Etapa 4.1 — Panel de catálogo en 2mino-BO (adelantado desde v2) — ✅ hecho
 
@@ -494,6 +541,51 @@ acento ámbar uniforme; equipar un avatar actualiza al instante el avatar del
 sidebar (confirma que `onAvatarChange`/`setSession` propaga bien), responsive
 sin scroll horizontal en 375px, y modo claro sin romper nada.
 
+### Etapa E — Avatares dentro de la tienda — ✅ hecho
+
+Migra los avatares de "gratis para todos, fuera del sistema" a `tienda_items`
+real, gated por posesión.
+
+- [x] `ms-usuarios/src/db/pool.ts`: seed de los 8 avatares actuales como
+      `tienda_items` (`categoria='avatar'`, `precio=0`, `clave` = nombre de
+      archivo exacto en `src/assets/avatars/`). El backfill genérico ya
+      existente (`WHERE t.precio = 0`, cross join con todos los usuarios)
+      los otorga solos a cuentas existentes al reiniciar — no hizo falta
+      código nuevo de backfill.
+- [x] `ms-usuarios/src/routes/usuarios.ts` — `PATCH /usuarios/:id/avatar`:
+      gated por posesión. Verifica `inventario JOIN tienda_items` antes de
+      escribir la columna `avatar`; devuelve 403 si no lo posee. La columna
+      `avatar` se conserva igual (la leen social/leaderboard/amigos).
+- [x] `api-integracion/src/routes/auth.ts` — `PATCH /auth/avatar`: agrega el
+      403 a la documentación del passthrough (el forward ya lo soportaba).
+- [x] `src/components/AvatarPicker.tsx`: ya no ofrece `avatarOptions`
+      completo — hace `fetch` a `api.tienda.inventario()` y filtra a solo lo
+      poseído.
+- [x] `src/components/InventarioView.tsx`: la sección Avatares pasa a leer
+      del inventario real (`items.filter(categoria==='avatar')`) en vez del
+      catálogo completo de `avatarOptions` — mismo criterio que ficha/tablero,
+      sin cambiar la estructura de 3 secciones.
+- [x] `src/components/TiendaView.tsx`: sección "Avatares" nueva (antes no
+      existía ninguna, ya que la categoría nunca se listaba). De paso se
+      corrigió un bug latente e inalcanzable en `handleEquipar` — trataba
+      cualquier categoría no-`ficha` como `tablero`, lo que habría escrito
+      `skin_tablero` para un avatar; ahora avatar llama a `api.setAvatar`
+      (mismo patrón que `InventarioView`).
+- [x] `2mino-BO`: sin cambios — la vista Tienda del BO ya es genérica por
+      categoría (confirmado por lectura de código, no probado en vivo esta
+      vez).
+
+**Verificado en Docker + navegador (cuenta `cosmtest1`)**: reconstruidas las
+imágenes de `ms-usuarios`/`api-integracion`; en Postgres, los 8 `tienda_items`
+categoria=avatar existen y el backfill le dio los 8 a `cosmtest1`
+(`SELECT count(*) ... = 8`). Inventario muestra "Avatar 1".."Avatar 8" reales
+(no el catálogo hardcodeado); equipar desde Inventario Y desde la Tienda
+actualiza el avatar del sidebar al instante en ambos casos. Gating confirmado
+con una llamada directa a `PATCH /api/auth/avatar` con una clave inventada →
+`403 { error: "No poseés ese avatar" }`. `AvatarPicker` (sidebar) muestra los
+8 poseídos. `tsc` limpio en frontend + `ms-usuarios` + `api-integracion`. Sin
+errores nuevos en consola (solo el placeholder de AdSense, preexistente).
+
 ### Etapa 5 — v2, aparte (no arrancar sin cerrar 1-4)
 
 Cosméticos que se desbloquean por rango en vez de comprarse (Oro/
@@ -501,9 +593,9 @@ Platino/Diamante) · compra de doblones con dinero real (reusa `azul.ts`/
 PayPal de `PLAN_TORNEOS.md` cuando exista — el desembolso ya pasa por
 `billetera_movimientos` con `motivo` libre, ver nota de la Etapa 3, así
 que esto es agregar un endpoint/webhook, no rediseñar el schema) ·
-marcos de avatar, avatares nuevos vendibles · otorgar doblones al jugar
-(Etapa 2 del plan original — explícitamente pospuesta por el usuario,
-no implementada todavía).
+marcos de avatar, avatares nuevos vendibles.
+
+(Otorgar doblones al jugar — Etapa 2 — ya está implementado, ver arriba.)
 
 ---
 

@@ -19,6 +19,10 @@ import tiendaImg      from '../assets/iconos/tienda.webp';
 import solImg         from '../assets/iconos/sol.webp';
 import lunaImg        from '../assets/iconos/luna.webp';
 import doblonImg      from '../assets/iconos/doblon.webp';
+import inventarioImg  from '../assets/iconos/inventario.webp';
+import fichaImg       from '../assets/iconos/ficha.webp';
+import tableroImg     from '../assets/iconos/tablero.webp';
+import avatarImg      from '../assets/iconos/avatar.webp';
 
 const SRC = {
   ranked:      rankedImg,
@@ -33,6 +37,10 @@ const SRC = {
   sol:         solImg,
   luna:        lunaImg,
   doblon:      doblonImg,
+  inventario:  inventarioImg,
+  ficha:       fichaImg,
+  tablero:     tableroImg,
+  avatar:      avatarImg,
 } as const;
 
 export type GameIconName = keyof typeof SRC;

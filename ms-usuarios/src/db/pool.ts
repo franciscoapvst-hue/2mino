@@ -143,6 +143,18 @@ const SCHEMA = `
   );
   CREATE INDEX IF NOT EXISTS idx_billetera_mov_usuario ON billetera_movimientos (usuario_id);
 
+  -- Idempotencia de otorgamientos (docs/PLAN_COSMETICOS.md Etapa 2):
+  -- acreditar doblones por la MISMA partida (ref = sala_id) o el MISMO día
+  -- (ref = fecha YYYY-MM-DD) no debe duplicar el saldo si guardarPartida se
+  -- persiste/reintenta varias veces. Parcial (WHERE ref IS NOT NULL) a
+  -- propósito: 'ajuste_admin' no lleva ref y debe poder repetirse, así que
+  -- queda fuera del índice. 'compra_item'/'compra_doblones' ya son únicos de
+  -- hecho (inventario PK / order_id único), así que este índice no los
+  -- rompe. Lo consume el ON CONFLICT de routes/interno.ts (otorgar).
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_billetera_mov_idem
+    ON billetera_movimientos (usuario_id, motivo, ref)
+    WHERE ref IS NOT NULL;
+
   -- Catálogo de cosméticos. v1 solo categoria='ficha'; el resto ya
   -- modelado para no rehacer la tabla cuando lleguen tableros/avatares.
   CREATE TABLE IF NOT EXISTS tienda_items (
@@ -187,7 +199,20 @@ const SCHEMA = `
     ('tablero', 'cuero',      'Cuero',      90, 7),
     ('tablero', 'onix',       'Ónix',      100, 8),
     ('tablero', 'petroleo',   'Petróleo',   70, 9),
-    ('tablero', 'arce',       'Arce',       80, 10)
+    ('tablero', 'arce',       'Arce',       80, 10),
+    -- Avatares (docs/PLAN_COSMETICOS.md Etapa E): los 8 actuales quedan
+    -- gratis para todos (no se le puede cobrar retroactivamente a quien ya
+    -- los tenía sin pasar por la tienda) — avatares nuevos entran pagos.
+    -- clave = nombre de archivo exacto en src/assets/avatars/ (src/avatars.ts
+    -- lo resuelve vía avatarUrl()).
+    ('avatar', 'avatar1.webp', 'Avatar 1', 0, 0),
+    ('avatar', 'avatar2.webp', 'Avatar 2', 0, 1),
+    ('avatar', 'avatar3.webp', 'Avatar 3', 0, 2),
+    ('avatar', 'avatar4.webp', 'Avatar 4', 0, 3),
+    ('avatar', 'avatar5.webp', 'Avatar 5', 0, 4),
+    ('avatar', 'avatar6.webp', 'Avatar 6', 0, 5),
+    ('avatar', 'avatar7.webp', 'Avatar 7', 0, 6),
+    ('avatar', 'avatar8.webp', 'Avatar 8', 0, 7)
   ON CONFLICT (clave) DO NOTHING;
 
   -- Backfill: usuarios creados antes de que existiera este otorgamiento
@@ -202,6 +227,51 @@ const SCHEMA = `
   SELECT u.id, t.id FROM usuarios u, tienda_items t
   WHERE t.precio = 0
   ON CONFLICT DO NOTHING;
+
+  -- Comprar doblones con dinero real (docs/PLAN_COSMETICOS.md Etapa F,
+  -- flujo técnico ya fijado en docs/PLAN_TORNEOS.md §5 — mismo proveedor
+  -- PayPal Orders API v2, acá sin la coordinación de "equipo" de torneos:
+  -- es un comprador solo). Catálogo de paquetes — precio en USD (PayPal no
+  -- soporta DOP como moneda de transacción, ya verificado en PLAN_TORNEOS).
+  CREATE TABLE IF NOT EXISTS doblon_paquetes (
+    id          UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+    nombre      VARCHAR(60)   UNIQUE NOT NULL,
+    doblones    INT           NOT NULL CHECK (doblones > 0),
+    precio_usd  NUMERIC(6,2)  NOT NULL CHECK (precio_usd > 0),
+    disponible  BOOLEAN       NOT NULL DEFAULT true,
+    orden       INT           NOT NULL DEFAULT 0,
+    created_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+  );
+
+  -- Una fila por INTENTO de compra (mismo criterio que torneo_pagos: un
+  -- reintento es una fila nueva con un Order de PayPal nuevo, nunca se
+  -- reusa un paypal_order_id). doblones/precio_usd se copian del paquete
+  -- al crear la orden — si el paquete cambia de precio después, la compra
+  -- ya iniciada mantiene el monto que el jugador vio y aprobó.
+  CREATE TABLE IF NOT EXISTS doblon_compras (
+    id                UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    usuario_id        UUID         NOT NULL REFERENCES usuarios(id),
+    paquete_id        UUID         REFERENCES doblon_paquetes(id),
+    doblones          INT          NOT NULL,
+    precio_usd        NUMERIC(6,2) NOT NULL,
+    estado            VARCHAR(20)  NOT NULL DEFAULT 'iniciado' CHECK (estado IN ('iniciado', 'aprobado', 'expirado')),
+    paypal_order_id   VARCHAR(30)  UNIQUE NOT NULL,
+    paypal_capture_id VARCHAR(30),
+    paypal_respuesta  JSONB,
+    created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+  );
+  CREATE INDEX IF NOT EXISTS idx_doblon_compras_usuario ON doblon_compras (usuario_id);
+
+  -- Paquetes de ejemplo — sin panel admin todavía (mismo criterio que el
+  -- resto del seed a mano de este archivo). Bonus creciente por paquete
+  -- más grande, sin llegar a sentirse "oferta de casino".
+  INSERT INTO doblon_paquetes (nombre, doblones, precio_usd, orden) VALUES
+    ('Puñado',    100,  0.99, 0),
+    ('Bolsillo',  550,  4.99, 1),
+    ('Cartera',  1200,  9.99, 2),
+    ('Baúl',     2500, 19.99, 3)
+  ON CONFLICT (nombre) DO NOTHING;
 
   CREATE OR REPLACE FUNCTION usuario_completo(p_usuario_id UUID)
   RETURNS TABLE (

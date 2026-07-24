@@ -165,6 +165,17 @@ export type InventarioItem = {
   comprado_at: string;
 };
 
+// Comprar doblones con PayPal (docs/PLAN_COSMETICOS.md Etapa F).
+// precio_usd viaja como string (NUMERIC de Postgres, evita perder
+// precisión de punto flotante en el viaje por JSON).
+export type DoblonPaquete = {
+  id:         string;
+  nombre:     string;
+  doblones:   number;
+  precio_usd: string;
+  orden:      number;
+};
+
 // ── Social: amigos, bandeja, leaderboard extendido, historial, chat ──
 // Tipos según docs/CASOS_DE_USO_SOCIAL.md, servidos por ms-social/ms-salas
 // vía el gateway.
@@ -492,6 +503,13 @@ export const api = {
 
   billetera: {
     saldo: () => req<Billetera>('/billetera'),
+    doblones: {
+      paquetes: () => req<DoblonPaquete[]>('/billetera/doblones/paquetes'),
+      crearOrden: (paqueteId: string) =>
+        req<{ orderId: string }>('/billetera/doblones/orden', { method: 'POST', body: JSON.stringify({ paqueteId }) }),
+      capturar: (orderId: string) =>
+        req<{ saldo: number; doblones: number }>(`/billetera/doblones/${orderId}/capturar`, { method: 'POST', body: '{}' }),
+    },
   },
 
   // ── Torneos: solo el resumen para el banner del dashboard (ms-salas) —

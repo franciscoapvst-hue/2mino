@@ -22,18 +22,17 @@
   border-bottom: 1px solid var(--d-border);
 }
 
-/* Tile del ícono de categoría — ámbar tenue, el mismo tono de acento que
-   usa la Tienda para precio/CTA. Igual en las tres secciones: lo que cambia
-   es el ícono, no el color. */
+/* Tile del ícono de categoría — íconos dimensionales reales (ficha/tablero/
+   avatar, ver GameIcons.tsx). Sin chip de fondo: cada ícono ya trae su
+   propia sombra de contacto horneada en el arte, y un chip detrás se ve
+   como una caja encimada — mismo criterio que el sidebar (AppSidebar), que
+   tampoco pone fondo detrás de sus GameIcon. */
 .inv-section-icon {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   flex: none;
-  border-radius: 9px;
-  color: var(--amber-hi);
-  background: color-mix(in srgb, var(--amber) 14%, transparent);
 }
 
 .inv-section-head h2 {

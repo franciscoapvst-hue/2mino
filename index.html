@@ -6,14 +6,12 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>2mino</title>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <!-- AdSense: tiene que estar siempre en el HTML (no inyectado por JS)
-         porque Google verifica el sitio sin sesión iniciada — ve la
-         pantalla de login, no el dashboard donde recién ahí montaríamos
-         el script si fuera dinámico. Si VITE_ADSENSE_CLIENT_ID está vacío
-         (sin cuenta configurada), el src queda con client= vacío y el
-         pedido lo rechaza Google con un 400 — no rompe nada, solo no
-         hace nada. -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=%VITE_ADSENSE_CLIENT_ID%" crossorigin="anonymous"></script>
+    <!-- El <script> de AdSense se inyecta acá desde vite.config.ts (plugin
+         'adsense-script'), pero SOLO si VITE_ADSENSE_CLIENT_ID está seteado.
+         Queda en el HTML estático del build (Google lo verifica sin sesión),
+         y en dev/sin cuenta no se emite nada — así se evita el URIError que
+         daba el placeholder literal. Ver el comentario del plugin. -->
+
   </head>
   <body>
     <div id="root"></div>

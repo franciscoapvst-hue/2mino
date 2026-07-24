@@ -39,7 +39,11 @@ const SCHEMA = `
     ('secciones_landing',    '["hero","caracteristicas","como_jugar","tabla_clasificacion"]',
                                                                               'Secciones del landing habilitadas'),
     ('reintegro_partida_activa_habilitado', 'true',
-       'Avisar en el dashboard si el usuario tiene una partida en curso, con botón para reintegrarse. Apagar si da problemas.')
+       'Avisar en el dashboard si el usuario tiene una partida en curso, con botón para reintegrarse. Apagar si da problemas.'),
+    ('tienda_habilitada', 'true',
+       'Muestra la Tienda de cosméticos (entrada del sidebar, ruta /tienda y el saldo de doblones). Apagar la oculta por completo — el Inventario y lo ya equipado siguen funcionando.'),
+    ('comprar_doblones_habilitado', 'true',
+       'Muestra la sección "Comprar doblones" (paquetes con PayPal) dentro de la Tienda. Independiente de tienda_habilitada: la Tienda puede seguir abierta para cosméticos sin vender doblones.')
   ON CONFLICT (clave) DO NOTHING;
 `;
 

@@ -22,7 +22,7 @@ export default function TerminosView() {
 
         <h2>Cuentas</h2>
         <ul>
-          <li>Sos responsable de mantener segura tu contraseña.</li>
+          <li>Eres responsable de mantener segura tu contraseña.</li>
           <li>Las cuentas de invitado son temporales: se eliminan al cerrar sesión, junto con su progreso.</li>
           <li>Nos reservamos el derecho de suspender cuentas que hagan trampa, abusen del chat o exploten fallas del sistema.</li>
         </ul>

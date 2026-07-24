@@ -151,7 +151,7 @@ export default function Dashboard({
       {salaParaReintegrar && (
         <div className="rejoin-banner">
           <span className="rejoin-banner-text">
-            <strong>Tenés una partida en curso.</strong> Sala {salaParaReintegrar.codigo}
+            <strong>Tienes una partida en curso.</strong> Sala {salaParaReintegrar.codigo}
           </span>
           <div className="rejoin-banner-actions">
             <button className="rejoin-banner-cta" onClick={onReintegrarSala}>Reintegrarme</button>
@@ -194,7 +194,7 @@ export default function Dashboard({
                 {racha === null
                   ? 'racha de victorias'
                   : racha === 0
-                    ? 'empezá tu racha'
+                    ? 'empieza tu racha'
                     : racha === 1
                       ? 'victoria al hilo'
                       : 'victorias al hilo'}

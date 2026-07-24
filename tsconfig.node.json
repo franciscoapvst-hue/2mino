@@ -1,6 +1,11 @@
 {
   "compilerOptions": {
     "composite": true,
+    // composite obliga a emitir; sin outDir, `tsc -b` dejaba vite.config.js
+    // + .d.ts JUNTO al fuente, y Vite prioriza el .js sobre el .ts →
+    // cualquier cambio a vite.config.ts quedaba silenciosamente ignorado.
+    // Emitir a un temp ignorado evita que ese shadow vuelva a aparecer.
+    "outDir": "./node_modules/.tmp/tsconfig.node",
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "allowSyntheticDefaultImports": true

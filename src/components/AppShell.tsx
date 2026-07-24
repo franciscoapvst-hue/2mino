@@ -23,6 +23,8 @@ type Props = {
   user: AuthUser;
   config: UserConfig;
   dark: boolean;
+  /** Feature flag tienda_habilitada (BO): oculta Tienda + saldo si está off. */
+  tiendaHabilitada: boolean;
   onToggleTheme: () => void;
   onLogout: () => void;
   onAvatarChange: (avatar: string) => void;
@@ -33,7 +35,7 @@ type Props = {
 };
 
 export default function AppShell({
-  user, config, dark, onToggleTheme, onLogout, onAvatarChange, onUnirseSala,
+  user, config, dark, tiendaHabilitada, onToggleTheme, onLogout, onAvatarChange, onUnirseSala,
   notifVersion, children,
 }: Props) {
   const location = useLocation();
@@ -69,6 +71,7 @@ export default function AppShell({
       user={user}
       config={config}
       dark={dark}
+      tiendaHabilitada={tiendaHabilitada}
       saldo={saldo}
       noLeidas={noLeidas}
       onNavigate={() => setDrawerAbierto(false)}

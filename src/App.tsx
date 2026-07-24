@@ -52,6 +52,7 @@ type Session = { user: AuthUser; config: UserConfig };
 type AppCtx = {
   session: Session | null;
   dark: boolean;
+  flags: Record<string, unknown> | null;
   toggleTheme: () => void;
   enVivo: Map<string, boolean>;
   notifVersion: number;
@@ -75,10 +76,18 @@ function useApp(): AppCtx {
   return ctx;
 }
 
+// Lee un feature flag: null (todavía cargando) → se asume ENCENDIDO, para no
+// esconder-y-mostrar la Tienda en el caso normal (que es el común). Ya
+// cargado, una clave ausente = apagada (GET /frontend/config solo devuelve
+// las habilitadas).
+function flagOn(flags: Record<string, unknown> | null, clave: string): boolean {
+  return flags === null ? true : Boolean(flags[clave]);
+}
+
 // ── Layout autenticado: monta el shell una vez y rutea con <Outlet/> ──
 function AuthLayout() {
   const {
-    session, dark, toggleTheme, handleLogout, handleUnirseSala, notifVersion, setSession,
+    session, dark, flags, toggleTheme, handleLogout, handleUnirseSala, notifVersion, setSession,
   } = useApp();
   if (!session) return <Navigate to="/login" replace />;
   return (
@@ -86,6 +95,7 @@ function AuthLayout() {
       user={session.user}
       config={session.config}
       dark={dark}
+      tiendaHabilitada={flagOn(flags, 'tienda_habilitada')}
       onToggleTheme={toggleTheme}
       onLogout={handleLogout}
       onAvatarChange={(avatar) => setSession(s => s && { ...s, user: { ...s.user, avatar } })}
@@ -288,14 +298,21 @@ function TorneoJoinRoute() {
 }
 
 function TiendaRoute() {
-  const { session, dark, setSession } = useApp();
+  const { session, dark, flags, setSession } = useApp();
   const navigate = useNavigate();
   if (!session) return null;
+  // Tienda apagada desde el BO: la ruta redirige al home (por si alguien
+  // llega por URL directa). Solo una vez que los flags cargaron — mientras
+  // son null se deja pasar para no expulsar en el caso normal.
+  if (flags !== null && !flagOn(flags, 'tienda_habilitada')) return <Navigate to="/home" replace />;
   return (
     <TiendaView
       dark={dark}
       config={session.config}
+      avatarActual={session.user.avatar}
+      comprarDoblonesHabilitado={flagOn(flags, 'comprar_doblones_habilitado')}
       onConfigChange={(config) => setSession(sess => sess && { ...sess, config })}
+      onAvatarChange={(avatar) => setSession(sess => sess && { ...sess, user: { ...sess.user, avatar } })}
       onBack={() => navigate('/home')}
     />
   );
@@ -405,6 +422,10 @@ export default function App() {
 
   const [session,  setSession]  = useState<Session | null>(null);
   const [booting,  setBooting]  = useState(true);
+  // Feature flags de landing_config (BO → "Feature flags"), editables sin
+  // redeploy. null = todavía cargando; una vez cargados, una clave ausente
+  // significa "apagada" (GET /frontend/config solo trae las habilitadas).
+  const [flags, setFlags] = useState<Record<string, unknown> | null>(null);
   // Partida en_juego que el usuario ya tenía abierta al iniciar sesión —
   // se ofrece reintegrarse desde un banner en el dashboard, en vez de
   // forzar la navegación (por eso vive aparte de la ruta /game/:id).
@@ -465,10 +486,11 @@ export default function App() {
   // Feature flags): si diera problemas, se apaga sin redeploy — ni
   // siquiera se llega a pedir /salas/activa.
   useEffect(() => {
-    if (!session) return;
+    if (!session) { setFlags(null); return; }
     api.featureFlags()
-      .then(flags => {
-        if (!flags.reintegro_partida_activa_habilitado) return;
+      .then(f => {
+        setFlags(f); // los consumen también AppSidebar (Tienda) y TiendaView (doblones)
+        if (!f.reintegro_partida_activa_habilitado) return;
         return api.salas.activa().then(r => setSalaParaReintegrar(r.sala));
       })
       .catch(() => {});
@@ -569,6 +591,7 @@ export default function App() {
   const ctx: AppCtx = {
     session,
     dark,
+    flags,
     toggleTheme: () => setDark(d => !d),
     enVivo,
     notifVersion,

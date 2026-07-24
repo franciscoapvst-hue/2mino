@@ -4,7 +4,6 @@ import type { AuthUser, UserConfig } from '../api';
 import { Bone } from './DominoStage';
 import { avatarUrl } from '../avatars';
 import GameIcon, { type GameIconName } from './GameIcons';
-import { InventarioIcon } from './icons';
 
 // ── Barra lateral global (shell a nivel de app) ───────────────────
 // Vive dentro de AppShell y se muestra en TODA la app autenticada,
@@ -35,6 +34,8 @@ type Props = {
   user: AuthUser;
   config: UserConfig;
   dark: boolean;
+  /** Feature flag tienda_habilitada (BO): oculta la entrada Tienda + el saldo. */
+  tiendaHabilitada: boolean;
   saldo: number | null;
   noLeidas: number;
   /** En móvil el sidebar es un drawer; al navegar se cierra. */
@@ -46,13 +47,16 @@ type Props = {
 };
 
 export default function AppSidebar({
-  user, config, dark, saldo, noLeidas,
+  user, config, dark, tiendaHabilitada, saldo, noLeidas,
   onNavigate, onToggleTheme, onOpenInbox, onOpenAvatar, onLogout,
 }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
   const foto = avatarUrl(user.avatar);
 
+  // La Tienda se oculta si el BO la apagó (tienda_habilitada). El Inventario
+  // se queda: equipar lo ya poseído (incluidos los avatares gratis) sigue
+  // teniendo sentido con la tienda cerrada.
   const items: NavDef[] = [
     { to: '/home', label: 'Jugar', img: 'casual',
       match: p => p === '/home' || p === '/rooms' || p === '/ranked' || p === '/casual' || p.startsWith('/game') },
@@ -62,8 +66,8 @@ export default function AppSidebar({
     { to: '/leaderboard', label: 'Leaderboard', img: 'leaderboard' },
     { to: '/history', label: 'Historial', img: 'historial',
       match: p => p === '/history' || p.startsWith('/replay') },
-    { to: '/tienda', label: 'Tienda', img: 'tienda' },
-    { to: '/inventario', label: 'Inventario', svg: <InventarioIcon /> },
+    ...(tiendaHabilitada ? [{ to: '/tienda', label: 'Tienda', img: 'tienda' as const }] : []),
+    { to: '/inventario', label: 'Inventario', img: 'inventario' },
     { to: '/piece-demo', label: 'Ver fichas', svg: <Bone a={3} b={5} className="nav-tile" /> },
   ];
 
@@ -99,8 +103,9 @@ export default function AppSidebar({
         ))}
       </nav>
 
-      {/* Saldo de doblones — atajo a la tienda */}
-      {saldo !== null && (
+      {/* Saldo de doblones — atajo a la tienda. Se oculta con la tienda
+          apagada: es literalmente el atajo a ella y quedaría como link muerto. */}
+      {tiendaHabilitada && saldo !== null && (
         <button className="asb-saldo" onClick={() => go('/tienda')} title="Tienda de cosméticos">
           <span className="asb-saldo-icon">
             <GameIcon name="doblon" size={26} />

@@ -43,7 +43,7 @@ export default function TorneoUnirseView({ torneoId, onVolver, onListo }: Props)
     const faltante = torneo!.campos.find(c => c.requerido && !respuestas[c.clave]?.trim());
     if (faltante) { setError(`Falta completar: ${faltante.etiqueta}`); return; }
     if (torneo!.reglamentoPdfUrl && !aceptaPoliticas) {
-      setError('Tenés que aceptar las políticas del torneo para continuar.');
+      setError('Tienes que aceptar las políticas del torneo para continuar.');
       return;
     }
 
