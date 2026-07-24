@@ -6,10 +6,10 @@ import {
 } from '../game/logic';
 import type { PartidaState, Pieza } from '../game/logic';
 import { aplicarEloRanked } from './ranked';
-import { resolverTurnosBotConDelay } from '../game/bots';
+import { resolverTurnosBotConDelay, esBot } from '../game/bots';
 import type { MovimientoBot } from '../game/bots';
 import { getRegla, limiteJugadaMsDe } from '../game/reglas';
-import { avisarPartidaActualizada } from '../http';
+import { avisarPartidaActualizada, otorgarDoblones } from '../http';
 
 const ErrorSchema = {
   type: 'object',
@@ -68,6 +68,14 @@ async function guardarPartida(juegoId: string, salaId: string, partida: PartidaS
     } catch (e) {
       console.error('Error guardando partida_resultados:', e);
     }
+    // Doblones ganados jugando (docs/PLAN_COSMETICOS.md Etapa 2) — mismo
+    // criterio que ELO/historial: fire-and-forget hacia ms-usuarios,
+    // idempotente por (usuario, motivo, ref), un fallo no tumba el cierre.
+    try {
+      await otorgarDoblonesPorPartida(salaId, partida);
+    } catch (e) {
+      console.error('Error otorgando doblones:', e);
+    }
   }
   // Un solo punto de aviso para todo lo que persiste un cambio de estado
   // (jugar/pasar/listo/abandonar y cada paso de bot resuelto en segundo
@@ -100,6 +108,46 @@ async function guardarResultados(salaId: string, partida: PartidaState) {
         partida.marcador[rival],
       ],
     );
+  }
+}
+
+// ── Doblones ganados por jugar (docs/PLAN_COSMETICOS.md §4, Etapa 2) ──
+const DOBLONES_PARTIDA         = 5;  // completar una partida (gane o pierda)
+const DOBLONES_RANKED_GANADO   = 5;  // EXTRA para el ganador en ranked (total 10)
+const DOBLONES_PRIMERA_DEL_DIA = 15; // primera partida del día calendario, una sola vez
+
+// Otorga doblones a cada jugador HUMANO al cerrar la partida. Los bots se
+// excluyen (sus BOT_IDS no existen en la tabla usuarios; la FK de
+// billetera_movimientos rompería). Cada otorgamiento es fire-and-forget e
+// idempotente del lado de ms-usuarios por (usuario_id, motivo, ref) — llamar
+// esto dos veces por la misma sala (guardarPartida se puede repetir) no
+// duplica saldo. Espeja la iteración de asientos de guardarResultados.
+async function otorgarDoblonesPorPartida(salaId: string, partida: PartidaState) {
+  if (partida.equipoGanadorPartida === null) return; // sin ganador definido: no otorgar
+  const { rows: salaRows } = await pool.query('SELECT tipo FROM salas WHERE id = $1', [salaId]);
+  const esRanked = salaRows[0]?.tipo === 'ranked';
+  const hoy = new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
+
+  for (let seat = 0; seat < partida.asientos.length; seat++) {
+    const { usuario_id } = partida.asientos[seat];
+    if (esBot(usuario_id)) continue;
+    // El que ABANDONA no cobra nada — si no, se podría farmear doblones
+    // arrancando y abandonando partidas en loop. El rival que se quedó sí
+    // cobra (jugó y ganó de verdad); solo se saltea el asiento que se fue.
+    if (partida.abandonadoPorSeat === seat) continue;
+
+    // Completar la partida: fijo, gane o pierda. ref = salaId → una sola vez
+    // por partida aunque el cierre se persista/reintente varias veces.
+    otorgarDoblones(usuario_id, DOBLONES_PARTIDA, 'partida_completada', salaId);
+
+    // Ganar en ranked: extra sobre el fijo (10 vs 5). Mismo ref = salaId.
+    if (esRanked && equipoDe(seat) === partida.equipoGanadorPartida) {
+      otorgarDoblones(usuario_id, DOBLONES_RANKED_GANADO, 'ranked_ganado', salaId);
+    }
+
+    // Primera partida del día: ref = fecha de hoy → el índice único lo vuelve
+    // "una vez por día calendario" sin lógica de fechas extra en el código.
+    otorgarDoblones(usuario_id, DOBLONES_PRIMERA_DEL_DIA, 'racha_diaria', hoy);
   }
 }
 

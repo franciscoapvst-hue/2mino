@@ -30,6 +30,47 @@
   --teal:      #0f8f78;
 }
 
+/* ── Skins de tablero (docs/PLAN_COSMETICOS.md, Etapa 4) ──────────
+   Mismo mecanismo que las skins de ficha: comprar un tablero solo
+   cambia estas variables (fondo + tinte del gradiente), nunca la
+   disposición/tamaño de las fichas — eso sigue siendo 100% CSS, sin
+   assets rasterizados. 'clasico' es gratis y es el bloque de arriba
+   (sin selector propio, no necesita override). */
+.game-shell[data-tablero="roble"] {
+  --g-bg: #1a1109;
+  background:
+    radial-gradient(120% 60% at 50% -10%, rgba(239, 159, 46, 0.16) 0%, transparent 50%),
+    var(--g-bg) !important;
+}
+:root.light .game-shell[data-tablero="roble"] { --g-bg: #faf1e4; }
+
+.game-shell[data-tablero="esmeralda"] {
+  --g-bg: #071a16;
+  background:
+    radial-gradient(120% 60% at 50% -10%, rgba(52, 211, 180, 0.14) 0%, transparent 50%),
+    var(--g-bg) !important;
+}
+:root.light .game-shell[data-tablero="esmeralda"] { --g-bg: #eaf7f3; }
+
+/* ── Tableros de imagen: MESA ACOTADA (PLAN_COSMETICOS Tienda v2, Etapa B) ──
+   En vez de wallpaper a pantalla completa (se veía pixelado y peleaba con la
+   UI), la textura vive en un panel tipo mesa de dominó en el área de juego:
+   marco redondeado, sombra elevada y viñeta interior. El shell queda con la
+   UI oscura de siempre; solo la superficie de juego es la "mesa". Cubrir un
+   área más chica también hace que la textura se vea nítida.
+   La textura llega por --board-img desde GameBoard (se setea en el shell y
+   la lee este descendiente). */
+.game-shell[data-tablero-tipo="imagen"] .game-table {
+  background: var(--board-img) center / cover no-repeat;
+  border-radius: 22px;
+  margin: 4px 14px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  box-shadow:
+    inset 0 0 80px rgba(0, 0, 0, 0.5),        /* viñeta interior: legibilidad + profundidad */
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05), /* filo cálido sutil */
+    0 22px 48px -16px rgba(0, 0, 0, 0.62);     /* mesa elevada sobre la UI */
+}
+
 /* ── Nav ─────────────────────────────────────────── */
 .game-nav {
   padding: 12px 22px;
@@ -53,7 +94,7 @@
 .game-nav .btn-back:hover { border-color: var(--amber); color: var(--g-ink); }
 
 .game-room-code {
-  font-family: 'Space Grotesk', Inter, sans-serif !important;
+  font-family: 'Segoe UI', Inter, sans-serif !important;
   font-size: 0.8rem !important;
   font-weight: 600;
   letter-spacing: 0.04em !important;
@@ -220,7 +261,7 @@
   box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.5) !important;
 }
 .game-result-card h2 {
-  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-family: 'Segoe UI', Inter, sans-serif;
   color: var(--g-ink) !important;
 }
 .result-points { color: var(--amber) !important; }

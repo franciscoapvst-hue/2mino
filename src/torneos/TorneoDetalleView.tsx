@@ -125,8 +125,8 @@ export default function TorneoDetalleView({ torneoId, onVolver, onInscribirme, o
           <section className="tor-panel">
             <h2 className="tor-panel-title">Inscribirme</h2>
             <p className="tor-panel-text">
-              Los torneos se juegan estrictamente en pareja. Inscribite y compartí un código con tu compañero,
-              o unite a un equipo si ya tenés un código.
+              Los torneos se juegan estrictamente en pareja. Inscríbete y comparte un código con tu compañero,
+              o únete a un equipo si ya tienes un código.
             </p>
             <div className="tor-inscribir-actions">
               <button className="btn-primary" onClick={() => onInscribirme(torneo.id)}>

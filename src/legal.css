@@ -1,0 +1,71 @@
+/* ═══════════════════════════════════════════════════════
+   Páginas legales (Privacidad/Términos) — docs/PLAN_MONETIZACION.md.
+   Públicas, con o sin sesión — mismos tokens ámbar/teal de siempre.
+   ═══════════════════════════════════════════════════════ */
+.legal-page {
+  --lg-bg:     #0a0f0d;
+  --lg-ink:    #f2ede3;
+  --lg-muted:  #b6beb4;
+  --lg-border: rgba(242, 237, 227, 0.10);
+
+  min-height: 100vh;
+  background: var(--lg-bg);
+  color: var(--lg-ink);
+}
+:root.light .legal-page {
+  --lg-bg:     #f4f4f2;
+  --lg-ink:    #16211d;
+  --lg-muted:  #566159;
+  --lg-border: rgba(20, 30, 26, 0.10);
+}
+
+.legal-inner {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 24px 80px;
+}
+.legal-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 24px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--lg-border);
+  background: none;
+  color: var(--lg-ink);
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.legal-back:hover { border-color: var(--amber); }
+
+.legal-page h1 {
+  font-family: 'Segoe UI', Inter, sans-serif;
+  font-size: 1.6rem;
+  font-weight: 800;
+}
+.legal-updated { margin-top: 6px; font-size: 0.82rem; color: var(--lg-muted); }
+.legal-page h2 {
+  margin-top: 28px;
+  font-family: 'Segoe UI', Inter, sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.legal-page p, .legal-page li {
+  margin-top: 10px;
+  font-size: 0.94rem;
+  line-height: 1.65;
+  color: var(--lg-muted);
+}
+.legal-page ul { padding-left: 20px; }
+.legal-page strong { color: var(--lg-ink); }
+.legal-page a { color: var(--teal); }
+.legal-inline-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--teal);
+  cursor: pointer;
+}

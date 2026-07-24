@@ -1,10 +1,11 @@
-import { useRef, useCallback, useState } from 'react';
+import { useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useReveal } from '../hooks/useReveal';
 import { Bone } from './DominoStage';
+import Footer from './Footer';
 import { SunIcon, MoonIcon } from './icons';
 import GameIcon from './GameIcons';
 import { todosLosRangos } from '../ranks';
-import { api, tokenStore, type AuthUser, type UserConfig } from '../api';
 import amigosImg  from '../assets/iconos/amigos.webp';
 import bandejaImg from '../assets/iconos/bandeja.webp';
 
@@ -49,44 +50,60 @@ function HBone({ a, b, className = '' }: { a: number; b: number; className?: str
 type Props = {
   dark: boolean;
   onToggleTheme: () => void;
-  onSuccess: (user: AuthUser, config: UserConfig) => void;
 };
 
 // Landing pública — lo primero que ve alguien sin sesión. Login/Register/
 // Forgot siguen siendo pantallas propias (LoginScreen, etc); esta solo
 // vende el juego y navega ahí directo.
-export default function LandingScreen({ dark, onToggleTheme, onSuccess }: Props) {
+export default function LandingScreen({ dark, onToggleTheme }: Props) {
   const navigate = useNavigate();
-  const [guestLoading, setGuestLoading] = useState(false);
-  const [guestError,   setGuestError]   = useState<string | null>(null);
 
-  // Cuenta efímera (mismo endpoint/flujo que el botón de LoginScreen) —
-  // se ofrece acá también para que probar el juego no obligue a pasar
-  // primero por login/registro.
-  async function handleGuestClick() {
-    setGuestError(null);
-    setGuestLoading(true);
-    try {
-      const authRes = await api.jugarInvitado();
-      tokenStore.set(authRes.token, false);
-      const config = await api.getPreferencias();
-      onSuccess(authRes.user, config);
-    } catch (err: unknown) {
-      setGuestError(err instanceof Error ? err.message : 'No se pudo iniciar como invitado');
-      setGuestLoading(false);
-    }
-  }
+  // Scroll-reveal de las secciones bajo el hero (una llamada por sección,
+  // orden fijo — ver src/hooks/useReveal.ts).
+  const [demoVisible, demoRef] = useReveal();
+  const [modesVisible, modesRef] = useReveal();
+  const [rulesVisible, rulesRef] = useReveal();
+  const [ranksVisible, ranksRef] = useReveal();
+  const [torneosVisible, torneosRef] = useReveal();
+  const [socialVisible, socialRef] = useReveal();
+  const [finalCtaVisible, finalCtaRef] = useReveal();
+
   // Mismo parallax de fichas con el mouse que ya usa DominoStage (login) —
   // reimplementado acá porque el hero tiene su propia escena/tiles.
+  // El rect se cachea en mouseenter (no en cada mousemove: leerlo ahí forzaría
+  // un layout síncrono por evento) y el write de --px/--py se limita a una
+  // vez por frame con rAF — "último valor gana", sin encolar frames.
   const sceneRef = useRef<HTMLDivElement>(null);
-  const onMove = useCallback((e: React.MouseEvent) => {
+  const rectRef = useRef<DOMRect | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const posRef = useRef({ x: 0, y: 0 });
+
+  const applyParallax = useCallback(() => {
+    rafRef.current = null;
     const el = sceneRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    el.style.setProperty('--px', ((e.clientX - r.left) / r.width - 0.5).toFixed(3));
-    el.style.setProperty('--py', ((e.clientY - r.top) / r.height - 0.5).toFixed(3));
+    const rect = rectRef.current;
+    if (!el || !rect) return;
+    const { x, y } = posRef.current;
+    el.style.setProperty('--px', ((x - rect.left) / rect.width - 0.5).toFixed(3));
+    el.style.setProperty('--py', ((y - rect.top) / rect.height - 0.5).toFixed(3));
   }, []);
+
+  const onEnter = useCallback(() => {
+    rectRef.current = sceneRef.current?.getBoundingClientRect() ?? null;
+  }, []);
+
+  const onMove = useCallback((e: React.MouseEvent) => {
+    posRef.current = { x: e.clientX, y: e.clientY };
+    if (rafRef.current === null) {
+      rafRef.current = requestAnimationFrame(applyParallax);
+    }
+  }, [applyParallax]);
+
   const onLeave = useCallback(() => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
     const el = sceneRef.current;
     if (!el) return;
     el.style.setProperty('--px', '0');
@@ -114,7 +131,7 @@ export default function LandingScreen({ dark, onToggleTheme, onSuccess }: Props)
       </header>
 
       {/* ── 1 · Hero ─────────────────────────────────── */}
-      <section className="ld-hero" ref={sceneRef} onMouseMove={onMove} onMouseLeave={onLeave}>
+      <section className="ld-hero" ref={sceneRef} onMouseEnter={onEnter} onMouseMove={onMove} onMouseLeave={onLeave}>
         <div className="ld-hero-tiles" aria-hidden="true">
           <Bone a={6} b={6} className="ld-htile ld-htile-1" />
           <Bone a={6} b={3} className="ld-htile ld-htile-2" />
@@ -132,22 +149,13 @@ export default function LandingScreen({ dark, onToggleTheme, onSuccess }: Props)
             Encuentra partida en segundos y deja que tu rango hable por ti.
           </p>
           <div className="ld-hero-actions">
-            <button className="ld-btn-primary" onClick={() => navigate('/register')}>
+            {/* Un solo botón grande: adentro (LoginScreen) ya se puede crear
+                cuenta, seguir con Google o entrar como invitado — no hace
+                falta triplicar esas rutas acá en el hero. */}
+            <button className="ld-btn-primary ld-btn-hero" onClick={() => navigate('/login')}>
               Jugar gratis ahora
             </button>
-            <button className="ld-btn-ghost" onClick={() => navigate('/login')}>
-              Ya tengo cuenta
-            </button>
           </div>
-          <button
-            type="button"
-            className="ld-guest-cta"
-            onClick={handleGuestClick}
-            disabled={guestLoading}
-          >
-            {guestLoading ? 'Entrando…' : 'Jugar como invitado'}
-          </button>
-          {guestError && <p className="ld-guest-err" role="alert">⚠ {guestError}</p>}
           <p className="ld-hero-note">
             Sin descargas: juegas desde el navegador, en el celular o en la computadora.
           </p>
@@ -155,7 +163,7 @@ export default function LandingScreen({ dark, onToggleTheme, onSuccess }: Props)
       </section>
 
       {/* ── 2 · Demo: la mesa en acción ──────────────── */}
-      <section className="ld-demo">
+      <section className={`ld-demo ld-reveal${demoVisible ? ' is-visible' : ''}`} ref={demoRef}>
         <h2 className="ld-h2">Así se siente la mesa</h2>
         <p className="ld-section-sub">
           Arrastra tu ficha, colócala en la punta y celebra en el chat.
@@ -196,7 +204,7 @@ export default function LandingScreen({ dark, onToggleTheme, onSuccess }: Props)
       </section>
 
       {/* ── 3 · Modos de juego ───────────────────────── */}
-      <section className="ld-modes">
+      <section className={`ld-modes ld-reveal${modesVisible ? ' is-visible' : ''}`} ref={modesRef}>
         <h2 className="ld-h2">Elige cómo jugar</h2>
 
         <div className="ld-modes-layout">
@@ -233,7 +241,7 @@ export default function LandingScreen({ dark, onToggleTheme, onSuccess }: Props)
       </section>
 
       {/* ── 4 · Reglas personalizables ───────────────── */}
-      <section className="ld-rules">
+      <section className={`ld-rules ld-reveal${rulesVisible ? ' is-visible' : ''}`} ref={rulesRef}>
         <div className="ld-rules-copy">
           <h2 className="ld-h2">Las reglas las pones tú</h2>
           <p className="ld-section-sub">
@@ -277,7 +285,7 @@ export default function LandingScreen({ dark, onToggleTheme, onSuccess }: Props)
       </section>
 
       {/* ── 5 · Rangos / ELO ─────────────────────────── */}
-      <section id="ld-ranks" className="ld-ranks">
+      <section id="ld-ranks" className={`ld-ranks ld-reveal${ranksVisible ? ' is-visible' : ''}`} ref={ranksRef}>
         <h2 className="ld-h2">Tu rango, tu orgullo</h2>
         <p className="ld-section-sub">
           Cinco escalones, un solo objetivo: que el equipo de enfrente sepa
@@ -299,7 +307,7 @@ export default function LandingScreen({ dark, onToggleTheme, onSuccess }: Props)
       </section>
 
       {/* ── 6 · Torneos con premios reales ───────────── */}
-      <section className="ld-torneos">
+      <section className={`ld-torneos ld-reveal${torneosVisible ? ' is-visible' : ''}`} ref={torneosRef}>
         <div className="ld-torneos-inner">
           <GameIcon name="torneos" size={72} />
           <div className="ld-torneos-copy">
@@ -317,7 +325,7 @@ export default function LandingScreen({ dark, onToggleTheme, onSuccess }: Props)
       </section>
 
       {/* ── 7 · Social ───────────────────────────────── */}
-      <section className="ld-social">
+      <section className={`ld-social ld-reveal${socialVisible ? ' is-visible' : ''}`} ref={socialRef}>
         <div className="ld-social-copy">
           <h2 className="ld-h2">Nunca juegues solo</h2>
           <ul className="ld-social-list">
@@ -355,23 +363,18 @@ export default function LandingScreen({ dark, onToggleTheme, onSuccess }: Props)
       </section>
 
       {/* ── 8 · CTA final ────────────────────────────── */}
-      <section className="ld-final-cta">
+      <section className={`ld-final-cta ld-reveal${finalCtaVisible ? ' is-visible' : ''}`} ref={finalCtaRef}>
         <h2 className="ld-h2">¿Listo para sentarte a la mesa?</h2>
-        <button className="ld-btn-primary ld-btn-lg" onClick={() => navigate('/register')}>
+        {/* Mismo criterio que el hero: un solo botón a /login (ahí ya se
+            crea cuenta, se sigue con Google o se entra de invitado) — la
+            nota de "¿ya tienes cuenta?" quedaba redundante apuntando al
+            mismo lugar. */}
+        <button className="ld-btn-primary ld-btn-lg" onClick={() => navigate('/login')}>
           Jugar gratis ahora
         </button>
-        <p className="ld-final-note">
-          ¿Ya tienes cuenta?{' '}
-          <button type="button" className="ld-link" onClick={() => navigate('/login')}>
-            Inicia sesión
-          </button>
-        </p>
       </section>
 
-      <footer className="ld-footer">
-        <Bone a={3} b={3} className="ld-footer-bone" />
-        <span>© {new Date().getFullYear()} 2mino</span>
-      </footer>
+      <Footer />
     </div>
   );
 }

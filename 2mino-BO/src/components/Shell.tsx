@@ -5,7 +5,7 @@ import './shell.css';
 const GRAFANA_LAUNCHER_URL = 'http://localhost:4590/start';
 const GRAFANA_URL = 'http://localhost:3030';
 
-export type View = 'flags' | 'usuarios' | 'segmentos' | 'reglas' | 'torneos';
+export type View = 'flags' | 'usuarios' | 'segmentos' | 'reglas' | 'torneos' | 'tienda';
 
 const NAV: { view: View; label: string; hint: string }[] = [
   { view: 'flags', label: 'Feature flags', hint: 'FF' },
@@ -13,6 +13,7 @@ const NAV: { view: View; label: string; hint: string }[] = [
   { view: 'segmentos', label: 'Segmentos', hint: 'SG' },
   { view: 'reglas', label: 'Reglas del juego', hint: 'RJ' },
   { view: 'torneos', label: 'Torneos', hint: 'TR' },
+  { view: 'tienda', label: 'Tienda', hint: 'TI' },
 ];
 
 type Props = {

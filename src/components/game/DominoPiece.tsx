@@ -1,6 +1,7 @@
 import { useId } from 'react';
 import type { CSSProperties } from 'react';
 import type { Val } from '../../api';
+import { SKIN_FICHA, type SkinFicha, type SkinFichaDef } from '../../skins';
 
 // ── Dimensiones SVG ─────────────────────────────────
 const F   = 44;   // tamaño de cada cara (cuadrado)
@@ -23,22 +24,33 @@ const PIPS: Record<Val, [number, number][]> = {
   6: [[14, 14], [30, 14], [14, 22], [30, 22], [14, 30], [30, 30]],
 };
 
-// Colores con buen contraste sobre fondo BLANCO
-const PIP_COLOR: Record<Val, string> = {
-  0: 'transparent',
-  1: '#dc2626', // rojo
-  2: '#2563eb', // azul
-  3: '#16a34a', // verde
-  4: '#b45309', // ámbar oscuro
-  5: '#ea580c', // naranja
-  6: '#1e1b4b', // índigo casi negro
-};
+// El color de un pip sale del descriptor de la skin: uniforme (string) o
+// uno por valor (Record) — ver SKIN_FICHA en skins.ts.
+function pipColorDe(def: SkinFichaDef, val: Val): string {
+  return typeof def.pipColor === 'string' ? def.pipColor : def.pipColor[val];
+}
 
-function Cara({ val, ox, oy }: { val: Val; ox: number; oy: number }) {
+// Una cara: puntos clásicos, o el dígito escrito si la skin es de 'numeros'.
+// El centro de la cara está en (ox+22, oy+22) — 22 = F/2.
+function Cara({ val, ox, oy, def }: { val: Val; ox: number; oy: number; def: SkinFichaDef }) {
+  const color = pipColorDe(def, val);
+  if (def.render === 'numeros') {
+    return (
+      <text
+        x={ox + 22} y={oy + 22}
+        fill={color}
+        fontSize={30} fontWeight={800}
+        fontFamily="'Space Grotesk', Inter, system-ui, sans-serif"
+        textAnchor="middle" dominantBaseline="central"
+      >
+        {val}
+      </text>
+    );
+  }
   return (
     <>
       {PIPS[val].map(([px, py], i) => (
-        <circle key={i} cx={ox + px} cy={oy + py} r={PR} fill={PIP_COLOR[val]} />
+        <circle key={i} cx={ox + px} cy={oy + py} r={PR} fill={color} />
       ))}
     </>
   );
@@ -58,6 +70,9 @@ export type DominoPieceProps = {
    *  (zonas de drop del tablero) — no es clickeable/arrastrable en sí, el
    *  contenedor que la envuelve maneja click/drop. */
   ghost?:      boolean;
+  /** Skin de ficha comprada y equipada (docs/PLAN_COSMETICOS.md) — solo
+   *  cambia el color de fondo, nunca los pips/patrón (legibilidad). */
+  skin?:       SkinFicha;
   onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
   onDragEnd?:  () => void;
   /** Reordenar la mano: la propia ficha es también zona de drop de otra ficha arrastrada. */
@@ -82,6 +97,7 @@ export default function DominoPiece({
   placing   = false,
   draggable = false,
   ghost     = false,
+  skin      = 'clasica',
   onDragStart,
   onDragEnd,
   onDragOver,
@@ -103,22 +119,31 @@ export default function DominoPiece({
   const bx = isV ? PAD : PAD + F + DIV;
   const by = isV ? PAD + F + DIV : PAD;
 
-  // Borde: sutil en normal, verde en jugable, violeta en seleccionado,
-  // ámbar punteado en preview (ghost, en las zonas de drop del tablero)
+  // Descriptor de la skin equipada — define fondo, pips (color y si son
+  // puntos o números) y el borde en estado normal. Los estados semánticos
+  // (jugable/seleccionado/ghost) pisan el borde igual para todas las skins.
+  // La skin se muestra SIEMPRE (jugable o no): una ficha no jugable NO
+  // reemplaza fondo/pips por gris (eso hacía desaparecer los pips de skins
+  // claras como 'oscura'), solo se atenúa entera vía `opacity` del CSS
+  // (.dp-disabled). Únicamente faceDown ignora la skin (muestra el dorso).
+  const def = SKIN_FICHA[skin] ?? SKIN_FICHA.clasica;
+
+  // Borde: el de la skin en normal, verde en jugable, violeta en
+  // seleccionado, ámbar punteado en preview (ghost, zonas de drop). El
+  // estado disabled usa el borde de la skin (atenuado por el opacity del CSS).
   const stroke  = ghost    ? 'var(--amber, #ef9f2e)'
                 : selected ? '#7c3aed'
                 : playable ? '#16a34a'
-                : disabled ? '#d1d5db'
-                :            '#6b7280'; // gris medio — tile blanco ya destaca solo
+                :            def.stroke;
   const strokeW = ghost ? 2 : selected ? 2.5 : 1.5;
 
-  // Fondo SIEMPRE blanco sólido (como un dominó real) — el ghost se atenúa
-  // entero vía opacity del wrapper (.dp-ghost), no mezclando alpha acá:
-  // si no, blanco-semitransparente sobre el fondo oscuro de la mesa se ve
-  // gris sucio en vez de "la ficha real, más tenue".
-  const fillFace = faceDown  ? '#1e1b4b'  // dorso oscuro
-                 : disabled  ? '#f3f4f6'  // blanco apagado
-                 :             '#ffffff';  // blanco puro (ghost incluido)
+  // Fondo sólido (real, no dinero real — como un dominó de verdad) — el
+  // ghost se atenúa entero vía opacity del wrapper (.dp-ghost), no
+  // mezclando alpha acá: si no, el color semitransparente sobre el fondo
+  // oscuro de la mesa se ve sucio en vez de "la ficha real, más tenue".
+  // disabled también se atenúa por opacity (.dp-disabled), sin tocar el color.
+  const fillFace = faceDown ? '#1e1b4b'      // dorso oscuro (único caso que ignora la skin)
+                 :            def.fillFace;
 
   const [dX1, dY1, dX2, dY2] = isV
     ? [PAD, PAD + F, PAD + F, PAD + F]
@@ -185,8 +210,8 @@ export default function DominoPiece({
             x1={dX1} y1={dY1} x2={dX2} y2={dY2}
             stroke={stroke} strokeWidth={1.2}
           />
-          <Cara val={a} ox={ax} oy={ay} />
-          <Cara val={b} ox={bx} oy={by} />
+          <Cara val={a} ox={ax} oy={ay} def={def} />
+          <Cara val={b} ox={bx} oy={by} def={def} />
         </>
       )}
     </svg>

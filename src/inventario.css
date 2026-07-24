@@ -1,0 +1,80 @@
+/* ═══════════════════════════════════════════════════════
+   Inventario / "Mis cosméticos" (InventarioView) —
+   docs/PLAN_COSMETICOS.md, Etapa D. Mismo vocabulario visual que la
+   Tienda (tienda.css): mismas tarjetas, un solo acento ámbar, y teal
+   reservado para el estado "Equipada" (.tienda-item-equipada).
+
+   Los tres segmentos (fichas / tableros / avatares) se distinguen por su
+   ENCABEZADO —ícono de categoría + título + conteo + regla—, no por
+   contenedores de colores ni franjas laterales: un único acento cálido
+   mantiene la pantalla cohesionada (PRODUCT.md: cálido, nítido, restringido).
+   ═══════════════════════════════════════════════════════ */
+
+.inv-section { margin-bottom: 34px; }
+.inv-section:last-child { margin-bottom: 6px; }
+
+.inv-section-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding-bottom: 12px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--d-border);
+}
+
+/* Tile del ícono de categoría — íconos dimensionales reales (ficha/tablero/
+   avatar, ver GameIcons.tsx). Sin chip de fondo: cada ícono ya trae su
+   propia sombra de contacto horneada en el arte, y un chip detrás se ve
+   como una caja encimada — mismo criterio que el sidebar (AppSidebar), que
+   tampoco pone fondo detrás de sus GameIcon. */
+.inv-section-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+}
+
+.inv-section-head h2 {
+  font-family: 'Segoe UI', Inter, sans-serif;
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--d-ink);
+}
+
+.inv-section-count {
+  margin-left: auto;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--amber-hi);
+  background: color-mix(in srgb, var(--amber) 15%, transparent);
+  padding: 2px 11px;
+  border-radius: 20px;
+}
+
+.inv-section-empty {
+  font-size: 0.88rem;
+  color: var(--d-muted);
+  padding: 2px 2px 4px;
+}
+
+.inv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+}
+
+/* Tarjeta de la misma familia que .tienda-item (idéntica estructura). */
+.inv-item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--d-border);
+  background: var(--d-surface);
+  transition: border-color .15s ease;
+}
+.inv-item:hover { border-color: color-mix(in srgb, var(--amber) 45%, var(--d-border)); }
+.inv-item .cosmetico-preview { height: 78px; }
+.inv-item-nombre { font-weight: 600; font-size: 0.88rem; color: var(--d-ink); }

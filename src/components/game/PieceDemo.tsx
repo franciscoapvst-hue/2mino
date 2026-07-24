@@ -3,6 +3,7 @@ import DominoPiece from './DominoPiece';
 import { crearSet } from '../../game/local-rules';
 import type { Val } from '../../game/local-rules';
 import { BackIcon } from '../icons';
+import type { SkinFicha } from '../../skins';
 
 const SET = crearSet(); // 28 fichas
 
@@ -15,7 +16,7 @@ const ESTADOS = [
   { label: 'Boca abajo V', props: { faceDown: true, orient: 'v' as const } },
 ];
 
-export default function PieceDemo({ onBack }: { onBack: () => void }) {
+export default function PieceDemo({ onBack, skin = 'clasica' }: { onBack: () => void; skin?: SkinFicha }) {
   const [selected, setSelected] = useState<string | null>(null);
 
   return (
@@ -39,6 +40,7 @@ export default function PieceDemo({ onBack }: { onBack: () => void }) {
                   key={key}
                   a={p.a} b={p.b}
                   orient="h"
+                  skin={skin}
                   selected={selected === key}
                   playable={selected === null}
                   onClick={() => setSelected(s => s === key ? null : key)}
@@ -53,7 +55,7 @@ export default function PieceDemo({ onBack }: { onBack: () => void }) {
           <h2>Fichas dobles <span>se cruzan en el tablero</span></h2>
           <div className="pdemo-row">
             {([0,1,2,3,4,5,6] as Val[]).map(v => (
-              <DominoPiece key={v} a={v} b={v} orient="v" />
+              <DominoPiece key={v} a={v} b={v} orient="v" skin={skin} />
             ))}
           </div>
         </section>
@@ -65,7 +67,7 @@ export default function PieceDemo({ onBack }: { onBack: () => void }) {
             {ESTADOS.map(({ label, props }) => (
               <div key={label} className="pdemo-state">
                 <span className="pdemo-state-label">{label}</span>
-                <DominoPiece a={3} b={5} {...props} />
+                <DominoPiece a={3} b={5} skin={skin} {...props} />
               </div>
             ))}
           </div>

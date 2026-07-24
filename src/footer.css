@@ -1,0 +1,78 @@
+/* ═══════════════════════════════════════════════════════
+   Footer compartido (Dashboard + Landing) — docs/PLAN_MONETIZACION.md,
+   punto 9. Paleta propia (--ftr-*), independiente del contenedor que lo
+   monte (.dash usa --d-*, .landing usa --l-*).
+   ═══════════════════════════════════════════════════════ */
+.app-footer {
+  --ftr-ink:    #f2ede3;
+  --ftr-muted:  #8a938a;
+  --ftr-border: rgba(242, 237, 227, 0.10);
+
+  margin-top: 40px;
+  padding: 32px 24px 20px;
+  border-top: 1px solid var(--ftr-border);
+}
+:root.light .app-footer {
+  --ftr-ink:    #16211d;
+  --ftr-muted:  #6b756d;
+  --ftr-border: rgba(20, 30, 26, 0.10);
+}
+
+.app-footer-top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+.app-footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto;
+}
+.app-footer-bone { width: 16px; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3)); }
+.app-footer-word { font-weight: 800; font-size: 1rem; color: var(--ftr-ink); }
+.app-footer-word span { color: var(--amber); }
+
+.app-footer-col { display: flex; flex-direction: column; gap: 8px; min-width: 140px; }
+.app-footer-heading {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ftr-muted);
+}
+.app-footer-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  font-size: 0.86rem;
+  color: var(--ftr-ink);
+  cursor: pointer;
+  width: fit-content;
+}
+.app-footer-link:hover { color: var(--amber); text-decoration: underline; }
+
+.app-footer-stores { display: flex; flex-direction: column; gap: 6px; }
+.app-footer-store {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--ftr-border);
+  font-size: 0.78rem;
+  color: var(--ftr-muted);
+  cursor: default;
+}
+
+.app-footer-bottom {
+  max-width: 1000px;
+  margin: 24px auto 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--ftr-border);
+  font-size: 0.78rem;
+  color: var(--ftr-muted);
+}

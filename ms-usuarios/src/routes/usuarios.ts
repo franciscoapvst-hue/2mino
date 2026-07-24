@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import { pool } from '../db/pool';
 import { enviarEmailVerificacion } from '../email';
+import { otorgarItemsGratis } from './tienda';
 
 const ROUNDS = 12;
 // bcrypt(12) por invitado (varios cientos de ms de CPU cada uno, y esa
@@ -330,6 +331,7 @@ export async function usuariosRoutes(app: FastifyInstance) {
           [username, email, passwordHash, segmentoId],
         );
         const usuario = rows[0];
+        await otorgarItemsGratis(usuario.id);
 
         const token     = crypto.randomBytes(32).toString('hex');
         const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -671,11 +673,25 @@ export async function usuariosRoutes(app: FastifyInstance) {
         },
         response: {
           200: { description: 'Avatar actualizado',    ...UserSchema },
+          403: { description: 'No poseés ese avatar',  ...ErrorSchema },
           404: { description: 'Usuario no encontrado', ...ErrorSchema },
         },
       },
     },
     async (req, reply) => {
+      // Gated por posesión (docs/PLAN_COSMETICOS.md Etapa E): solo se puede
+      // equipar un avatar que esté en el inventario del usuario. Los 8
+      // actuales son gratis (otorgados a todos, ver seed en db/pool.ts), así
+      // que hoy esto no bloquea a nadie existente — empieza a importar
+      // cuando se agreguen avatares pagos nuevos al catálogo.
+      const { rows: poseido } = await pool.query(
+        `SELECT 1 FROM inventario inv
+         JOIN tienda_items t ON t.id = inv.item_id
+         WHERE inv.usuario_id = $1 AND t.categoria = 'avatar' AND t.clave = $2`,
+        [req.params.id, req.body.avatar],
+      );
+      if (!poseido.length) return reply.code(403).send({ error: 'No poseés ese avatar' });
+
       const { rows } = await pool.query(
         `UPDATE usuarios SET avatar = $1, updated_at = NOW() WHERE id = $2
          RETURNING id, username, email, segmento_id, avatar, created_at, updated_at`,
@@ -860,6 +876,7 @@ export async function usuariosRoutes(app: FastifyInstance) {
              RETURNING id, username, email, segmento_id, avatar, created_at`,
             [username, email, passwordHash, segmentoId],
           );
+          await otorgarItemsGratis(rows[0].id);
           return reply.code(201).send({ ...rows[0], segmento: 'jugador' });
         } catch (err: any) {
           if (err.code === '23505' && err.detail?.includes('username')) continue;
@@ -904,6 +921,7 @@ export async function usuariosRoutes(app: FastifyInstance) {
            RETURNING id, username, email, segmento_id, avatar, created_at`,
           [username, email, passwordHash, segmentoId],
         );
+        await otorgarItemsGratis(rows[0].id);
         return reply.code(201).send({ ...rows[0], segmento: 'invitado' });
       } catch (err: any) {
         if (err.code === '23505' && err.detail?.includes('username')) continue;

@@ -4,8 +4,9 @@ import SnakeBoard from './SnakeBoard';
 import { puedeJugar, getExtremos } from '../../game/local-rules';
 import { sounds } from '../../game/sounds';
 import { api } from '../../api';
-import type { PartidaPublica, Pieza, Sala, AuthUser } from '../../api';
+import type { PartidaPublica, Pieza, Sala, AuthUser, UserConfig } from '../../api';
 import { BackIcon, PersonAddIcon } from '../icons';
+import { skinFichaDe, skinTableroDe, skinTableroDef, type SkinFicha } from '../../skins';
 import { useMeasuredWidth } from '../../hooks/useMeasuredWidth';
 import { usePoll } from '../../hooks/usePoll';
 import { useSalaChat } from '../../hooks/useSalaChat';
@@ -15,6 +16,7 @@ import AdSlot from '../AdSlot';
 type Props = {
   sala: Sala;
   user: AuthUser;
+  config: UserConfig;
   onExit: () => void;
   /** Acciones sociales post-partida (§6/§7 de docs/CASOS_DE_USO_SOCIAL.md) — opcionales, stubs. */
   onRevancha?: () => void;
@@ -22,7 +24,24 @@ type Props = {
   onAgregarAmigo?: (usuarioId: string, username: string) => void;
 };
 
-export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCompanero, onAgregarAmigo }: Props) {
+export default function GameBoard({ sala, user, config, onExit, onRevancha, onInvitarCompanero, onAgregarAmigo }: Props) {
+  // Cosméticos equipados (docs/PLAN_COSMETICOS.md, Etapa 4) — se leen una
+  // sola vez acá y se pasan hacia abajo a cada <DominoPiece>/<SnakeBoard>,
+  // en vez de que cada uno decida por su cuenta (así la partida entera se
+  // ve consistente con lo que el jugador eligió en la Tienda).
+  const skinFicha   = skinFichaDe(config.opciones);
+  const skinTablero = skinTableroDe(config.opciones);
+  const tableroDef  = skinTableroDef(skinTablero);
+  // Props del shell según el tablero: los de imagen inyectan la textura por
+  // `--board-img` (game.css la aplica de fondo con viñeta); los CSS usan el
+  // `[data-tablero]` de siempre. `data-tablero-tipo` selecciona el modo.
+  const shellProps = {
+    'data-tablero': skinTablero,
+    'data-tablero-tipo': tableroDef.tipo,
+    ...(tableroDef.tipo === 'imagen'
+      ? { style: { ['--board-img' as string]: `url(${tableroDef.url})` } as React.CSSProperties }
+      : {}),
+  };
   const [partida,       setPartida]       = useState<PartidaPublica | null>(null);
   const [cargando,      setCargando]      = useState(true);
   const [error,         setError]         = useState<string | null>(null);
@@ -125,11 +144,16 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
 
   // ── Countdown del tiempo límite por jugada ────
   // Se recalcula localmente cada segundo a partir de turnoEmpiezaEn/
-  // limiteJugadaMs, y se resincroniza solo con el poll de 2s existente
-  // (no hay websocket de partida, ver GameBoard/PartidaPublica).
+  // limiteJugadaMs, y se resincroniza con el WS/poll de la partida.
+  // SOLO corre durante MI turno: el timer es mi tiempo de pensar, así que
+  // en el instante que pongo la ficha (el turno pasa al rival) desaparece
+  // — no se queda "corriendo" mostrando el countdown del rival. Vuelve
+  // fresco cuando el turno regresa a mí (turnoEmpiezaEn re-sellado por el
+  // server en cada jugada, ver ms-salas/game/logic.ts aplicarJugada).
   const [restanteMs, setRestanteMs] = useState<number | null>(null);
   useEffect(() => {
-    if (!partida || partida.fase !== 'jugando' || partida.limiteJugadaMs == null) {
+    const miTurno = !!partida && partida.fase === 'jugando' && partida.turno === partida.miSeat;
+    if (!partida || !miTurno || partida.limiteJugadaMs == null) {
       setRestanteMs(null);
       return;
     }
@@ -137,7 +161,7 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
     setRestanteMs(calcular());
     const id = setInterval(() => setRestanteMs(calcular()), 1000);
     return () => clearInterval(id);
-  }, [partida?.fase, partida?.limiteJugadaMs, partida?.turnoEmpiezaEn, partida?.turno]);
+  }, [partida?.fase, partida?.limiteJugadaMs, partida?.turnoEmpiezaEn, partida?.turno, partida?.miSeat]);
 
   // ── Espera antes de mostrar la pantalla de fin de mano ────
   // Configurable desde el BO (reglas_juego.delay_fin_mano_ms) — deja ver
@@ -456,7 +480,7 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
   // ── Guards de carga ───────────────────────────
   if (cargando) {
     return (
-      <div className="game-shell">
+      <div className="game-shell" {...shellProps}>
         <div className="game-loading">
           <div className="boot-spinner" />
           <p>Cargando partida…</p>
@@ -467,7 +491,7 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
 
   if (!partida) {
     return (
-      <div className="game-shell">
+      <div className="game-shell" {...shellProps}>
         <div className="game-loading">
           <p>No se encontró la partida.</p>
           <button className="btn-primary" style={{ marginTop: 16 }} onClick={onExit}>Volver</button>
@@ -542,7 +566,7 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
   const marcadorEllos = partida.marcador[miEq === 0 ? 1 : 0];
 
   return (
-    <div className="game-shell">
+    <div className="game-shell" {...shellProps}>
       {/* ── Nav ─────────────────────────────────── */}
       <nav className="game-nav">
         <button className="btn-back" onClick={onClickSalir}><BackIcon /> Salir</button>
@@ -628,6 +652,7 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
               containerWidth={boardWidth}
               nuevaFichaIdx={nuevaFichaIdx}
               piezaFantasma={piezaActiva}
+              skinFicha={skinFicha}
               canIzq={canIzq}
               canDer={canDer}
               sobreIzq={sobreZona === 'izq'}
@@ -694,6 +719,7 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
                 key={sigPieza(p)}
                 a={p.a} b={p.b}
                 orient="v"
+                skin={skinFicha}
                 selected={isSel}
                 playable={canPlay && !isSel}
                 disabled={!canPlay}
@@ -753,6 +779,7 @@ export default function GameBoard({ sala, user, onExit, onRevancha, onInvitarCom
           nombreAsiento={nombreAsiento}
           onListo={handleListo}
           confirmando={jugando}
+          skinFicha={skinFicha}
         />
       )}
 
@@ -877,11 +904,12 @@ const equipoDeSeat = (seat: number) => seat % 2;
 /** Suma de pips de una mano — para mostrar junto a las fichas reveladas al cerrar la mano. */
 const sumaPips = (mano: Pieza[]) => mano.reduce((s, p) => s + p.a + p.b, 0);
 
-function ManoOverlay({ partida, nombreAsiento, onListo, confirmando }: {
+function ManoOverlay({ partida, nombreAsiento, onListo, confirmando, skinFicha }: {
   partida: PartidaPublica;
   nombreAsiento: (seat: number) => string;
   onListo: () => void;
   confirmando: boolean;
+  skinFicha: SkinFicha;
 }) {
   const r = partida.resultadoMano;
   if (!r) return null;
@@ -906,7 +934,7 @@ function ManoOverlay({ partida, nombreAsiento, onListo, confirmando }: {
                     <span className="result-mano-vacia">¡Dominó! Sin fichas</span>
                   ) : (
                     mano.map((p, i) => (
-                      <DominoPiece key={i} a={p.a} b={p.b} orient="v" style={{ width: 26, height: 48 }} />
+                      <DominoPiece key={i} a={p.a} b={p.b} orient="v" skin={skinFicha} style={{ width: 26, height: 48 }} />
                     ))
                   )}
                 </div>

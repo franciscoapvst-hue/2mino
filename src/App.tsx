@@ -1,12 +1,15 @@
-import { useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import {
-  Routes, Route, Navigate, useNavigate, useLocation, useParams,
+  Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams,
 } from 'react-router-dom';
 import LandingScreen from './components/LandingScreen';
+import PrivacidadView from './components/legal/PrivacidadView';
+import TerminosView from './components/legal/TerminosView';
 import LoginScreen from './components/LoginScreen';
 import RegisterScreen from './components/RegisterScreen';
 import ForgotScreen from './components/ForgotScreen';
 import Dashboard from './components/Dashboard';
+import AppShell from './components/AppShell';
 import SalasView from './components/SalasView';
 import MatchmakingView from './components/MatchmakingView';
 import PieceDemo from './components/game/PieceDemo';
@@ -21,9 +24,12 @@ import TorneosListView from './torneos/TorneosListView';
 import TorneoDetalleView from './torneos/TorneoDetalleView';
 import TorneoInscripcionForm from './torneos/TorneoInscripcionForm';
 import TorneoUnirseView from './torneos/TorneoUnirseView';
+import TiendaView from './components/TiendaView';
+import InventarioView from './components/InventarioView';
 import { api, tokenStore, type AuthUser, type UserConfig, type Sala } from './api';
 import { useSocialSocket } from './hooks/useSocialSocket';
 import { sounds } from './game/sounds';
+import { skinFichaDe } from './skins';
 
 // El tutorial se ofrece una sola vez: se marca en `opciones` del usuario
 // (mismo bucket genérico que ya usan tema/idioma — ver ms-frontend-landing),
@@ -34,13 +40,103 @@ function necesitaOnboarding(config: UserConfig): boolean {
 
 type Session = { user: AuthUser; config: UserConfig };
 
-// ── Rutas auxiliares que solo necesitan un param de la URL ─────────
+// ── Contexto de app ───────────────────────────────────────────────
+// El shell a nivel de app (AppShell + sidebar) tiene que persistir entre
+// pantallas y DENTRO de la partida (docs/PLAN_ESCRITORIO.md, S1). Para eso
+// el shell se monta una sola vez, como layout route con <Outlet/>, y las
+// vistas ruteadas cuelgan de él. Como React re-monta un componente cuando
+// su *tipo* cambia, las rutas y el layout tienen que ser componentes
+// estables a nivel de módulo (no funciones re-creadas en cada render de
+// App); por eso todo lo dinámico (sesión, tema, handlers) baja por este
+// contexto en vez de por props/closures redefinidos cada render.
+type AppCtx = {
+  session: Session | null;
+  dark: boolean;
+  flags: Record<string, unknown> | null;
+  toggleTheme: () => void;
+  enVivo: Map<string, boolean>;
+  notifVersion: number;
+  setSession: React.Dispatch<React.SetStateAction<Session | null>>;
+  salaParaReintegrar: Sala | null;
+  onReintegrarSala: () => void;
+  onDescartarReintegro: () => void;
+  handleLogout: () => void;
+  handleUnirseSala: (codigo: string) => void;
+  handleInvitarCompanero: (usuarioId: string) => void;
+  handleAgregarAmigo: (usuarioId: string, username: string) => void;
+  handleSuccess: (user: AuthUser, config: UserConfig) => void;
+  handleNivelElegido: (nivel: NivelDomino) => void;
+  handleTutorialResuelto: () => void;
+};
 
-function GameRoute({ session, onInvitarCompanero, onAgregarAmigo }: {
-  session: Session;
-  onInvitarCompanero: (usuarioId: string) => void;
-  onAgregarAmigo: (usuarioId: string, username: string) => void;
-}) {
+const AppContext = createContext<AppCtx | null>(null);
+function useApp(): AppCtx {
+  const ctx = useContext(AppContext);
+  if (!ctx) throw new Error('useApp fuera de <AppContext.Provider>');
+  return ctx;
+}
+
+// Lee un feature flag: null (todavía cargando) → se asume ENCENDIDO, para no
+// esconder-y-mostrar la Tienda en el caso normal (que es el común). Ya
+// cargado, una clave ausente = apagada (GET /frontend/config solo devuelve
+// las habilitadas).
+function flagOn(flags: Record<string, unknown> | null, clave: string): boolean {
+  return flags === null ? true : Boolean(flags[clave]);
+}
+
+// ── Layout autenticado: monta el shell una vez y rutea con <Outlet/> ──
+function AuthLayout() {
+  const {
+    session, dark, flags, toggleTheme, handleLogout, handleUnirseSala, notifVersion, setSession,
+  } = useApp();
+  if (!session) return <Navigate to="/login" replace />;
+  return (
+    <AppShell
+      user={session.user}
+      config={session.config}
+      dark={dark}
+      tiendaHabilitada={flagOn(flags, 'tienda_habilitada')}
+      onToggleTheme={toggleTheme}
+      onLogout={handleLogout}
+      onAvatarChange={(avatar) => setSession(s => s && { ...s, user: { ...s.user, avatar } })}
+      onUnirseSala={handleUnirseSala}
+      notifVersion={notifVersion}
+    >
+      <Outlet />
+    </AppShell>
+  );
+}
+
+// Guarda para rutas públicas (landing/login/…): si ya hay sesión, al home.
+function PublicOnly({ children }: { children: JSX.Element }) {
+  const { session } = useApp();
+  return !session ? children : <Navigate to="/home" replace />;
+}
+
+// ── Rutas autenticadas (dentro del shell) ─────────────────────────
+
+function HomeRoute() {
+  const { session, dark, salaParaReintegrar, onReintegrarSala, onDescartarReintegro } = useApp();
+  const navigate = useNavigate();
+  if (!session) return null;
+  return (
+    <Dashboard
+      user={session.user}
+      config={session.config}
+      dark={dark}
+      onGoToSalas={() => navigate('/rooms')}
+      onGoToRanked={() => navigate('/ranked')}
+      onGoToCasual={() => navigate('/casual')}
+      onGoToTorneos={() => navigate('/tournaments')}
+      salaParaReintegrar={salaParaReintegrar}
+      onReintegrarSala={onReintegrarSala}
+      onDescartarReintegro={onDescartarReintegro}
+    />
+  );
+}
+
+function GameRoute() {
+  const { session, handleInvitarCompanero, handleAgregarAmigo } = useApp();
   const { salaId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -68,6 +164,7 @@ function GameRoute({ session, onInvitarCompanero, onAgregarAmigo }: {
     } catch { /* noop, botón best-effort */ }
   }
 
+  if (!session) return null;
   if (!sala) {
     return (
       <div className="app-shell">
@@ -80,21 +177,24 @@ function GameRoute({ session, onInvitarCompanero, onAgregarAmigo }: {
     <GameBoard
       sala={sala}
       user={session.user}
+      config={session.config}
       onExit={() => navigate(origin)}
       onRevancha={handleRevancha}
-      onInvitarCompanero={onInvitarCompanero}
-      onAgregarAmigo={onAgregarAmigo}
+      onInvitarCompanero={handleInvitarCompanero}
+      onAgregarAmigo={handleAgregarAmigo}
     />
   );
 }
 
-function RoomsRoute({ user, dark }: { user: AuthUser; dark: boolean }) {
+function RoomsRoute() {
+  const { session, dark } = useApp();
   const location = useLocation();
   const navigate = useNavigate();
   const salaInicial = (location.state as { salaEspera?: Sala } | null)?.salaEspera ?? null;
+  if (!session) return null;
   return (
     <SalasView
-      user={user}
+      user={session.user}
       dark={dark}
       onBack={() => navigate('/home')}
       onGameStart={(sala) => navigate(`/game/${sala.id}`, { state: { origin: 'rooms' } })}
@@ -103,15 +203,17 @@ function RoomsRoute({ user, dark }: { user: AuthUser; dark: boolean }) {
   );
 }
 
-function MatchmakingRoute({ user, dark, tipo }: { user: AuthUser; dark: boolean; tipo: 'ranked' | 'casual' }) {
+function MatchmakingRoute({ tipo }: { tipo: 'ranked' | 'casual' }) {
+  const { session, dark } = useApp();
   const location = useLocation();
   const navigate = useNavigate();
   const partyCodigo = tipo === 'ranked'
     ? ((location.state as { partyCodigo?: string } | null)?.partyCodigo ?? null)
     : null;
+  if (!session) return null;
   return (
     <MatchmakingView
-      user={user}
+      user={session.user}
       tipo={tipo}
       dark={dark}
       onBack={() => navigate('/home')}
@@ -121,10 +223,41 @@ function MatchmakingRoute({ user, dark, tipo }: { user: AuthUser; dark: boolean;
   );
 }
 
-function ReplayRoute({ dark }: { dark: boolean }) {
+function FriendsRoute() {
+  const { dark, enVivo } = useApp();
+  const navigate = useNavigate();
+  return <FriendsView dark={dark} onBack={() => navigate('/home')} conectadosEnVivo={enVivo} />;
+}
+
+function LeaderboardRoute() {
+  const { session, dark } = useApp();
+  const navigate = useNavigate();
+  if (!session) return null;
+  return <LeaderboardView dark={dark} onBack={() => navigate('/home')} miUsuarioId={session.user.id} />;
+}
+
+function HistoryRoute() {
+  const { dark } = useApp();
+  const navigate = useNavigate();
+  return (
+    <MatchHistoryView
+      dark={dark}
+      onBack={() => navigate('/home')}
+      onVerReplay={(salaId) => navigate(`/replay/${salaId}`)}
+    />
+  );
+}
+
+function ReplayRoute() {
+  const { dark } = useApp();
   const { salaId } = useParams();
   const navigate = useNavigate();
   return <ReplayViewer dark={dark} salaId={salaId!} onBack={() => navigate('/history')} />;
+}
+
+function TorneosRoute() {
+  const navigate = useNavigate();
+  return <TorneosListView onVolver={() => navigate('/home')} onVerTorneo={(id) => navigate(`/tournaments/${id}`)} />;
 }
 
 function TorneoDetalleRoute() {
@@ -164,10 +297,72 @@ function TorneoJoinRoute() {
   );
 }
 
+function TiendaRoute() {
+  const { session, dark, flags, setSession } = useApp();
+  const navigate = useNavigate();
+  if (!session) return null;
+  // Tienda apagada desde el BO: la ruta redirige al home (por si alguien
+  // llega por URL directa). Solo una vez que los flags cargaron — mientras
+  // son null se deja pasar para no expulsar en el caso normal.
+  if (flags !== null && !flagOn(flags, 'tienda_habilitada')) return <Navigate to="/home" replace />;
+  return (
+    <TiendaView
+      dark={dark}
+      config={session.config}
+      avatarActual={session.user.avatar}
+      comprarDoblonesHabilitado={flagOn(flags, 'comprar_doblones_habilitado')}
+      onConfigChange={(config) => setSession(sess => sess && { ...sess, config })}
+      onAvatarChange={(avatar) => setSession(sess => sess && { ...sess, user: { ...sess.user, avatar } })}
+      onBack={() => navigate('/home')}
+    />
+  );
+}
+
+function InventarioRoute() {
+  const { session, dark, setSession } = useApp();
+  const navigate = useNavigate();
+  if (!session) return null;
+  return (
+    <InventarioView
+      dark={dark}
+      user={session.user}
+      config={session.config}
+      onConfigChange={(config) => setSession(sess => sess && { ...sess, config })}
+      onAvatarChange={(avatar) => setSession(sess => sess && { ...sess, user: { ...sess.user, avatar } })}
+      onBack={() => navigate('/home')}
+    />
+  );
+}
+
+// ── Rutas autenticadas de pantalla completa (sin shell) ───────────
+function OnboardingRoute() {
+  const { session, dark, handleNivelElegido } = useApp();
+  if (!session) return <Navigate to="/login" replace />;
+  return <OnboardingLevelScreen dark={dark} onElegir={handleNivelElegido} />;
+}
+
+function TutorialRoute() {
+  const { session, handleTutorialResuelto } = useApp();
+  if (!session) return <Navigate to="/login" replace />;
+  return <TutorialGame onSkip={handleTutorialResuelto} onFinish={handleTutorialResuelto} />;
+}
+
+function PieceDemoRoute() {
+  const { session } = useApp();
+  const navigate = useNavigate();
+  return (
+    <PieceDemo
+      onBack={() => navigate(session ? '/home' : '/login')}
+      skin={session ? skinFichaDe(session.config.opciones) : undefined}
+    />
+  );
+}
+
 // Link de invitación a party (/party/:codigo): sin sesión manda a login,
 // con sesión manda directo a ranked — en ambos casos el código viaja en
 // location.state para que ranked lo use como autoJoinCodigo.
-function PartyRedirect({ session }: { session: Session | null }) {
+function PartyRedirect() {
+  const { session } = useApp();
   const { codigo } = useParams();
   return session
     ? <Navigate to="/ranked" replace state={{ partyCodigo: codigo }} />
@@ -176,7 +371,8 @@ function PartyRedirect({ session }: { session: Session | null }) {
 
 // Link de confirmación de cuenta por email. El backend ya devuelve
 // token+user al verificar — no hace falta un login aparte.
-function VerifyEmailRoute({ onSuccess }: { onSuccess: (user: AuthUser, config: UserConfig) => void }) {
+function VerifyEmailRoute() {
+  const { handleSuccess } = useApp();
   const { token } = useParams();
   const navigate = useNavigate();
   const [fallo, setFallo] = useState(false);
@@ -186,7 +382,7 @@ function VerifyEmailRoute({ onSuccess }: { onSuccess: (user: AuthUser, config: U
       .then(async (authRes) => {
         tokenStore.set(authRes.token, true);
         const config = await api.getPreferencias();
-        onSuccess(authRes.user, config);
+        handleSuccess(authRes.user, config);
       })
       .catch(() => setFallo(true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -226,9 +422,10 @@ export default function App() {
 
   const [session,  setSession]  = useState<Session | null>(null);
   const [booting,  setBooting]  = useState(true);
-  // Sala 'esperando' a abrir directamente al entrar a SalasView (revancha /
-  // invitación aceptada) — viaja como location.state (ver RoomsRoute), este
-  // estado ya no hace falta acá.
+  // Feature flags de landing_config (BO → "Feature flags"), editables sin
+  // redeploy. null = todavía cargando; una vez cargados, una clave ausente
+  // significa "apagada" (GET /frontend/config solo trae las habilitadas).
+  const [flags, setFlags] = useState<Record<string, unknown> | null>(null);
   // Partida en_juego que el usuario ya tenía abierta al iniciar sesión —
   // se ofrece reintegrarse desde un banner en el dashboard, en vez de
   // forzar la navegación (por eso vive aparte de la ruta /game/:id).
@@ -237,9 +434,9 @@ export default function App() {
     () => localStorage.getItem('2mino-theme') !== 'light'
   );
   // WS de presencia/notificaciones (docs/CASOS_DE_USO_SOCIAL.md §2.3):
-  // un solo socket para toda la sesión, su estado baja como props a quien
-  // lo necesite (Dashboard para el badge de la campana, FriendsView para
-  // los puntitos de "en línea").
+  // un solo socket para toda la sesión, su estado baja por el contexto a
+  // quien lo necesite (AppShell para el badge de la campana, FriendsView
+  // para los puntitos de "en línea").
   const { enVivo, notifVersion } = useSocialSocket(session ? tokenStore.get() : null);
 
   useEffect(() => {
@@ -289,10 +486,11 @@ export default function App() {
   // Feature flags): si diera problemas, se apaga sin redeploy — ni
   // siquiera se llega a pedir /salas/activa.
   useEffect(() => {
-    if (!session) return;
+    if (!session) { setFlags(null); return; }
     api.featureFlags()
-      .then(flags => {
-        if (!flags.reintegro_partida_activa_habilitado) return;
+      .then(f => {
+        setFlags(f); // los consumen también AppSidebar (Tienda) y TiendaView (doblones)
+        if (!f.reintegro_partida_activa_habilitado) return;
         return api.salas.activa().then(r => setSalaParaReintegrar(r.sala));
       })
       .catch(() => {});
@@ -382,22 +580,6 @@ export default function App() {
     api.social.enviarSolicitud(usuarioId).catch(() => {});
   }
 
-  // Helpers de guarda de rutas — cierran sobre `session`, no una
-  // arquitectura nueva: reemplazan el `&& session`/`&& !session` que se
-  // repetía en cada rama del viejo árbol de `if`. `children` es una
-  // FUNCIÓN, no un elemento ya armado: los `element={...}` de TODAS las
-  // rutas se evalúan en cada render de `<Routes>` (aunque solo se monte
-  // la que hace match con la URL), así que construir el JSX del hijo acá
-  // adentro (recién cuando `session` ya se confirmó no-nulo) es lo que
-  // evita un `session.user` sobre `null` en cualquier ruta que no sea la
-  // activa.
-  function Private({ children }: { children: (s: Session) => JSX.Element }) {
-    return session ? children(session) : <Navigate to="/login" replace />;
-  }
-  function PublicOnly({ children }: { children: JSX.Element }) {
-    return !session ? children : <Navigate to="/home" replace />;
-  }
-
   if (booting) {
     return (
       <div className="app-shell">
@@ -406,111 +588,90 @@ export default function App() {
     );
   }
 
+  const ctx: AppCtx = {
+    session,
+    dark,
+    flags,
+    toggleTheme: () => setDark(d => !d),
+    enVivo,
+    notifVersion,
+    setSession,
+    salaParaReintegrar,
+    onReintegrarSala: handleReintegrarSala,
+    onDescartarReintegro: () => setSalaParaReintegrar(null),
+    handleLogout,
+    handleUnirseSala,
+    handleInvitarCompanero,
+    handleAgregarAmigo,
+    handleSuccess,
+    handleNivelElegido,
+    handleTutorialResuelto,
+  };
+
   return (
-    <Routes>
-      <Route path="/" element={<Navigate to={session ? '/home' : '/landing'} replace />} />
+    <AppContext.Provider value={ctx}>
+      <Routes>
+        <Route path="/" element={<Navigate to={session ? '/home' : '/landing'} replace />} />
 
-      <Route path="/landing" element={
-        <PublicOnly><LandingScreen dark={dark} onToggleTheme={() => setDark(d => !d)} onSuccess={handleSuccess} /></PublicOnly>
-      } />
-      <Route path="/login" element={
-        <PublicOnly><LoginScreen onSuccess={handleSuccess} dark={dark} onToggleTheme={() => setDark(d => !d)} /></PublicOnly>
-      } />
-      <Route path="/register" element={
-        <PublicOnly><RegisterScreen onSuccess={handleSuccess} dark={dark} onToggleTheme={() => setDark(d => !d)} /></PublicOnly>
-      } />
-      <Route path="/forgot" element={
-        <PublicOnly><ForgotScreen dark={dark} onToggleTheme={() => setDark(d => !d)} /></PublicOnly>
-      } />
+        {/* Landing: pública, pero SIN el guard de PublicOnly — el logo del
+            sidebar manda acá aunque haya sesión (ver AppSidebar), así que
+            esta ruta no puede rebotar a /home cuando el usuario ya está
+            logueado. Las demás públicas (login/registro/olvidé) sí lo
+            mantienen, porque no tiene sentido mostrarlas con sesión activa. */}
+        <Route path="/landing" element={
+          <LandingScreen dark={dark} onToggleTheme={() => setDark(d => !d)} />
+        } />
+        <Route path="/login" element={
+          <PublicOnly><LoginScreen onSuccess={handleSuccess} dark={dark} onToggleTheme={() => setDark(d => !d)} /></PublicOnly>
+        } />
+        <Route path="/register" element={
+          <PublicOnly><RegisterScreen onSuccess={handleSuccess} dark={dark} onToggleTheme={() => setDark(d => !d)} /></PublicOnly>
+        } />
+        <Route path="/forgot" element={
+          <PublicOnly><ForgotScreen dark={dark} onToggleTheme={() => setDark(d => !d)} /></PublicOnly>
+        } />
 
-      <Route path="/piece-demo" element={
-        <PieceDemo onBack={() => navigate(session ? '/home' : '/login')} />
-      } />
+        {/* Autenticadas con shell persistente (sidebar en todas, incluida /game) */}
+        <Route element={<AuthLayout />}>
+          <Route path="/home" element={<HomeRoute />} />
+          <Route path="/rooms" element={<RoomsRoute />} />
+          <Route path="/ranked" element={<MatchmakingRoute tipo="ranked" />} />
+          <Route path="/casual" element={<MatchmakingRoute tipo="casual" />} />
+          <Route path="/game/:salaId" element={<GameRoute />} />
+          <Route path="/friends" element={<FriendsRoute />} />
+          <Route path="/leaderboard" element={<LeaderboardRoute />} />
+          <Route path="/history" element={<HistoryRoute />} />
+          <Route path="/replay/:salaId" element={<ReplayRoute />} />
+          <Route path="/tournaments" element={<TorneosRoute />} />
+          <Route path="/tournaments/:torneoId" element={<TorneoDetalleRoute />} />
+          <Route path="/tournaments/:torneoId/enroll" element={<TorneoEnrollRoute />} />
+          <Route path="/tournaments/:torneoId/join" element={<TorneoJoinRoute />} />
+          <Route path="/tienda" element={<TiendaRoute />} />
+          <Route path="/inventario" element={<InventarioRoute />} />
+          {/* Con sesión, "Ver fichas" cuelga del shell como cualquier otra
+              sección (mismo Outlet persistente) — si viviera afuera, entrar
+              acá remontaría el shell y el sidebar desaparecería un instante. */}
+          {session && <Route path="/piece-demo" element={<PieceDemoRoute />} />}
+        </Route>
 
-      <Route path="/onboarding" element={
-        <Private>{() => <OnboardingLevelScreen dark={dark} onElegir={handleNivelElegido} />}</Private>
-      } />
-      <Route path="/tutorial" element={
-        <Private>{() => <TutorialGame onSkip={handleTutorialResuelto} onFinish={handleTutorialResuelto} />}</Private>
-      } />
+        {/* Autenticadas de pantalla completa (sin shell) */}
+        <Route path="/onboarding" element={<OnboardingRoute />} />
+        <Route path="/tutorial" element={<TutorialRoute />} />
 
-      <Route path="/home" element={
-        <Private>{(s) => (
-          <Dashboard
-            user={s.user}
-            config={s.config}
-            dark={dark}
-            onToggleTheme={() => setDark(d => !d)}
-            onLogout={handleLogout}
-            onGoToSalas={() => navigate('/rooms')}
-            onGoToRanked={() => navigate('/ranked')}
-            onGoToCasual={() => navigate('/casual')}
-            onPieceDemo={() => navigate('/piece-demo')}
-            onAvatarChange={(avatar) =>
-              setSession(s => s && { ...s, user: { ...s.user, avatar } })
-            }
-            onGoToAmigos={() => navigate('/friends')}
-            onGoToLeaderboard={() => navigate('/leaderboard')}
-            onGoToHistorial={() => navigate('/history')}
-            onGoToTorneos={() => navigate('/tournaments')}
-            onUnirseSala={handleUnirseSala}
-            notifVersion={notifVersion}
-            salaParaReintegrar={salaParaReintegrar}
-            onReintegrarSala={handleReintegrarSala}
-            onDescartarReintegro={() => setSalaParaReintegrar(null)}
-          />
-        )}</Private>
-      } />
+        {/* Demo de fichas sin sesión (ej. desde landing) — pantalla completa,
+            no hay shell que mantener porque todavía no hay sidebar. */}
+        {!session && <Route path="/piece-demo" element={<PieceDemoRoute />} />}
 
-      <Route path="/rooms" element={
-        <Private>{(s) => <RoomsRoute user={s.user} dark={dark} />}</Private>
-      } />
-      <Route path="/ranked" element={
-        <Private>{(s) => <MatchmakingRoute user={s.user} dark={dark} tipo="ranked" />}</Private>
-      } />
-      <Route path="/casual" element={
-        <Private>{(s) => <MatchmakingRoute user={s.user} dark={dark} tipo="casual" />}</Private>
-      } />
-      <Route path="/game/:salaId" element={
-        <Private>{(s) => (
-          <GameRoute
-            session={s}
-            onInvitarCompanero={handleInvitarCompanero}
-            onAgregarAmigo={handleAgregarAmigo}
-          />
-        )}</Private>
-      } />
+        <Route path="/party/:codigo" element={<PartyRedirect />} />
+        <Route path="/verify-email/:token" element={<VerifyEmailRoute />} />
 
-      <Route path="/friends" element={
-        <Private>{() => <FriendsView dark={dark} onBack={() => navigate('/home')} conectadosEnVivo={enVivo} />}</Private>
-      } />
-      <Route path="/leaderboard" element={
-        <Private>{(s) => <LeaderboardView dark={dark} onBack={() => navigate('/home')} miUsuarioId={s.user.id} />}</Private>
-      } />
-      <Route path="/history" element={
-        <Private>{() => (
-          <MatchHistoryView
-            dark={dark}
-            onBack={() => navigate('/home')}
-            onVerReplay={(salaId) => navigate(`/replay/${salaId}`)}
-          />
-        )}</Private>
-      } />
-      <Route path="/replay/:salaId" element={<Private>{() => <ReplayRoute dark={dark} />}</Private>} />
+        {/* Legales — públicas, con o sin sesión (requisito de AdSense:
+            deben navegarse sin login). */}
+        <Route path="/privacidad" element={<PrivacidadView />} />
+        <Route path="/terminos" element={<TerminosView />} />
 
-      <Route path="/tournaments" element={
-        <Private>{() => (
-          <TorneosListView onVolver={() => navigate('/home')} onVerTorneo={(id) => navigate(`/tournaments/${id}`)} />
-        )}</Private>
-      } />
-      <Route path="/tournaments/:torneoId" element={<Private>{() => <TorneoDetalleRoute />}</Private>} />
-      <Route path="/tournaments/:torneoId/enroll" element={<Private>{() => <TorneoEnrollRoute />}</Private>} />
-      <Route path="/tournaments/:torneoId/join" element={<Private>{() => <TorneoJoinRoute />}</Private>} />
-
-      <Route path="/party/:codigo" element={<PartyRedirect session={session} />} />
-      <Route path="/verify-email/:token" element={<VerifyEmailRoute onSuccess={handleSuccess} />} />
-
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </AppContext.Provider>
   );
 }

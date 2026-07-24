@@ -22,7 +22,7 @@
   --err:   #f87171;
   --ok:    #4ade80;
   color-scheme: dark;
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-family: 'Segoe UI', system-ui, sans-serif;
 }
 
 /* ── Light theme overrides ─────────────────────── */
@@ -831,7 +831,7 @@ button:active { transform: scale(0.97); }
 }
 .search-code-input::placeholder {
   color: var(--text-dim);
-  font-family: Inter, sans-serif;
+  font-family: 'Segoe UI', sans-serif;
   letter-spacing: 0;
 }
 

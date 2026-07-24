@@ -27,6 +27,20 @@ docker compose up -d
 popd
 
 echo.
+echo Verificando que el puerto 5174 este libre...
+REM Si quedo un serve-pwa.cjs (u otro "npm run dev") de una sesion
+REM anterior ocupando el 5174, vite falla al arrancar (strictPort: true,
+REM ver vite.config.ts) EN SU PROPIA VENTANA -- que nadie mira -- mientras
+REM el chequeo de mas abajo sigue viendo un 200 (del proceso viejo) y abre
+REM el navegador contento con el build desactualizado. Se mata cualquier
+REM cosa en el 5174 antes de arrancar, asi el puerto siempre queda para
+REM el vite de esta sesion.
+for /f "tokens=5" %%P in ('netstat -ano ^| findstr ":5174" ^| findstr "LISTENING"') do (
+  echo Matando proceso viejo en el puerto 5174 ^(PID %%P^)...
+  taskkill /F /PID %%P >nul 2>&1
+)
+
+echo.
 echo Iniciando el servidor del Back Office en una ventana aparte...
 start "2mino BO - servidor (no cerrar)" cmd /k "npm run dev"
 

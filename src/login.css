@@ -124,7 +124,7 @@
 /* ── Marca ──────────────────────────────────────── */
 .lg-brand { text-align: center; }
 .lg-wordmark {
-  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-family: 'Segoe UI', Inter, sans-serif;
   font-weight: 700;
   font-size: clamp(3rem, 6vw, 4.4rem);
   letter-spacing: -0.03em;
@@ -134,7 +134,7 @@
 .lg-wordmark span { color: var(--amber); }
 .lg-tagline {
   margin-top: 14px;
-  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-family: 'Segoe UI', Inter, sans-serif;
   font-weight: 600;
   font-size: 1rem;
   letter-spacing: 0.02em;
@@ -167,7 +167,7 @@
 .lg-mini-mark { display: inline-flex; margin-bottom: 16px; }
 .lg-mini-bone { width: 26px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3)); }
 .lg-form-head h2 {
-  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-family: 'Segoe UI', Inter, sans-serif;
   font-size: 1.7rem;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -411,7 +411,7 @@
   border: 1px solid color-mix(in srgb, var(--amber) 34%, transparent);
 }
 .lg-sent h2 {
-  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-family: 'Segoe UI', Inter, sans-serif;
   font-size: 1.5rem;
   font-weight: 700;
   letter-spacing: -0.02em;

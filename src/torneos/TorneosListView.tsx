@@ -40,7 +40,7 @@ export default function TorneosListView({ onVerTorneo, onVolver }: Props) {
         {!torneos ? (
           <p className="tor-loading">Cargando torneos…</p>
         ) : torneos.length === 0 ? (
-          <p className="tor-loading">No hay torneos disponibles para vos ahora mismo.</p>
+          <p className="tor-loading">No hay torneos disponibles para ti ahora mismo.</p>
         ) : (
           <div className="tor-list">
             {torneos.map(t => {

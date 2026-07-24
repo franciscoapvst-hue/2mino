@@ -59,6 +59,33 @@ export type AdminSession = {
   token: string;
 };
 
+// ── Tienda / cosméticos (docs/PLAN_COSMETICOS.md) ──────────────────
+// Backend en snake_case, igual que Torneo* — se usa tal cual.
+export type TiendaItem = {
+  id: string;
+  categoria: 'ficha' | 'tablero' | 'avatar' | 'marco_avatar';
+  clave: string;
+  nombre: string;
+  precio: number;
+  disponible: boolean;
+  orden: number;
+  created_at: string;
+};
+
+export type Billetera = {
+  usuario_id: string;
+  saldo: number;
+  updated_at: string;
+};
+
+export type InventarioItem = {
+  item_id: string;
+  categoria: string;
+  clave: string;
+  nombre: string;
+  comprado_at: string;
+};
+
 // ── Torneos (Etapa 1 de docs/PLAN_TORNEOS.md) ──────────────────────
 // Backend en snake_case — se usa tal cual (sin mapeo a camelCase como
 // Usuario) porque el wizard manda de vuelta el mismo shape que recibe.

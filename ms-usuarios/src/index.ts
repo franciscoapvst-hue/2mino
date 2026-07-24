@@ -3,6 +3,8 @@ import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { runMigrations } from './db/pool';
 import { usuariosRoutes, limpiarInvitadosAbandonados } from './routes/usuarios';
+import { tiendaRoutes } from './routes/tienda';
+import { internoRoutes } from './routes/interno';
 
 const app = Fastify({
   logger: true,
@@ -24,6 +26,7 @@ app.register(swagger, {
     ],
     tags: [
       { name: 'usuarios', description: 'Gestión de usuarios y autenticación' },
+      { name: 'tienda',   description: 'Cosméticos: billetera, catálogo, inventario' },
       { name: 'system',   description: 'Estado del servicio' },
     ],
   },
@@ -40,6 +43,8 @@ app.register(swaggerUi, {
 
 // ── Rutas ─────────────────────────────────────────
 app.register(usuariosRoutes);
+app.register(tiendaRoutes);
+app.register(internoRoutes);
 
 app.get('/health', {
   schema: {
