@@ -1,0 +1,47 @@
+# Plantilla del override de desarrollo local. Copiar antes de levantar el stack:
+#
+#   cp docker-compose.override.yml.example docker-compose.override.yml
+#
+# El archivo real (`docker-compose.override.yml`) está en .gitignore — cada
+# máquina puede ajustarlo sin ensuciar el repo. Esta plantilla existe para que
+# un clone nuevo sepa QUÉ mapeos hacen falta en local, sobre todo el de
+# `ms-social` (sin él los WebSockets no funcionan con el dev server de Vite).
+#
+# El docker-compose.yml base ya publica api-integracion en 127.0.0.1:3000
+# (agregado para el túnel SSH del Back Office a producción) — alcanza también
+# para local, no hace falta repetirlo acá.
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+
+  # ms-social no publica puerto en el compose base (en producción solo nginx le
+  # habla por la red Docker interna, ver nginx.conf). En local, el dev server de
+  # Vite corre en el HOST (5173) y necesita alcanzarlo para proxyar los
+  # WebSockets — el proxy `/ws` de vite.config.ts apunta a localhost:6200.
+  # Sin este mapeo, el chat de partida y el aviso `partida_actualizada` no
+  # conectan (docs/DESARROLLO.md § Troubleshooting).
+  # Solo en loopback (127.0.0.1), nunca a la interfaz pública, mismo criterio
+  # que api-integracion:3000.
+  ms-social:
+    ports:
+      - "127.0.0.1:6200:6200"
+
+  # En local no hay dominio ni TLS — se prueba pegándole directo al frontend.
+  frontend:
+    ports:
+      - "80:80"
+
+  caddy:
+    profiles: ["nunca"]  # no levantar caddy en local (necesita DOMAIN real)
+
+  # cadvisor/node-exporter miden el VPS real — el dashboard local los lee vía
+  # túnel SSH (ver docs/DEPLOY.md § Monitoreo), no tiene sentido correr una
+  # copia local. Además "ports:" en compose se MERGEA (no reemplaza) entre este
+  # override y el compose base, así que cambiarle el puerto acá no bastaría
+  # para evitar el choque con Jenkins (ci/, siempre en 8080) — hay que
+  # directamente no levantarlos en local.
+  cadvisor:
+    profiles: ["nunca"]
+  node-exporter:
+    profiles: ["nunca"]
