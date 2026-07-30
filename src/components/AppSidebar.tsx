@@ -68,7 +68,7 @@ export default function AppSidebar({
       match: p => p === '/history' || p.startsWith('/replay') },
     ...(tiendaHabilitada ? [{ to: '/tienda', label: 'Tienda', img: 'tienda' as const }] : []),
     { to: '/inventario', label: 'Inventario', img: 'inventario' },
-    { to: '/piece-demo', label: 'Ver fichas', svg: <Bone a={3} b={5} className="nav-tile" /> },
+    { to: '/reglas-domino-dominicano', label: 'Ver fichas', svg: <Bone a={3} b={5} className="nav-tile" /> },
   ];
 
   function go(to: string) {

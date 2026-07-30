@@ -3,6 +3,9 @@
 
 node_modules/
 dist/
+# Bundle SSR intermedio del prerender de SEO (ver scripts/prerender.mjs):
+# se regenera en cada build, no es artefacto publicable.
+dist-prerender/
 .env
 .env.local
 .env.*.local

@@ -1,0 +1,23 @@
+# robots.txt de 2mino.
+#
+# ⚠️ VERIFICAR DESPUÉS DE DEPLOYAR. Hoy https://2mino.online/robots.txt lo
+# responde un robots GESTIONADO POR CLOUDFLARE (trae el bloque
+# "Content-Signal: search=yes,ai-train=no" y bloquea los crawlers de
+# entrenamiento de IA: GPTBot, CCBot, ClaudeBot, Google-Extended, etc.).
+# Este archivo viaja en el build (Vite copia public/ a la raíz de dist, y
+# nginx sirve estáticos antes del fallback de la SPA), pero si Cloudflare
+# sigue pisándolo, la línea `Sitemap:` de abajo hay que agregarla desde el
+# panel de Cloudflare en vez de acá.
+
+User-agent: *
+Allow: /
+
+# Rutas sin valor para un buscador: requieren sesión o son de un solo uso, y
+# al ser una SPA devuelven el mismo HTML que la home (no aportan contenido
+# nuevo y solo gastan presupuesto de rastreo).
+Disallow: /verify-email/
+Disallow: /party/
+Disallow: /game/
+Disallow: /replay/
+
+Sitemap: https://2mino.online/sitemap.xml

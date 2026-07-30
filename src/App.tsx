@@ -651,7 +651,7 @@ export default function App() {
           {/* Con sesión, "Ver fichas" cuelga del shell como cualquier otra
               sección (mismo Outlet persistente) — si viviera afuera, entrar
               acá remontaría el shell y el sidebar desaparecería un instante. */}
-          {session && <Route path="/piece-demo" element={<PieceDemoRoute />} />}
+          {session && <Route path="/reglas-domino-dominicano" element={<PieceDemoRoute />} />}
         </Route>
 
         {/* Autenticadas de pantalla completa (sin shell) */}
@@ -660,7 +660,15 @@ export default function App() {
 
         {/* Demo de fichas sin sesión (ej. desde landing) — pantalla completa,
             no hay shell que mantener porque todavía no hay sidebar. */}
-        {!session && <Route path="/piece-demo" element={<PieceDemoRoute />} />}
+        {!session && <Route path="/reglas-domino-dominicano" element={<PieceDemoRoute />} />}
+
+        {/* La ruta vieja `/piece-demo` se renombró por SEO: el slug ahora
+            describe el contenido ("reglas del dominó dominicano") en vez de
+            ser un nombre interno que nadie busca. nginx ya responde un 301
+            permanente para quien entre de afuera; esto cubre las navegaciones
+            del lado del cliente (un link viejo dentro de la app) y el caso de
+            `npm run dev`, donde no hay nginx delante. */}
+        <Route path="/piece-demo" element={<Navigate to="/reglas-domino-dominicano" replace />} />
 
         <Route path="/party/:codigo" element={<PartyRedirect />} />
         <Route path="/verify-email/:token" element={<VerifyEmailRoute />} />
