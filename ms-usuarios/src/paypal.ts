@@ -13,7 +13,12 @@
 
 import crypto from 'crypto';
 
-const ENABLE_PAGOS = process.env.ENABLE_PAGOS === 'true';
+// Se exporta para que las RUTAS puedan negarse a operar cuando está apagado
+// (ver routes/tienda.ts). Sin ese chequeo, con ENABLE_PAGOS=false los
+// endpoints seguían funcionando en modo simulado: crearOrden/capturarOrden
+// devolvían "aprobado" sin cobrar nada y el saldo se acreditaba igual — o sea,
+// doblones gratis para cualquiera que llamara la API.
+export const ENABLE_PAGOS = process.env.ENABLE_PAGOS === 'true';
 const PAYPAL_ENV = process.env.PAYPAL_ENV === 'live' ? 'live' : 'sandbox';
 const BASE_URL = PAYPAL_ENV === 'live'
   ? 'https://api-m.paypal.com'
