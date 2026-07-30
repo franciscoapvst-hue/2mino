@@ -26,8 +26,18 @@ npm install --prefix ms-salas
 cp .env.example .env
 # Editar POSTGRES_PASSWORD y JWT_SECRET
 
+# Mapeos de puerto que solo aplican en local (el archivo real está
+# gitignored; la plantilla dice qué expone y por qué)
+cp docker-compose.override.yml.example docker-compose.override.yml
+
 docker compose up --build
 ```
+
+> **El override no es opcional si vas a usar `npm run dev`.** `ms-social` no
+> publica puerto en el compose base (en producción solo nginx le habla por la
+> red interna), pero el dev server de Vite corre en el host y proxya `/ws` a
+> `localhost:6200`. Sin ese mapeo los WebSockets no conectan — ver
+> Troubleshooting.
 
 Servicios levantados:
 
@@ -35,6 +45,7 @@ Servicios levantados:
 |----------|-------------|---------|
 | api-integracion | 3000 | http://localhost:3000/docs |
 | postgres | 5432 | — |
+| ms-social | 6200 (solo con el override) | — |
 | ms-usuarios | — (interno) | — |
 | ms-frontend-landing | — (interno) | — |
 | ms-salas | — (interno) | — |
@@ -133,6 +144,7 @@ npm run start --prefix api-integracion
 | CORS en producción | Definir `CORS_ORIGIN` con el dominio exacto del frontend |
 | JWT inválido | Regenerar `JWT_SECRET`; los tokens previos dejan de valer |
 | ms-salas no responde | Confirmar que corre en el puerto 6001 |
+| WebSockets no conectan en dev (chat de partida mudo, el tablero solo se actualiza cada 20s) | Vite proxya `/ws` → `localhost:6200`, así que `ms-social` tiene que ser alcanzable desde el host. Con Docker: copiar `docker-compose.override.yml.example` (expone `127.0.0.1:6200`) y recrear el contenedor (`docker compose up -d ms-social`). Todo-local: ya corre nativo en 6200. Verificar con `curl http://localhost:6200/health` |
 
 ## Branches
 
