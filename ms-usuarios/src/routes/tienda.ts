@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import crypto from 'crypto';
 import { pool } from '../db/pool';
-import { crearOrden, capturarOrden, verificarWebhookSignature } from '../paypal';
+import { crearOrden, capturarOrden, verificarWebhookSignature, ENABLE_PAGOS } from '../paypal';
 
 // ── Schemas reutilizables ─────────────────────────
 const ItemSchema = {
@@ -425,6 +425,10 @@ export async function tiendaRoutes(app: FastifyInstance) {
       response: { 200: { description: 'Paquetes', type: 'array', items: DoblonPaqueteSchema } },
     },
   }, async (_req, reply) => {
+    // Sin pagos habilitados la feature NO existe: catálogo vacío. El frontend
+    // ya oculta la sección cuando no hay paquetes (`paquetes.length > 0` en
+    // TiendaView), así que esto sola alcanza para que no se vea nada.
+    if (!ENABLE_PAGOS) return reply.send([]);
     const { rows } = await pool.query(
       `SELECT id, nombre, doblones, precio_usd, orden FROM doblon_paquetes
        WHERE disponible = true ORDER BY orden`,
@@ -454,6 +458,13 @@ export async function tiendaRoutes(app: FastifyInstance) {
       },
     },
   }, async (req, reply) => {
+    // Guard PRINCIPAL de seguridad. Sin esto, con ENABLE_PAGOS=false esta ruta
+    // seguía creando órdenes que `capturar` daba por aprobadas sin cobrar —
+    // el agujero real, explotable llamando la API aunque la UI esté oculta por
+    // el feature flag `comprar_doblones_habilitado` (ese flag es cosmético).
+    if (!ENABLE_PAGOS) {
+      return reply.code(503).send({ error: 'La compra de doblones no está disponible' });
+    }
     const { usuarioId, paqueteId } = req.body;
     const { rows: paqueteRows } = await pool.query(
       `SELECT id, doblones, precio_usd FROM doblon_paquetes WHERE id = $1 AND disponible = true`,
@@ -547,6 +558,12 @@ export async function tiendaRoutes(app: FastifyInstance) {
       },
     },
   }, async (req, reply) => {
+    // Segundo cerrojo: aunque no se puedan crear órdenes nuevas, esta ruta es
+    // la que ACREDITA el saldo. Cerrarla también evita que una orden vieja
+    // quedada en 'iniciado' se pueda capturar más tarde.
+    if (!ENABLE_PAGOS) {
+      return reply.code(503).send({ error: 'La compra de doblones no está disponible' });
+    }
     const resultado = await acreditarCompra(req.params.orderId);
     if (!resultado) return reply.code(404).send({ error: 'Orden no encontrada o ya procesada' });
     return reply.send(resultado);
@@ -565,6 +582,14 @@ export async function tiendaRoutes(app: FastifyInstance) {
   app.post<{ Body: { headers: Record<string, string | undefined>; event: unknown } }>('/interno/paypal/webhook', {
     schema: { tags: ['tienda'], summary: 'Webhook de PayPal (verificado por firma, no por JWT)' },
   }, async (req, reply) => {
+    // Tercer cerrojo, y el más importante de los tres: con ENABLE_PAGOS=false
+    // `verificarWebhookSignature()` devuelve `true` SIN verificar nada (ver
+    // paypal.ts), así que sin este chequeo cualquiera podía POSTear un evento
+    // inventado a esta ruta y acreditarse doblones. Se responde 200 para no
+    // provocar reintentos infinitos del lado de PayPal si algún día llegara
+    // uno legítimo con la feature apagada.
+    if (!ENABLE_PAGOS) return reply.code(200).send({ recibido: false });
+
     const { headers, event } = req.body;
     const ok = await verificarWebhookSignature(headers, event);
     if (!ok) return reply.code(400).send({ error: 'Firma de webhook inválida' });
