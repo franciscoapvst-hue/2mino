@@ -4,7 +4,32 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>2mino</title>
+
+    <!-- ── SEO ────────────────────────────────────────────────────────────
+         La app es una SPA: TODAS las rutas devuelven este mismo HTML, así
+         que estos tags describen la home/landing y el canonical apunta a la
+         raíz a propósito (sin eso, cada ruta sería contenido duplicado con
+         el mismo <head>). Cuando se agregue prerender por ruta, cada página
+         pasa a llevar su propio title/description/canonical y este bloque
+         queda solo como default de la raíz. -->
+    <title>Dominó online gratis — juega 1vs1 o en parejas | 2mino</title>
+    <meta name="description" content="Juega dominó online gratis, sin descargas. Partidas 1vs1 o en parejas, con chat en vivo, ranking ELO y repeticiones. Reglas dominicanas: capicúa y tranca." />
+    <link rel="canonical" href="https://2mino.online/" />
+    <meta name="theme-color" content="#0a0f0d" />
+
+    <!-- Open Graph / Twitter. Falta `og:image`: requiere una imagen social
+         real de 1200x630 (no hay ninguna en el repo — los assets son
+         avatares/tableros/iconos). Apuntar a un archivo inexistente es peor
+         que omitirlo, así que se agrega cuando exista el diseño. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="2mino" />
+    <meta property="og:title" content="Dominó online gratis — juega 1vs1 o en parejas" />
+    <meta property="og:description" content="Dominó multijugador en el navegador, sin descargas. Chat en vivo, ranking ELO y repeticiones. Reglas dominicanas: capicúa y tranca." />
+    <meta property="og:url" content="https://2mino.online/" />
+    <meta property="og:locale" content="es_DO" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Dominó online gratis — juega 1vs1 o en parejas" />
+    <meta name="twitter:description" content="Dominó multijugador en el navegador, sin descargas. Chat en vivo, ranking ELO y repeticiones." />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- El <script> de AdSense se inyecta acá desde vite.config.ts (plugin
          'adsense-script'), pero SOLO si VITE_ADSENSE_CLIENT_ID está seteado.
@@ -12,9 +37,101 @@
          y en dev/sin cuenta no se emite nada — así se evita el URIError que
          daba el placeholder literal. Ver el comentario del plugin. -->
 
+    <!-- Datos estructurados (schema.org). Van en el HTML estático a
+         propósito: el crawler los lee sin ejecutar JS, que es justo lo que
+         hoy NO puede ver del resto de la página. Solo se declara lo que el
+         producto realmente cumple — nada de `aggregateRating` ni reseñas
+         inventadas (además de deshonesto, Google penaliza el markup que no
+         se corresponde con la página). Falta `image` por el mismo motivo
+         que `og:image`. -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://2mino.online/#website",
+          "url": "https://2mino.online/",
+          "name": "2mino",
+          "description": "Dominó online gratis, multijugador en el navegador.",
+          "inLanguage": "es"
+        },
+        {
+          "@type": "VideoGame",
+          "@id": "https://2mino.online/#game",
+          "name": "2mino — Dominó online",
+          "url": "https://2mino.online/",
+          "description": "Dominó multijugador para jugar en el navegador, sin descargas. Partidas 1vs1 o en parejas con reglas dominicanas: capicúa, tranca y partida a puntos.",
+          "genre": ["Board game", "Dominó", "Multijugador"],
+          "gamePlatform": "Web browser",
+          "applicationCategory": "GameApplication",
+          "operatingSystem": "Web browser",
+          "playMode": ["MultiPlayer", "SinglePlayer"],
+          "numberOfPlayers": {
+            "@type": "QuantitativeValue",
+            "minValue": 2,
+            "maxValue": 4
+          },
+          "inLanguage": "es",
+          "isPartOf": { "@id": "https://2mino.online/#website" },
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD",
+            "availability": "https://schema.org/InStock"
+          }
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+
+    <!-- Contenido para quien llega sin JavaScript: tanto un visitante real
+         (que si no ve una página en blanco) como los crawlers que no ejecutan
+         JS. NO es cloaking: describe honestamente lo que la app hace y no
+         oculta nada distinto de lo que ve un usuario normal.
+         Mientras el <body> siga vacío para el crawler (la app se renderiza en
+         el cliente), este bloque es la única descripción rastreable del juego
+         — se vuelve secundario cuando exista prerender por ruta. -->
+    <noscript>
+      <div style="max-width: 42rem; margin: 0 auto; padding: 2rem 1.25rem; font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; color: #e8e5df; background: #0a0f0d;">
+        <h1>Dominó online gratis — 2mino</h1>
+        <p>
+          2mino es un dominó multijugador para jugar directo en el navegador,
+          sin descargar ni instalar nada. Podés jugar <strong>1vs1</strong> o
+          <strong>en parejas</strong> (2 contra 2), contra otros jugadores en
+          partidas casuales o clasificatorias.
+        </p>
+
+        <h2>Qué incluye</h2>
+        <ul>
+          <li>Partidas 1vs1 y en parejas, casuales o clasificatorias.</li>
+          <li>Ranking ELO: subís de bronce a diamante según tus resultados.</li>
+          <li>Chat en vivo durante la partida.</li>
+          <li>Repeticiones jugada por jugada al terminar.</li>
+          <li>Salas privadas con enlace para invitar a tu equipo.</li>
+          <li>Tabla de clasificación y lista de amigos.</li>
+        </ul>
+
+        <h2>Reglas del dominó dominicano</h2>
+        <ul>
+          <li><strong>Set:</strong> del 0 (blanco) al 6 — 28 fichas en total, 7 por jugador en partidas de 4.</li>
+          <li><strong>Partida a puntos:</strong> se juegan varias manos hasta que un equipo alcanza el objetivo (100, 150 o 200 puntos).</li>
+          <li><strong>Victoria normal:</strong> quien cierra la mano suma los pips que le quedaron al equipo contrario.</li>
+          <li><strong>Capicúa:</strong> si la última ficha encaja en ambos extremos del tablero, suma un bono de 30 puntos.</li>
+          <li><strong>Tranca:</strong> si nadie puede jugar, gana el equipo con menos pips en mano y suma todos los pips que quedaron sobre la mesa.</li>
+          <li><strong>Robar del pozo:</strong> en 1vs1, cuando no tenés ficha jugable tomás del pozo hasta poder jugar.</li>
+        </ul>
+
+        <p>
+          <strong>Para jugar necesitás habilitar JavaScript</strong> en tu
+          navegador: la mesa, el arrastre de fichas y el chat funcionan en vivo.
+        </p>
+      </div>
+    </noscript>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Antes de este archivo, https://2mino.online/sitemap.xml devolvía 200 con el
+  index.html (el fallback de la SPA en nginx) — para un buscador eso es peor
+  que un 404, porque parece un sitemap válido y no lo es.
+
+  Tiene UNA sola URL a propósito: hoy la app no tiene prerender, así que todas
+  las rutas devuelven el mismo HTML con <link rel="canonical"> apuntando a la
+  raíz. Listar /piece-demo, /privacidad, etc. sería una señal contradictoria
+  (URLs en el sitemap que canonicalizan a otra página). Cuando exista
+  prerender por ruta —cada página con su propio title/description/canonical—
+  este archivo se amplía con esas páginas.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://2mino.online/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>
