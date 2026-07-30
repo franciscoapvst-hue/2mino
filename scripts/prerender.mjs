@@ -45,7 +45,13 @@ for (const { ruta, title, description, html } of paginas) {
   const url = `https://2mino.online${ruta}`;
   let salida = shell;
 
-  salida = reemplazar(salida, /<title>[\s\S]*?<\/title>/, `<title>${title}</title>`, '<title>');
+  // `[^<]*` y no `[\s\S]*?`: un título no puede contener `<`, y así el match
+  // no puede arrancar en una MENCIÓN de la etiqueta dentro de un comentario y
+  // estirarse hasta el cierre real. Con el patrón perezoso anterior eso pasó:
+  // el título terminó dentro de un comentario sin cerrar y la página quedó sin
+  // title, description ni canonical — en silencio, porque el reemplazo "sí"
+  // había ocurrido. La comprobación de más abajo es la red que lo detecta.
+  salida = reemplazar(salida, /<title>[^<]*<\/title>/, `<title>${title}</title>`, 'la etiqueta title');
   salida = reemplazar(
     salida,
     /<meta name="description" content="[^"]*" \/>/,
@@ -107,6 +113,23 @@ for (const { ruta, title, description, html } of paginas) {
   // <link rel="canonical"> (que apunta sin barra) — señal contradictoria para
   // el buscador, y un redirect de más en cada link interno de la app.
   // Con `$uri.html` en el try_files de nginx, la ruta responde 200 directo.
+  // Comprobación final, mirando el HTML COMO LO VE UN CRAWLER: se descartan
+  // los comentarios y recién ahí se exige que los tres tags críticos existan y
+  // digan lo que deben. Que un reemplazo "haya ocurrido" no alcanza — puede
+  // haber dejado el tag adentro de un comentario, que es exactamente el bug
+  // que motivó esto. Falla el build antes que publicar páginas sin SEO.
+  const visible = salida.replace(/<!--[\s\S]*?-->/g, '');
+  const comprobar = (regex, esperado, queCosa) => {
+    const m = visible.match(regex);
+    if (!m) throw new Error(`prerender: ${ruta} quedó SIN ${queCosa} visible (¿tag dentro de un comentario?)`);
+    if (m[1] !== esperado) {
+      throw new Error(`prerender: ${ruta} tiene ${queCosa} inesperado.\n  esperado: ${esperado}\n  obtenido: ${m[1]}`);
+    }
+  };
+  comprobar(/<title>([^<]*)<\/title>/, title, 'title');
+  comprobar(/<meta name="description" content="([^"]*)"/, escaparAttr(description), 'description');
+  comprobar(/<link rel="canonical" href="([^"]*)"/, url, 'canonical');
+
   const destino = join(dist, `${ruta.replace(/^\//, '')}.html`);
   await mkdir(dirname(destino), { recursive: true });
   await writeFile(destino, salida, 'utf8');

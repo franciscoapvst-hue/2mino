@@ -16,8 +16,12 @@ export type MetaPagina = {
 
 // Debe coincidir con el <title> de index.html — es el que sirve nginx para la
 // raíz y para toda ruta sin archivo propio (las privadas: /home, /game/…).
+// Apila los términos que se buscan de verdad ("juego de dominó", "dominó
+// online gratis", "dominó por parejas") en vez de una frase de marketing, y va
+// sin marca porque "2mino" todavía no tiene volumen de búsqueda — ver el
+// comentario largo en index.html.
 export const TITULO_POR_DEFECTO =
-  'Dominó online gratis — juega 1vs1 o en parejas | 2mino';
+  'Juego de dominó online gratis - Dominó por parejas y 1vs1';
 
 // Solo rutas PÚBLICAS con contenido propio: son las que se prerenderizan y las
 // únicas que tiene sentido listar en el sitemap. Las privadas usan el título
