@@ -1,4 +1,20 @@
-{$DOMAIN}, www.{$DOMAIN} {
+# www → apex, con 301 permanente.
+#
+# Antes este host se servía desde el MISMO bloque que el apex, así que
+# https://www.2mino.online devolvía 200 con el sitio entero: el mismo
+# contenido vivía en dos hostnames. Google llegó a indexar la variante con
+# www —aparecía así en los resultados—, que no es la que declaramos en
+# <link rel="canonical">.
+#
+# El canonical ya apuntaba al apex, pero es una sugerencia: el 301 es una
+# instrucción, elimina el duplicado de raíz y traslada al apex lo que la
+# variante www hubiera acumulado. `{uri}` conserva ruta y query string, así
+# que www.2mino.online/reglas-domino-dominicano cae en su equivalente sin www.
+www.{$DOMAIN} {
+	redir https://{$DOMAIN}{uri} permanent
+}
+
+{$DOMAIN} {
 	# Comprime todo lo que pasa por acá (el bundle JS/CSS del frontend y
 	# las respuestas JSON del gateway vía /api/) — hoy no había compresión
 	# en ningún punto de la cadena. zstd primero (mejor ratio si el
