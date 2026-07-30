@@ -12,8 +12,22 @@
          el mismo <head>). Cuando se agregue prerender por ruta, cada página
          pasa a llevar su propio title/description/canonical y este bloque
          queda solo como default de la raíz. -->
-    <title>Dominó online gratis — juega 1vs1 o en parejas | 2mino</title>
-    <meta name="description" content="Juega dominó online gratis, sin descargas. Partidas 1vs1 o en parejas, con chat en vivo, ranking ELO y repeticiones. Reglas dominicanas: capicúa y tranca." />
+    <!-- OJO: no escribir la etiqueta `title` entre signos de menor/mayor en
+         estos comentarios — scripts/prerender.mjs la busca por texto y
+         terminaría reemplazando desde acá, dejando el título real adentro de
+         un comentario sin cerrar (pasó, y las páginas quedaron sin title,
+         description ni canonical).
+         El título está escrito para la SERP, no para lucir bonito: apila los
+         tres términos que la gente busca de verdad ("juego de dominó",
+         "dominó online gratis", "dominó por parejas") en vez de una frase
+         de marketing. Es el patrón que usan los competidores que hoy rankean
+         (Ludoteka y similares).
+         Sin "| 2mino": la marca todavía no tiene volumen de búsqueda, así que
+         eran 8 caracteres muertos. Se vuelve a poner cuando alguien busque
+         "2mino" por su nombre.
+         57 caracteres: por encima de ~60 Google lo corta con "…". -->
+    <title>Juego de dominó online gratis - Dominó por parejas y 1vs1</title>
+    <meta name="description" content="Juega dominó online gratis, sin descargas ni registro obligatorio. Dominó por parejas o 1vs1, con chat en vivo, ranking y repeticiones. Reglas dominicanas." />
     <link rel="canonical" href="https://2mino.online/" />
     <meta name="theme-color" content="#0a0f0d" />
 
@@ -24,6 +38,11 @@
          invitación a sala privada (/party/:codigo), que se comparten por
          WhatsApp: sin imagen llegan como texto pelado.
          La URL va absoluta porque las redes no resuelven rutas relativas. -->
+    <!-- OJO: el og:title NO copia al título de la página. Son públicos
+         distintos — el título lo lee un buscador y por eso apila términos;
+         esto lo lee una persona en un chat de WhatsApp, donde "Juego de
+         dominó - Dominó online gratis - Dominó por parejas" se ve a spam y
+         espanta el clic. -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="2mino" />
     <meta property="og:title" content="Dominó online gratis — juega 1vs1 o en parejas" />
