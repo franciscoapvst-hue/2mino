@@ -30,6 +30,7 @@ import { api, tokenStore, type AuthUser, type UserConfig, type Sala } from './ap
 import { useSocialSocket } from './hooks/useSocialSocket';
 import { sounds } from './game/sounds';
 import { skinFichaDe } from './skins';
+import { tituloDe } from './seo';
 
 // El tutorial se ofrece una sola vez: se marca en `opciones` del usuario
 // (mismo bucket genérico que ya usan tema/idioma — ver ms-frontend-landing),
@@ -443,6 +444,17 @@ export default function App() {
     document.documentElement.classList.toggle('light', !dark);
     localStorage.setItem('2mino-theme', dark ? 'dark' : 'light');
   }, [dark]);
+
+  // <title> al navegar dentro de la SPA. Al ENTRAR a una URL el título ya
+  // viene bien del servidor (la raíz trae el genérico; las páginas
+  // prerenderizadas, el suyo — ver scripts/prerender.mjs), pero como el
+  // documento no se recarga al cambiar de ruta, sin esto quedaría el de la
+  // página anterior: se nota en la pestaña, en el historial y al guardar un
+  // favorito. No cambia nada del SEO —cada URL se sirve con su propio
+  // title—, es para la persona que está usando la app.
+  useEffect(() => {
+    document.title = tituloDe(location.pathname);
+  }, [location.pathname]);
 
   // Click genérico en cualquier botón de la app (delegación: un solo
   // listener para toda la vida de la app, en vez de tocar cada botón).

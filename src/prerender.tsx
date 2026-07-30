@@ -15,11 +15,13 @@
 // (que sí rompería: App.tsx lee `localStorage` en un inicializador de useState,
 // o sea durante el render, donde no existe en Node).
 
+import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { StaticRouter } from 'react-router-dom';
 import PieceDemo from './components/game/PieceDemo';
 import PrivacidadView from './components/legal/PrivacidadView';
 import TerminosView from './components/legal/TerminosView';
+import { META_POR_RUTA } from './seo';
 
 export type PaginaRenderizada = {
   /** Ruta pública, tal como la sirve el router del cliente. */
@@ -35,42 +37,24 @@ export type PaginaRenderizada = {
 // hay nada que manejar, así que va un noop.
 const noop = () => {};
 
-const PAGINAS = [
-  {
-    // El slug describe el contenido a propósito: es la página que apunta a
-    // "reglas del dominó" / "reglas del dominó dominicano". La ruta anterior
-    // (`/piece-demo`) era un nombre interno sin valor de búsqueda; nginx la
-    // redirige con 301 permanente.
-    ruta:  '/reglas-domino-dominicano',
-    title: 'Reglas del dominó dominicano y las 28 fichas | 2mino',
-    description:
-      'Cómo se juega el dominó dominicano: el set del 0 al 6 con 28 fichas, ' +
-      'partida a puntos, capicúa y tranca. Con todas las fichas ilustradas.',
-    elemento: <PieceDemo onBack={noop} />,
-  },
-  {
-    ruta:  '/privacidad',
-    title: 'Política de privacidad | 2mino',
-    description:
-      'Qué datos recoge 2mino, para qué se usan y cómo ejercer tus derechos.',
-    elemento: <PrivacidadView />,
-  },
-  {
-    ruta:  '/terminos',
-    title: 'Términos y condiciones | 2mino',
-    description:
-      'Condiciones de uso de 2mino: cuentas, conducta en las partidas y ' +
-      'compras de artículos cosméticos.',
-    elemento: <TerminosView />,
-  },
-];
+// Qué componente va en cada ruta. Los TEXTOS (title/description) no se
+// repiten acá: salen de META_POR_RUTA (src/seo.ts), la misma fuente que usa
+// el cliente para el <title> al navegar — así no pueden quedar desfasados.
+// El slug `/reglas-domino-dominicano` describe el contenido a propósito; la
+// ruta anterior (`/piece-demo`) era un nombre interno sin valor de búsqueda y
+// nginx la redirige con 301 permanente.
+const ELEMENTO_POR_RUTA: Record<string, ReactElement> = {
+  '/reglas-domino-dominicano': <PieceDemo onBack={noop} />,
+  '/privacidad':               <PrivacidadView />,
+  '/terminos':                 <TerminosView />,
+};
 
 /** Renderiza cada página pública a HTML. La llama scripts/prerender.mjs. */
 export function renderizarPaginas(): PaginaRenderizada[] {
-  return PAGINAS.map(({ ruta, title, description, elemento }) => ({
+  return Object.entries(ELEMENTO_POR_RUTA).map(([ruta, elemento]) => ({
     ruta,
-    title,
-    description,
+    title:       META_POR_RUTA[ruta].title,
+    description: META_POR_RUTA[ruta].description,
     // StaticRouter en vez de MemoryRouter: es el indicado para una sola
     // pasada de render en servidor y no necesita ninguna API del navegador.
     html: renderToStaticMarkup(
