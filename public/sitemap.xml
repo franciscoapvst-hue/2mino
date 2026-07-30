@@ -1,20 +1,39 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Antes de este archivo, https://2mino.online/sitemap.xml devolvía 200 con el
-  index.html (el fallback de la SPA en nginx) — para un buscador eso es peor
-  que un 404, porque parece un sitemap válido y no lo es.
+  Solo se listan URLs que devuelven HTML con contenido real y su propio
+  <link rel="canonical">:
 
-  Tiene UNA sola URL a propósito: hoy la app no tiene prerender, así que todas
-  las rutas devuelven el mismo HTML con <link rel="canonical"> apuntando a la
-  raíz. Listar /piece-demo, /privacidad, etc. sería una señal contradictoria
-  (URLs en el sitemap que canonicalizan a otra página). Cuando exista
-  prerender por ruta —cada página con su propio title/description/canonical—
-  este archivo se amplía con esas páginas.
+  - `/` es el cascarón de la SPA; su contenido rastreable sin JS es el bloque
+    <noscript> de index.html.
+  - `/piece-demo`, `/privacidad` y `/terminos` se generan en el build
+    (ver scripts/prerender.mjs) y nginx las sirve con 200 directo, sin barra
+    final, para que la URL coincida con su canonical.
+
+  NO se listan las rutas privadas (/home, /game/..., /tienda, …): requieren
+  sesión y devuelven el mismo cascarón que `/`, así que no aportan contenido
+  indexable. Están además en el Disallow de robots.txt.
+
+  Cuando se prerenderice una ruta nueva, hay que agregarla acá.
 -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://2mino.online/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://2mino.online/piece-demo</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://2mino.online/privacidad</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://2mino.online/terminos</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
   </url>
 </urlset>
