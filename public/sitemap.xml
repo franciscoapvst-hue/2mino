@@ -5,7 +5,7 @@
 
   - `/` es el cascarón de la SPA; su contenido rastreable sin JS es el bloque
     <noscript> de index.html.
-  - `/piece-demo`, `/privacidad` y `/terminos` se generan en el build
+  - `/reglas-domino-dominicano`, `/privacidad` y `/terminos` se generan en el build
     (ver scripts/prerender.mjs) y nginx las sirve con 200 directo, sin barra
     final, para que la URL coincida con su canonical.
 
@@ -22,7 +22,7 @@
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://2mino.online/piece-demo</loc>
+    <loc>https://2mino.online/reglas-domino-dominicano</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>

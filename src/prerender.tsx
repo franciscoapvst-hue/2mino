@@ -37,7 +37,11 @@ const noop = () => {};
 
 const PAGINAS = [
   {
-    ruta:  '/piece-demo',
+    // El slug describe el contenido a propósito: es la página que apunta a
+    // "reglas del dominó" / "reglas del dominó dominicano". La ruta anterior
+    // (`/piece-demo`) era un nombre interno sin valor de búsqueda; nginx la
+    // redirige con 301 permanente.
+    ruta:  '/reglas-domino-dominicano',
     title: 'Reglas del dominó dominicano y las 28 fichas | 2mino',
     description:
       'Cómo se juega el dominó dominicano: el set del 0 al 6 con 28 fichas, ' +

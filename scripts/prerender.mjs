@@ -2,10 +2,10 @@
 // Corre DESPUÉS de `vite build` (cliente) y de `vite build --config
 // vite.config.prerender.ts` (bundle SSR). Toma dist/index.html como cascarón,
 // le inyecta el contenido ya renderizado de cada ruta pública y escribe
-// dist/<ruta>/index.html.
+// dist/<ruta>.html.
 //
 // nginx sirve esos archivos antes del fallback de la SPA (`try_files $uri
-// $uri/ /index.html`), así que /piece-demo entrega HTML con contenido real en
+// $uri.html $uri/ /index.html`), así que /reglas-domino-dominicano entrega HTML real en
 // vez del <body> vacío. Cuando el JS carga, React monta la misma página encima
 // — el contenido coincide, así que no hay parpadeo.
 //
@@ -102,11 +102,11 @@ for (const { ruta, title, description, html } of paginas) {
   );
 
   // Se escribe `<ruta>.html` (no `<ruta>/index.html`) a propósito: con el
-  // patrón de directorio, nginx responde 301 a `/piece-demo/` para agregar la
+  // patrón de directorio, nginx responde 301 agregando la
   // barra final, y entonces la URL servida deja de coincidir con el
   // <link rel="canonical"> (que apunta sin barra) — señal contradictoria para
   // el buscador, y un redirect de más en cada link interno de la app.
-  // Con `$uri.html` en el try_files de nginx, /piece-demo responde 200 directo.
+  // Con `$uri.html` en el try_files de nginx, la ruta responde 200 directo.
   const destino = join(dist, `${ruta.replace(/^\//, '')}.html`);
   await mkdir(dirname(destino), { recursive: true });
   await writeFile(destino, salida, 'utf8');
