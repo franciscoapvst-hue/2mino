@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { api, type AuthUser, type UserConfig, type Sala, type PartidaHistorial } from '../api';
 import GameIcon, { type GameIconName } from './GameIcons';
 import { rangoDeElo, progresoRango } from '../ranks';
-import AdSlot from './AdSlot';
 import Footer from './Footer';
 import TorneoBanner from './TorneoBanner';
 import PartidasRecientes from './PartidasRecientes';
@@ -273,8 +272,6 @@ export default function Dashboard({
 
         {/* Últimas partidas — reusa el historial ya cargado (sin refetch) */}
         <PartidasRecientes partidas={historial} />
-
-        <AdSlot slot={import.meta.env.VITE_ADSENSE_SLOT_DASHBOARD} />
       </main>
 
       <Footer />
