@@ -31,7 +31,7 @@ const LA_MESA: Termino[] = [
   },
   {
     termino: 'Palo',
-    definicion: <>El número del que tenés varias fichas. "Estar cargado de cincos" es tener los cincos como palo.</>,
+    definicion: <>El número del que tienes varias fichas. "Estar cargado de cincos" es tener los cincos como palo.</>,
   },
   {
     termino: 'Pozo',
@@ -46,11 +46,11 @@ const LAS_JUGADAS: Termino[] = [
   },
   {
     termino: 'Pasar',
-    definicion: <>Perder el turno por no tener ninguna ficha que encaje. Solo se puede pasar si de verdad no hay jugada — y le avisa a toda la mesa qué números no tenés.</>,
+    definicion: <>Perder el turno por no tener ninguna ficha que encaje. Solo se puede pasar si de verdad no hay jugada — y le avisa a toda la mesa qué números no tienes.</>,
   },
   {
     termino: 'Robar',
-    definicion: <>Tomar una ficha del pozo cuando no tenés jugada, en partidas de dos. Se roba de a una y hay que hacerlo antes de poder pasar.</>,
+    definicion: <>Tomar una ficha del pozo cuando no tienes jugada, en partidas de dos. Se roba de a una y hay que hacerlo antes de poder pasar.</>,
   },
   {
     termino: 'Cargado',
@@ -73,14 +73,14 @@ const LOS_CIERRES: Termino[] = [
   },
   {
     termino: 'Pasó a todos',
-    definicion: <>Ponés una ficha, todos los demás pasan y el turno vuelve a vos. Suma un bono de 30 puntos y la mano continúa.</>,
+    definicion: <>Pones una ficha, todos los demás pasan y el turno vuelve a ti. Suma un bono de 30 puntos y la mano continúa.</>,
   },
 ];
 
 const LA_PARTIDA: Termino[] = [
   {
     termino: 'Mano',
-    definicion: <>Dos cosas, según el contexto: las fichas que tenés, y también cada ronda completa desde el reparto hasta el cierre. Una partida son varias manos.</>,
+    definicion: <>Dos cosas, según el contexto: las fichas que tienes, y también cada ronda completa desde el reparto hasta el cierre. Una partida son varias manos.</>,
   },
   {
     termino: 'Partida',

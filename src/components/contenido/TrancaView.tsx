@@ -44,12 +44,12 @@ export default function TrancaView({ onBack }: { onBack: () => void }) {
               mano</strong>. Ojo con esto: <strong>no gana el que trancó</strong>.
               Trancar es simplemente haber puesto la ficha que dejó a todos sin
               jugada; si al contar resulta que tu equipo tiene más pips, el
-              trancado sos vos.
+              trancado eres tú.
             </p>
             <p>
               En parejas se suman las fichas de los <em>dos</em> compañeros y se
               compara contra la suma de la pareja rival. Por eso a veces conviene
-              que tu compañero se descargue aunque a vos te deje incómodo: lo que
+              que tu compañero se descargue aunque a ti te deje incómodo: lo que
               cuenta es el total del equipo.
             </p>
           </section>
@@ -57,7 +57,7 @@ export default function TrancaView({ onBack }: { onBack: () => void }) {
           <section className="pdemo-section">
             <h2>Cuántos puntos vale</h2>
             <p>
-              Acá está el detalle que más se confunde, y el que hace de la tranca
+              Aquí está el detalle que más se confunde, y el que hace de la tranca
               una jugada temible: el equipo ganador suma{' '}
               <strong>todos los pips que quedaron sobre la mesa</strong> — los
               suyos y los del rival, todo junto.
@@ -86,7 +86,7 @@ export default function TrancaView({ onBack }: { onBack: () => void }) {
             <h2>Cómo se traba una mano a propósito</h2>
             <p>
               Trancar no siempre es accidente. Si vas contando lo que salió,
-              podés provocarlo.
+              puedes provocarlo.
             </p>
 
             <h3>Cerrar los dos extremos en el mismo número</h3>
@@ -94,21 +94,21 @@ export default function TrancaView({ onBack }: { onBack: () => void }) {
               La forma clásica: dejar la mesa abierta{' '}
               <strong>en el mismo número de los dos lados</strong>, cuando ya
               salieron casi todas las fichas de ese número. Si quedan pocas en
-              juego y vos tenés las que faltan, el resto no tiene con qué entrar.
+              juego y tú tienes las que faltan, el resto no tiene con qué entrar.
             </p>
 
             <h3>Insistir en el número que el rival no tiene</h3>
             <p>
               Cuando un rival pasa, te está diciendo qué números no tiene. Si
-              lográs que los dos extremos queden en palos que él pasó, ese jugador
+              logras que los dos extremos queden en palos que él pasó, ese jugador
               está fuera; si además tu compañero te acompaña, la mano se traba
               sola.
             </p>
 
             <h3>Contar antes de trancar</h3>
             <p>
-              Lo importante: <strong>antes de cerrar el juego, contá</strong>. Si
-              te quedan un 6-6 y un 5-4 en la mano, tenés 21 pips y probablemente
+              Lo importante: <strong>antes de cerrar el juego, cuenta</strong>. Si
+              te quedan un 6-6 y un 5-4 en la mano, tienes 21 pips y probablemente
               pierdas el conteo. Trancar con la mano cargada es regalarle al rival
               todos los puntos de la mesa.
             </p>
@@ -153,7 +153,7 @@ export default function TrancaView({ onBack }: { onBack: () => void }) {
               <a href="/reglas-domino-dominicano">guía de reglas</a>, y el otro
               cierre especial en{' '}
               <a href="/capicua-domino">qué es la capicúa</a>. Para el juego de
-              equipo, mirá <a href="/domino-en-parejas">cómo jugar en parejas</a>.
+              equipo, mira <a href="/domino-en-parejas">cómo jugar en parejas</a>.
             </p>
           </section>
         </article>
