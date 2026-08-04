@@ -16,7 +16,7 @@ export type Ticket = {
   creadoEn:   number;     // epoch ms
 };
 
-import { BOT_FILL_MS, BOT_IDS, BOT_USERNAMES } from './bots';
+import { BOT_FILL_MS, BOT_IDS, nombresDeBot } from './bots';
 
 // ── Rango de ELO aceptable, creciente con el tiempo de espera ──────
 // 0-15s: ±50 · 15-30s: ±100 · 30-45s: ±200 · 45-60s: ±400 · 60s+: ±800
@@ -177,8 +177,11 @@ export function rellenoConBots(
     }
   }
 
+  // Los nombres se sortean una sola vez para toda la mesa (y sin repetir),
+  // no uno por asiento: dos bots con el mismo nombre delatarían el relleno.
+  const nombres = nombresDeBot(libres.size);
   [...libres].sort((a, b) => a - b).forEach((pos, i) => {
-    asientos.push({ usuario_id: BOT_IDS[i], username: BOT_USERNAMES[i], posicion: pos });
+    asientos.push({ usuario_id: BOT_IDS[i], username: nombres[i], posicion: pos });
   });
 
   return { asientos, idsAEliminar: usados.map(t => t.id) };

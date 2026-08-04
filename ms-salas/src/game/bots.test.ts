@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { esBot, resolverTurnosBot, BOT_IDS, BOT_USERNAMES, BOT_FILL_MS } from './bots';
+import { esBot, resolverTurnosBot, nombresDeBot, BOT_IDS, BOT_FILL_MS } from './bots';
 import { crearPartida, getExtremos, puedeJugar, abrirTablero } from './logic';
 import type { Asiento, PartidaState } from './logic';
 
@@ -32,7 +32,7 @@ describe('resolverTurnosBot', () => {
   it('un bot solo (1v1 contra humano) juega hasta que le toca al humano', () => {
     const base = crearPartida([
       asiento('humano-1', 'ana', 1),
-      asiento(BOT_IDS[0], BOT_USERNAMES[0], 2),
+      asiento(BOT_IDS[0], 'Rafa', 2),
     ]);
     // Fuerza que le toque al bot (seat 1), tablero ya abierto (sin
     // salidaForzada de por medio) — determinista, sin depender del reparto.
@@ -54,7 +54,7 @@ describe('resolverTurnosBot', () => {
   it('el bot juega la primera ficha jugable de su mano cuando abre sin restricción', () => {
     // Mano 2 en adelante: sin salidaForzada, el bot que abre juega manos[seat][0].
     const base = crearPartida([
-      asiento(BOT_IDS[0], BOT_USERNAMES[0], 1),
+      asiento(BOT_IDS[0], 'Rafa', 1),
       asiento('humano-1', 'ana', 2),
     ]);
     const sinForzada: PartidaState = { ...base, turno: 0, salidaForzada: null, tablero: [] };
@@ -71,9 +71,9 @@ describe('resolverTurnosBot', () => {
   it('bots consecutivos en 4P sin humanos hasta que le toca al humano', () => {
     let partida = crearPartida([
       asiento('humano-1', 'ana', 1),
-      asiento(BOT_IDS[0], BOT_USERNAMES[0], 2),
-      asiento(BOT_IDS[1], BOT_USERNAMES[1], 3),
-      asiento(BOT_IDS[2], BOT_USERNAMES[2], 4),
+      asiento(BOT_IDS[0], 'Rafa', 2),
+      asiento(BOT_IDS[1], 'Manolo', 3),
+      asiento(BOT_IDS[2], 'Kelvin', 4),
     ]);
     const { partida: resuelta } = resolverTurnosBot(partida);
     partida = resuelta;
@@ -85,7 +85,7 @@ describe('resolverTurnosBot', () => {
   it('confirma "listo" automáticamente por los bots entre manos, sin generar movimientos', () => {
     const base = crearPartida([
       asiento('humano-1', 'ana', 1),
-      asiento(BOT_IDS[0], BOT_USERNAMES[0], 2),
+      asiento(BOT_IDS[0], 'Rafa', 2),
     ]);
     const entreManos: PartidaState = {
       ...base,
@@ -103,7 +103,7 @@ describe('resolverTurnosBot', () => {
   it('1vs1: el bot sin jugada toma del pozo de a una (sin timeout de por medio) hasta poder jugar', () => {
     const base = crearPartida([
       asiento('humano-1', 'ana', 1),
-      asiento(BOT_IDS[0], BOT_USERNAMES[0], 2),
+      asiento(BOT_IDS[0], 'Rafa', 2),
     ]);
     const estado: PartidaState = {
       ...base, turno: 1, salidaForzada: null,
@@ -121,8 +121,8 @@ describe('resolverTurnosBot', () => {
 
   it('sanidad: la jugada elegida siempre es una ficha realmente jugable', () => {
     let partida = crearPartida([
-      asiento(BOT_IDS[0], BOT_USERNAMES[0], 1),
-      asiento(BOT_IDS[1], BOT_USERNAMES[1], 2),
+      asiento(BOT_IDS[0], 'Rafa', 1),
+      asiento(BOT_IDS[1], 'Manolo', 2),
     ]);
     const { partida: resuelta } = resolverTurnosBot(partida);
     partida = resuelta;
@@ -218,5 +218,34 @@ describe('resolverTurnosBot — tiempo límite por jugada (docs/PENDIENTES_JUEGO
 describe('BOT_FILL_MS', () => {
   it('es 10 segundos', () => {
     expect(BOT_FILL_MS).toBe(10_000);
+  });
+});
+
+describe('nombresDeBot', () => {
+  it('devuelve la cantidad pedida', () => {
+    expect(nombresDeBot(1)).toHaveLength(1);
+    expect(nombresDeBot(3)).toHaveLength(3);
+  });
+
+  it('nunca repite un nombre en la misma mesa', () => {
+    // Un nombre duplicado delataría el relleno, así que se prueba muchas
+    // veces: es aleatorio y un solo intento no probaría nada.
+    for (let i = 0; i < 200; i++) {
+      const n = nombresDeBot(3);
+      expect(new Set(n).size).toBe(3);
+    }
+  });
+
+  it('ningún nombre dice "bot"', () => {
+    for (let i = 0; i < 50; i++) {
+      for (const n of nombresDeBot(3)) expect(n.toLowerCase()).not.toContain('bot');
+    }
+  });
+
+  it('varía entre partidas', () => {
+    // Con 22 nombres para elegir 3, que 30 tiradas den siempre lo mismo es
+    // prácticamente imposible — si pasa, se rompió la aleatoriedad.
+    const tiradas = new Set(Array.from({ length: 30 }, () => nombresDeBot(3).join(',')));
+    expect(tiradas.size).toBeGreaterThan(1);
   });
 });
