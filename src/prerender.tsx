@@ -19,6 +19,11 @@ import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { StaticRouter } from 'react-router-dom';
 import PieceDemo from './components/game/PieceDemo';
+import ParejasView from './components/contenido/ParejasView';
+import CapicuaView from './components/contenido/CapicuaView';
+import TrancaView from './components/contenido/TrancaView';
+import EstrategiaView from './components/contenido/EstrategiaView';
+import GlosarioView from './components/contenido/GlosarioView';
 import PrivacidadView from './components/legal/PrivacidadView';
 import TerminosView from './components/legal/TerminosView';
 import { META_POR_RUTA } from './seo';
@@ -45,6 +50,11 @@ const noop = () => {};
 // nginx la redirige con 301 permanente.
 const ELEMENTO_POR_RUTA: Record<string, ReactElement> = {
   '/reglas-domino-dominicano': <PieceDemo onBack={noop} />,
+  '/domino-en-parejas':        <ParejasView onBack={noop} />,
+  '/capicua-domino':           <CapicuaView onBack={noop} />,
+  '/tranca-domino':            <TrancaView onBack={noop} />,
+  '/estrategia-domino':        <EstrategiaView onBack={noop} />,
+  '/glosario-domino':          <GlosarioView onBack={noop} />,
   '/privacidad':               <PrivacidadView />,
   '/terminos':                 <TerminosView />,
 };

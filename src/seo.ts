@@ -33,6 +33,36 @@ export const META_POR_RUTA: Record<string, MetaPagina> = {
       'Cómo se juega el dominó dominicano: el set del 0 al 6 con 28 fichas, ' +
       'partida a puntos, capicúa y tranca. Con todas las fichas ilustradas.',
   },
+  '/domino-en-parejas': {
+    title: 'Cómo jugar dominó en parejas: reglas y estrategia | 2mino',
+    description:
+      'Cómo se arman las parejas en el dominó, qué se puede comunicar y qué no, ' +
+      'cómo leer los pases de tu compañero y la estrategia básica de equipo.',
+  },
+  '/capicua-domino': {
+    title: 'Qué es la capicúa en el dominó y cuánto vale | 2mino',
+    description:
+      'La capicúa es cerrar con una ficha que entraba por los dos extremos. ' +
+      'Qué es exactamente, cuánto suma, cuándo NO se aplica el bono y por qué casi no se busca.',
+  },
+  '/tranca-domino': {
+    title: 'La tranca en el dominó: quién gana y cuánto vale | 2mino',
+    description:
+      'Cuándo se traba la mano, por qué no gana el que tranca sino el que menos pips ' +
+      'tiene, y por qué una tranca puede valer más que un dominó.',
+  },
+  '/estrategia-domino': {
+    title: 'Estrategia de dominó para principiantes: 7 claves | 2mino',
+    description:
+      'Cómo contar las fichas, cuándo soltar las cargadas, qué dice un pase y cómo ' +
+      'elegir el lado. Siete ideas para dejar de jugar de memoria.',
+  },
+  '/glosario-domino': {
+    title: 'Glosario del dominó dominicano: todos los términos | 2mino',
+    description:
+      'Qué significa dominar, trancar, capicúa, pozo, palo, cargado y el resto de ' +
+      'las palabras que vas a escuchar en la mesa.',
+  },
   '/privacidad': {
     title: 'Política de privacidad | 2mino',
     description:

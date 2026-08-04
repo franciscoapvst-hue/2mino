@@ -3,6 +3,7 @@ import DominoPiece from './DominoPiece';
 import { crearSet } from '../../game/local-rules';
 import type { Val } from '../../game/local-rules';
 import { BackIcon } from '../icons';
+import ReglasArticulo from './ReglasArticulo';
 import type { SkinFicha } from '../../skins';
 
 const SET = crearSet(); // 28 fichas
@@ -91,10 +92,16 @@ export default function PieceDemo({ onBack, skin = 'clasica' }: { onBack: () => 
             </div>
             <div className="pdemo-rule">
               <span className="pdemo-rule-icon">🔒</span>
-              <p><strong>Tranca:</strong> si todos pasan sin poder jugar → gana el equipo con menos pips → <em>30 puntos</em>.</p>
+              {/* Antes decía "→ 30 puntos", que es incorrecto: la tranca NO da
+                  un bono fijo. El equipo ganador suma todos los pips que
+                  quedaron sobre la mesa (ver aplicarPase en
+                  ms-salas/src/game/logic.ts), que suele ser bastante más. */}
+              <p><strong>Tranca:</strong> si nadie puede jugar → gana el equipo con menos pips y suma <em>todos los pips de la mesa</em>.</p>
             </div>
           </div>
         </section>
+
+        <ReglasArticulo />
       </div>
     </div>
   );

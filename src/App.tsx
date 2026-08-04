@@ -13,6 +13,11 @@ import AppShell from './components/AppShell';
 import SalasView from './components/SalasView';
 import MatchmakingView from './components/MatchmakingView';
 import PieceDemo from './components/game/PieceDemo';
+import ParejasView from './components/contenido/ParejasView';
+import CapicuaView from './components/contenido/CapicuaView';
+import TrancaView from './components/contenido/TrancaView';
+import EstrategiaView from './components/contenido/EstrategiaView';
+import GlosarioView from './components/contenido/GlosarioView';
 import GameBoard from './components/game/GameBoard';
 import FriendsView from './components/social/FriendsView';
 import LeaderboardView from './components/social/LeaderboardView';
@@ -359,6 +364,39 @@ function PieceDemoRoute() {
   );
 }
 
+// Página de contenido (docs/SEO.md): pública con o sin sesión, igual que la
+// guía de reglas — se prerenderiza en el build, así que también existe como
+// HTML estático para los crawlers.
+function ParejasRoute() {
+  const { session } = useApp();
+  const navigate = useNavigate();
+  return <ParejasView onBack={() => navigate(session ? '/home' : '/login')} />;
+}
+
+function CapicuaRoute() {
+  const { session } = useApp();
+  const navigate = useNavigate();
+  return <CapicuaView onBack={() => navigate(session ? '/home' : '/login')} />;
+}
+
+function TrancaRoute() {
+  const { session } = useApp();
+  const navigate = useNavigate();
+  return <TrancaView onBack={() => navigate(session ? '/home' : '/login')} />;
+}
+
+function EstrategiaRoute() {
+  const { session } = useApp();
+  const navigate = useNavigate();
+  return <EstrategiaView onBack={() => navigate(session ? '/home' : '/login')} />;
+}
+
+function GlosarioRoute() {
+  const { session } = useApp();
+  const navigate = useNavigate();
+  return <GlosarioView onBack={() => navigate(session ? '/home' : '/login')} />;
+}
+
 // Link de invitación a party (/party/:codigo): sin sesión manda a login,
 // con sesión manda directo a ranked — en ambos casos el código viaja en
 // location.state para que ranked lo use como autoJoinCodigo.
@@ -664,6 +702,11 @@ export default function App() {
               sección (mismo Outlet persistente) — si viviera afuera, entrar
               acá remontaría el shell y el sidebar desaparecería un instante. */}
           {session && <Route path="/reglas-domino-dominicano" element={<PieceDemoRoute />} />}
+          {session && <Route path="/domino-en-parejas" element={<ParejasRoute />} />}
+          {session && <Route path="/capicua-domino" element={<CapicuaRoute />} />}
+          {session && <Route path="/tranca-domino" element={<TrancaRoute />} />}
+          {session && <Route path="/estrategia-domino" element={<EstrategiaRoute />} />}
+          {session && <Route path="/glosario-domino" element={<GlosarioRoute />} />}
         </Route>
 
         {/* Autenticadas de pantalla completa (sin shell) */}
@@ -673,6 +716,11 @@ export default function App() {
         {/* Demo de fichas sin sesión (ej. desde landing) — pantalla completa,
             no hay shell que mantener porque todavía no hay sidebar. */}
         {!session && <Route path="/reglas-domino-dominicano" element={<PieceDemoRoute />} />}
+        {!session && <Route path="/domino-en-parejas" element={<ParejasRoute />} />}
+        {!session && <Route path="/capicua-domino" element={<CapicuaRoute />} />}
+        {!session && <Route path="/tranca-domino" element={<TrancaRoute />} />}
+        {!session && <Route path="/estrategia-domino" element={<EstrategiaRoute />} />}
+        {!session && <Route path="/glosario-domino" element={<GlosarioRoute />} />}
 
         {/* La ruta vieja `/piece-demo` se renombró por SEO: el slug ahora
             describe el contenido ("reglas del dominó dominicano") en vez de

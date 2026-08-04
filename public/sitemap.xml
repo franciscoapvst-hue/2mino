@@ -27,6 +27,31 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://2mino.online/domino-en-parejas</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://2mino.online/capicua-domino</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://2mino.online/tranca-domino</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://2mino.online/estrategia-domino</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://2mino.online/glosario-domino</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://2mino.online/privacidad</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>

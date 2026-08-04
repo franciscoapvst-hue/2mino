@@ -52,6 +52,10 @@
   color: var(--ftr-ink);
   cursor: pointer;
   width: fit-content;
+  /* Ahora estos son <a> (antes botones): sin esto salen subrayados de fábrica
+     y el subrayado deja de ser la señal de hover. De paso empareja el enlace
+     de soporte (mailto), que ya era <a> y por eso se veía distinto. */
+  text-decoration: none;
 }
 .app-footer-link:hover { color: var(--amber); text-decoration: underline; }
 
