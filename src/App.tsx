@@ -14,6 +14,7 @@ import SalasView from './components/SalasView';
 import MatchmakingView from './components/MatchmakingView';
 import PieceDemo from './components/game/PieceDemo';
 import ParejasView from './components/contenido/ParejasView';
+import CapicuaView from './components/contenido/CapicuaView';
 import GameBoard from './components/game/GameBoard';
 import FriendsView from './components/social/FriendsView';
 import LeaderboardView from './components/social/LeaderboardView';
@@ -369,6 +370,12 @@ function ParejasRoute() {
   return <ParejasView onBack={() => navigate(session ? '/home' : '/login')} />;
 }
 
+function CapicuaRoute() {
+  const { session } = useApp();
+  const navigate = useNavigate();
+  return <CapicuaView onBack={() => navigate(session ? '/home' : '/login')} />;
+}
+
 // Link de invitación a party (/party/:codigo): sin sesión manda a login,
 // con sesión manda directo a ranked — en ambos casos el código viaja en
 // location.state para que ranked lo use como autoJoinCodigo.
@@ -675,6 +682,7 @@ export default function App() {
               acá remontaría el shell y el sidebar desaparecería un instante. */}
           {session && <Route path="/reglas-domino-dominicano" element={<PieceDemoRoute />} />}
           {session && <Route path="/domino-en-parejas" element={<ParejasRoute />} />}
+          {session && <Route path="/capicua-domino" element={<CapicuaRoute />} />}
         </Route>
 
         {/* Autenticadas de pantalla completa (sin shell) */}
@@ -685,6 +693,7 @@ export default function App() {
             no hay shell que mantener porque todavía no hay sidebar. */}
         {!session && <Route path="/reglas-domino-dominicano" element={<PieceDemoRoute />} />}
         {!session && <Route path="/domino-en-parejas" element={<ParejasRoute />} />}
+        {!session && <Route path="/capicua-domino" element={<CapicuaRoute />} />}
 
         {/* La ruta vieja `/piece-demo` se renombró por SEO: el slug ahora
             describe el contenido ("reglas del dominó dominicano") en vez de

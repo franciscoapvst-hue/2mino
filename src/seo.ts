@@ -39,6 +39,12 @@ export const META_POR_RUTA: Record<string, MetaPagina> = {
       'Cómo se arman las parejas en el dominó, qué se puede comunicar y qué no, ' +
       'cómo leer los pases de tu compañero y la estrategia básica de equipo.',
   },
+  '/capicua-domino': {
+    title: 'Qué es la capicúa en el dominó y cuánto vale | 2mino',
+    description:
+      'La capicúa es cerrar con una ficha que entraba por los dos extremos. ' +
+      'Qué es exactamente, cuánto suma, cuándo NO se aplica el bono y por qué casi no se busca.',
+  },
   '/privacidad': {
     title: 'Política de privacidad | 2mino',
     description:

@@ -20,6 +20,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { StaticRouter } from 'react-router-dom';
 import PieceDemo from './components/game/PieceDemo';
 import ParejasView from './components/contenido/ParejasView';
+import CapicuaView from './components/contenido/CapicuaView';
 import PrivacidadView from './components/legal/PrivacidadView';
 import TerminosView from './components/legal/TerminosView';
 import { META_POR_RUTA } from './seo';
@@ -47,6 +48,7 @@ const noop = () => {};
 const ELEMENTO_POR_RUTA: Record<string, ReactElement> = {
   '/reglas-domino-dominicano': <PieceDemo onBack={noop} />,
   '/domino-en-parejas':        <ParejasView onBack={noop} />,
+  '/capicua-domino':           <CapicuaView onBack={noop} />,
   '/privacidad':               <PrivacidadView />,
   '/terminos':                 <TerminosView />,
 };

@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Bone } from './DominoStage';
 
 // ── Footer (docs/PLAN_MONETIZACION.md, punto 9) ────────────────────
@@ -10,9 +10,12 @@ import { Bone } from './DominoStage';
 // Paleta propia (--ftr-*) en vez de heredar --d-*/--l-* del contenedor:
 // así funciona igual dentro de `.dash` o de `.landing` sin depender de
 // qué prefijo de variables use la pantalla que lo monta.
+// Los enlaces son <Link> (que renderiza <a href>), NO botones con navigate().
+// Antes eran botones: funcionaban para una persona, pero un crawler no hace
+// clic — así el landing quedaba con CERO enlaces internos rastreables y todas
+// las páginas huérfanas, descubribles solo por el sitemap. Además "navegación
+// del sitio" es uno de los tres criterios de política de AdSense.
 export default function Footer() {
-  const navigate = useNavigate();
-
   return (
     <footer className="app-footer">
       <div className="app-footer-top">
@@ -26,14 +29,30 @@ export default function Footer() {
           <a className="app-footer-link" href="mailto:soporte@2mino.online">soporte@2mino.online</a>
         </div>
 
+        {/* Guías: las páginas de contenido no se alcanzaban desde ningún lado
+            sin sesión — ni para un visitante ni para un crawler. Acá es donde
+            el sitio deja de ser solo la app y muestra que tiene contenido. */}
+        <div className="app-footer-col">
+          <span className="app-footer-heading">Guías</span>
+          <Link className="app-footer-link" to="/reglas-domino-dominicano">
+            Reglas del dominó dominicano
+          </Link>
+          <Link className="app-footer-link" to="/domino-en-parejas">
+            Cómo jugar en parejas
+          </Link>
+          <Link className="app-footer-link" to="/capicua-domino">
+            Qué es la capicúa
+          </Link>
+        </div>
+
         <div className="app-footer-col">
           <span className="app-footer-heading">Legal</span>
-          <button className="app-footer-link" onClick={() => navigate('/privacidad')}>
+          <Link className="app-footer-link" to="/privacidad">
             Política de privacidad
-          </button>
-          <button className="app-footer-link" onClick={() => navigate('/terminos')}>
+          </Link>
+          <Link className="app-footer-link" to="/terminos">
             Términos y cumplimiento
-          </button>
+          </Link>
         </div>
 
         <div className="app-footer-col">
