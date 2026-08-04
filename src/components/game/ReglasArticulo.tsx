@@ -163,6 +163,19 @@ export default function ReglasArticulo() {
           <dd>Perder el turno por no tener ninguna ficha que encaje.</dd>
         </dl>
       </section>
+
+      {/* Esta es la página que más tráfico va a recibir; sin salidas, ni el
+          lector ni el crawler llegan al resto de las guías. */}
+      <section className="pdemo-section">
+        <h2>Seguir leyendo</h2>
+        <p>
+          Cada tema tiene su guía aparte: <a href="/domino-en-parejas">cómo jugar
+          en parejas</a>, <a href="/capicua-domino">qué es la capicúa</a>,{' '}
+          <a href="/tranca-domino">cómo se cuenta la tranca</a>,{' '}
+          <a href="/estrategia-domino">estrategia para principiantes</a> y el{' '}
+          <a href="/glosario-domino">glosario de términos</a>.
+        </p>
+      </section>
     </article>
   );
 }

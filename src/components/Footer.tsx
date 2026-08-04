@@ -43,6 +43,15 @@ export default function Footer() {
           <Link className="app-footer-link" to="/capicua-domino">
             Qué es la capicúa
           </Link>
+          <Link className="app-footer-link" to="/tranca-domino">
+            La tranca
+          </Link>
+          <Link className="app-footer-link" to="/estrategia-domino">
+            Estrategia para principiantes
+          </Link>
+          <Link className="app-footer-link" to="/glosario-domino">
+            Glosario
+          </Link>
         </div>
 
         <div className="app-footer-col">
