@@ -24,7 +24,7 @@ export default function ReglasArticulo() {
           común.
         </p>
         <p>
-          En 2mino podés jugar de dos formas: <strong>en parejas</strong> (cuatro
+          En 2mino puedes jugar de dos formas: <strong>en parejas</strong> (cuatro
           jugadores, dos contra dos) o <strong>uno contra uno</strong>. Las reglas
           son las mismas salvo un detalle importante, el pozo, que se explica más
           abajo.
@@ -62,16 +62,16 @@ export default function ReglasArticulo() {
       <section className="pdemo-section">
         <h2>El turno: jugar, pasar o robar</h2>
         <p>
-          En tu turno tenés que colocar una ficha que <strong>encaje en alguno de
+          En tu turno tienes que colocar una ficha que <strong>encaje en alguno de
           los dos extremos</strong> de la cadena. La mesa crece hacia los dos
-          lados y vos elegís de qué lado poner. Los dobles se cruzan, pero eso es
+          lados y tú eliges de qué lado poner. Los dobles se cruzan, pero eso es
           presentación: no cambian el número que queda abierto.
         </p>
 
         <h3>Cuándo se pasa</h3>
         <p>
-          Solo podés pasar si <strong>no tenés ninguna ficha jugable</strong>. No
-          es una decisión estratégica: si tenés con qué jugar, jugás. Un pase es
+          Solo puedes pasar si <strong>no tienes ninguna ficha jugable</strong>. No
+          es una decisión estratégica: si tienes con qué jugar, juegas. Un pase es
           información valiosa para todos en la mesa — cuando alguien pasa, todos
           saben qué números no tiene, y eso cambia el resto de la mano.
         </p>
@@ -79,10 +79,10 @@ export default function ReglasArticulo() {
         <h3>Robar del pozo (solo en 1vs1)</h3>
         <p>
           En las partidas de dos jugadores quedaron 14 fichas sin repartir. Si te
-          toca jugar y no tenés ficha que entre, <strong>tenés que robar del
+          toca jugar y no tienes ficha que entre, <strong>tienes que robar del
           pozo</strong> antes de poder pasar: se toma de a una ficha por vez, y
-          podés seguir robando mientras el pozo tenga fichas. Recién cuando el
-          pozo queda vacío y seguís sin poder jugar, se pasa el turno.
+          puedes seguir robando mientras el pozo tenga fichas. Recién cuando el
+          pozo queda vacío y sigues sin poder jugar, se pasa el turno.
         </p>
         <p>
           Con cuatro jugadores esto no aplica: como no sobra ninguna ficha, no hay
@@ -103,7 +103,7 @@ export default function ReglasArticulo() {
 
         <h3>Tranca</h3>
         <p>
-          Nadie puede jugar y el juego se traba. Acá no gana el que trancó, sino el
+          Nadie puede jugar y el juego se traba. Aquí no gana el que trancó, sino el
           equipo que tenga <strong>menos pips en la mano</strong>. Y el detalle que
           más se confunde: ese equipo suma <strong>todos los pips que quedaron
           sobre la mesa</strong>, los de los dos equipos, no solo los del rival.
@@ -116,7 +116,7 @@ export default function ReglasArticulo() {
 
         <h3>Capicúa</h3>
         <p>
-          Si la <strong>última ficha que ponés encajaba en los dos extremos</strong> de
+          Si la <strong>última ficha que pones encajaba en los dos extremos</strong> de
           la mesa, cerraste con capicúa y tu equipo suma un bono de{' '}
           <strong>30 puntos</strong> en vez de los pips del rival. Es la jugada más
           celebrada del dominó dominicano, y no se busca: se da.
@@ -130,8 +130,8 @@ export default function ReglasArticulo() {
 
         <h3>Pasó a todos</h3>
         <p>
-          Si ponés una ficha y <strong>todos los demás pasan</strong>, volviendo el
-          turno a vos, tu equipo suma <strong>30 puntos</strong> de bono y la mano
+          Si pones una ficha y <strong>todos los demás pasan</strong>, volviendo el
+          turno a ti, tu equipo suma <strong>30 puntos</strong> de bono y la mano
           sigue. Igual que con la capicúa, el bono no se aplica si te haría pasar
           el objetivo.
         </p>

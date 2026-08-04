@@ -27,7 +27,7 @@ export default function CapicuaView({ onBack }: { onBack: () => void }) {
           <section className="pdemo-section">
             <h2>Qué es una capicúa</h2>
             <p>
-              Hay capicúa cuando cerrás la mano con una ficha que{' '}
+              Hay capicúa cuando cierras la mano con una ficha que{' '}
               <strong>podía entrar por los dos extremos de la mesa</strong>. No es
               que la pongas de los dos lados —se juega una sola vez, de un lado—:
               lo que la define es que <em>los dos números de tu última ficha
@@ -41,10 +41,10 @@ export default function CapicuaView({ onBack }: { onBack: () => void }) {
 
             <h3>Un ejemplo concreto</h3>
             <p>
-              Imaginá que la mesa quedó <strong>abierta en 5 de un lado y en 3
+              Imagina que la mesa quedó <strong>abierta en 5 de un lado y en 3
               del otro</strong>, y que tu única ficha es la <strong>5-3</strong>.
-              La podés poner pegada al 5 o pegada al 3: entra por los dos lados.
-              La jugás, te quedás sin fichas y cerraste con capicúa.
+              La puedes poner pegada al 5 o pegada al 3: entra por los dos lados.
+              La juegas, te quedas sin fichas y cerraste con capicúa.
             </p>
             <p>
               Si en cambio la mesa estaba abierta en 5 y en 6, y tu última ficha
@@ -76,7 +76,7 @@ export default function CapicuaView({ onBack }: { onBack: () => void }) {
               cuentan los pips reales del rival, que sí pueden cerrar la partida.
             </p>
             <p>
-              En criollo: <strong>no se gana una partida con el bono de la
+              Dicho claro: <strong>no se gana una partida con el bono de la
               capicúa</strong>. El bono es un premio de estilo dentro del juego,
               no un atajo para llegar al final.
             </p>
@@ -86,7 +86,7 @@ export default function CapicuaView({ onBack }: { onBack: () => void }) {
             <h2>¿Se puede buscar una capicúa?</h2>
             <p>
               Poco, y ese es justamente su encanto. Para que se dé tienen que
-              coincidir tres cosas que casi no controlás: que te quede{' '}
+              coincidir tres cosas que casi no controlas: que te quede{' '}
               <strong>una sola ficha</strong>, que esa ficha <strong>no sea un
               doble</strong> —un doble tiene el mismo número de los dos lados, así
               que si entra por un extremo entra por el mismo número— y que{' '}
@@ -94,7 +94,7 @@ export default function CapicuaView({ onBack }: { onBack: () => void }) {
               números</strong>.
             </p>
             <p>
-              Lo que sí podés hacer es no arruinarla. Si te quedan dos fichas y
+              Lo que sí puedes hacer es no arruinarla. Si te quedan dos fichas y
               una de ellas tiene números que están abiertos en los dos extremos,
               guardarla para el final te deja la puerta abierta. Es una decisión
               chica, de la última jugada, no un plan de toda la mano.
@@ -117,7 +117,7 @@ export default function CapicuaView({ onBack }: { onBack: () => void }) {
               <li>
                 <strong>No es trancar.</strong> La tranca es que{' '}
                 <em>nadie</em> pueda jugar y la mano se trabe; la capicúa es que{' '}
-                <em>vos</em> cerrás quedándote sin fichas. Son cierres opuestos.
+                <em>tú</em> cierras quedándote sin fichas. Son cierres opuestos.
               </li>
               <li>
                 <strong>No aplica en cualquier jugada.</strong> Solo cuenta si la
@@ -137,7 +137,7 @@ export default function CapicuaView({ onBack }: { onBack: () => void }) {
               El resto del conteo —la victoria normal, la tranca y el objetivo de
               la partida— está en la{' '}
               <a href="/reglas-domino-dominicano">guía de reglas del dominó
-              dominicano</a>. Y si jugás de a cuatro, en{' '}
+              dominicano</a>. Y si juegas de a cuatro, en{' '}
               <a href="/domino-en-parejas">cómo jugar en parejas</a> está la parte
               de leer a tu compañero y jugar en equipo.
             </p>

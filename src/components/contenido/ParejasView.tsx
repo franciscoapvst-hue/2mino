@@ -37,8 +37,8 @@ export default function ParejasView({ onBack }: { onBack: () => void }) {
             </p>
             <p>
               Esa disposición no es decorativa — es lo que hace que el juego
-              funcione. Como entre vos y tu compañero siempre juega un rival, cada
-              ficha que ponés le llega a tu compañero <em>después</em> de que el
+              funcione. Como entre tú y tu compañero siempre juega un rival, cada
+              ficha que pones le llega a tu compañero <em>después</em> de que el
               rival tuvo su oportunidad de cerrar el número. Jugar en parejas es,
               en buena medida, abrirle camino a alguien que va a jugar dos turnos
               más tarde.
@@ -46,7 +46,7 @@ export default function ParejasView({ onBack }: { onBack: () => void }) {
             <p>
               <strong>Los puntos son del equipo</strong>, no del jugador. No
               importa quién de los dos cierre la mano: lo que se anota va a la
-              cuenta de la pareja. Por eso a veces la mejor jugada es la que a vos
+              cuenta de la pareja. Por eso a veces la mejor jugada es la que a ti
               te deja peor pero le sirve a tu compañero.
             </p>
           </section>
@@ -56,13 +56,13 @@ export default function ParejasView({ onBack }: { onBack: () => void }) {
             <p>
               Esta es la parte que más se discute en cualquier mesa. La regla
               general del dominó en parejas es simple: <strong>no se pueden hacer
-              señas ni decir qué fichas tenés</strong>. Nada de gestos, toques en
+              señas ni decir qué fichas tienes</strong>. Nada de gestos, toques en
               la mesa ni frases en clave.
             </p>
             <p>
               Lo que sí es legítimo —y es la mitad del juego— es{' '}
               <strong>la información que se transmite jugando</strong>. Cada ficha
-              que ponés y cada vez que pasás dice algo, y tu compañero está
+              que pones y cada vez que pasas dice algo, y tu compañero está
               obligado a leerlo. Eso no es trampa: es la comunicación real del
               dominó.
             </p>
@@ -78,7 +78,7 @@ export default function ParejasView({ onBack }: { onBack: () => void }) {
           <section className="pdemo-section">
             <h2>Cómo leer a tu compañero</h2>
             <p>
-              Todo lo que necesitás saber está en lo que ya pasó en la mesa. Tres
+              Todo lo que necesitas saber está en lo que ya pasó en la mesa. Tres
               señales valen más que el resto.
             </p>
 
@@ -87,7 +87,7 @@ export default function ParejasView({ onBack }: { onBack: () => void }) {
               Cuando alguien pasa, está diciendo en voz alta que{' '}
               <strong>no tiene ninguno de los dos números abiertos</strong>. Esa
               información no se borra: si tu compañero pasó en cincos y sietes más
-              tarde el juego vuelve a abrirse en cinco, ya sabés que ahí no te
+              tarde el juego vuelve a abrirse en cinco, ya sabes que ahí no te
               puede ayudar.
             </p>
             <p>
@@ -117,15 +117,15 @@ export default function ParejasView({ onBack }: { onBack: () => void }) {
 
             <h3>Cuidar el número de tu compañero</h3>
             <p>
-              Si sabés en qué palo está fuerte, evitá cerrarlo. Es el error más
+              Si sabes en qué palo está fuerte, evita cerrarlo. Es el error más
               común de quien viene de jugar uno contra uno: se juega la mejor
               ficha propia sin mirar que deja al compañero sin salida.
             </p>
 
             <h3>Ahogar al rival que pasó</h3>
             <p>
-              Un rival que pasó en un número es un rival al que podés dejar sin
-              jugar. Si entre vos y tu compañero pueden mantener los dos extremos
+              Un rival que pasó en un número es un rival al que puedes dejar sin
+              jugar. Si entre tú y tu compañero pueden mantener los dos extremos
               en palos que él no tiene, ese jugador queda fuera de la mano.
             </p>
 
@@ -164,7 +164,7 @@ export default function ParejasView({ onBack }: { onBack: () => void }) {
               </li>
               <li>
                 <strong>Cerrar el juego sin necesidad.</strong> Trancar conviene
-                solo si tenés menos pips que el rival; si no, le estás regalando
+                solo si tienes menos pips que el rival; si no, le estás regalando
                 todos los puntos de la mesa.
               </li>
             </ul>
@@ -173,14 +173,14 @@ export default function ParejasView({ onBack }: { onBack: () => void }) {
           <section className="pdemo-section">
             <h2>Jugar en parejas en 2mino</h2>
             <p>
-              Podés entrar a una partida de cuatro directamente desde la búsqueda
-              de rival, y el sistema arma los equipos. Si querés jugar con tu
-              compañero de siempre, creá una <strong>sala privada</strong> y
-              pasale el enlace: los dos entran a la misma mesa y quedan
+              Puedes entrar a una partida de cuatro directamente desde la búsqueda
+              de rival, y el sistema arma los equipos. Si quieres jugar con tu
+              compañero de siempre, crea una <strong>sala privada</strong> y
+              pásale el enlace: los dos entran a la misma mesa y quedan
               enfrentados.
             </p>
             <p>
-              Si todavía no conocés el detalle de cómo se cuentan los puntos —la
+              Si todavía no conoces el detalle de cómo se cuentan los puntos —la
               capicúa, la tranca, el objetivo de la partida—, está todo en la{' '}
               <a href="/reglas-domino-dominicano">guía de reglas del dominó
               dominicano</a>.

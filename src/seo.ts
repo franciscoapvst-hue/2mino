@@ -6,7 +6,7 @@
 //  - `src/App.tsx` (runtime): actualiza el <title> al navegar dentro de la
 //    SPA, donde el documento no se recarga.
 //
-// Tenerlos acá evita que las dos copias se desincronicen: si mañana cambia el
+// Tenerlos aquí evita que las dos copias se desincronicen: si mañana cambia el
 // título de una página, cambia en el HTML servido y en la pestaña a la vez.
 
 export type MetaPagina = {
