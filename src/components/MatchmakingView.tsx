@@ -3,7 +3,6 @@ import { api, type Sala, type AuthUser, type Party, type ColaEstado, type TipoJu
 import { BackIcon, CasualIcon, RankedIcon } from './icons';
 import { Bone } from './DominoStage';
 import { rangoDeElo } from '../ranks';
-import AdSlot from './AdSlot';
 import { usePoll } from '../hooks/usePoll';
 
 type Props = {
@@ -76,7 +75,6 @@ function ColaView({ estado, tipo, onCancelar, cancelando }: {
         {cancelando ? 'Cancelando…' : 'Cancelar búsqueda'}
       </button>
 
-      <AdSlot slot={import.meta.env.VITE_ADSENSE_SLOT_MATCHMAKING} />
     </div>
   );
 }

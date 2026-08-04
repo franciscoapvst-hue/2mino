@@ -11,7 +11,6 @@ import { useMeasuredWidth } from '../../hooks/useMeasuredWidth';
 import { usePoll } from '../../hooks/usePoll';
 import { useSalaChat } from '../../hooks/useSalaChat';
 import ChatPanel from '../social/ChatPanel';
-import AdSlot from '../AdSlot';
 
 type Props = {
   sala: Sala;
@@ -950,7 +949,6 @@ function ManoOverlay({ partida, nombreAsiento, onListo, confirmando, skinFicha }
             : 'Listo para la siguiente mano'}
         </button>
 
-        <AdSlot slot={import.meta.env.VITE_ADSENSE_SLOT_MANO} />
       </div>
     </div>
   );

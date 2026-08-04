@@ -17,8 +17,20 @@ type Props = {
   className?: string;
 };
 
-/** Espacio publicitario no invasivo: dashboard, pantallas de espera y entre
- *  manos — nunca durante una partida activa (ver dónde se usa este componente). */
+/** Espacio publicitario.
+ *
+ *  ⚠️ SOLO va en páginas con contenido editorial propio (una guía, un
+ *  artículo). NUNCA en pantallas de aplicación —dashboard, búsqueda de
+ *  rival, la partida—, aunque técnicamente funcione.
+ *
+ *  Estaba en esas tres pantallas y AdSense marcó el sitio con "Anuncios
+ *  servidos por Google en pantallas sin contenido del editor" (2026-07-30),
+ *  bloqueando la aprobación. Un spinner de "buscando rival" con un anuncio
+ *  al lado es exactamente lo que esa política prohíbe.
+ *
+ *  Hoy el componente no se usa en ningún lado a propósito: se vuelve a
+ *  colocar cuando haya páginas de contenido donde sí corresponda
+ *  (docs/SEO.md). */
 export default function AdSlot({ slot, className = '' }: Props) {
   const insertado = useRef(false);
 
