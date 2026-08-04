@@ -20,7 +20,38 @@ export const BOT_IDS = [
   '00000000-0000-0000-0000-0000000000b3',
 ] as const;
 
-export const BOT_USERNAMES = ['Bot Ana', 'Bot Beto', 'Bot Cami'] as const;
+// Nombres que se les muestra a los jugadores. Antes eran fijos y decían
+// "Bot" ('Bot Ana', 'Bot Beto', 'Bot Cami'): además de romper la ilusión de
+// mesa, hacía que las mismas tres caras aparecieran en todas las partidas.
+//
+// Ahora salen de este conjunto, al azar y sin repetir dentro de una misma
+// mesa. El nombre se elige UNA vez, al armar la sala, y viaja en los asientos
+// que persiste `crearSala` — así se mantiene estable durante toda la partida
+// (no se re-sortea en cada render ni en cada mano).
+//
+// La identidad sigue siendo el BOT_ID, no el nombre: `esBot()` compara contra
+// los UUID de arriba, así que cambiar, agregar o quitar nombres de acá no
+// afecta a ninguna lógica — ni al bloqueo de doblones, ni al ELO, ni al
+// replay.
+const NOMBRES_BOT = [
+  'Rafa', 'Manolo', 'Kelvin', 'Franklin', 'Junior', 'Ramón', 'Cristian', 'Wilkin',
+  'Yaniris', 'Wanda', 'Mildred', 'Yohanna', 'Altagracia', 'Yamilé', 'Marisol', 'Ingrid',
+  'Chelo', 'Papo', 'Tuti', 'Chichí', 'Fello', 'Nano',
+] as const;
+
+/**
+ * `cantidad` nombres distintos, elegidos al azar. Baraja una copia (no muta
+ * la constante) y corta — así nunca se repite un nombre en la misma mesa,
+ * que es lo que delataría el relleno.
+ */
+export function nombresDeBot(cantidad: number): string[] {
+  const baraja = [...NOMBRES_BOT];
+  for (let i = baraja.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [baraja[i], baraja[j]] = [baraja[j], baraja[i]];
+  }
+  return baraja.slice(0, cantidad);
+}
 
 export function esBot(usuarioId: string): boolean {
   return (BOT_IDS as readonly string[]).includes(usuarioId);
