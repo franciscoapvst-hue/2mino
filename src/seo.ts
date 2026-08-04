@@ -33,6 +33,12 @@ export const META_POR_RUTA: Record<string, MetaPagina> = {
       'Cómo se juega el dominó dominicano: el set del 0 al 6 con 28 fichas, ' +
       'partida a puntos, capicúa y tranca. Con todas las fichas ilustradas.',
   },
+  '/domino-en-parejas': {
+    title: 'Cómo jugar dominó en parejas: reglas y estrategia | 2mino',
+    description:
+      'Cómo se arman las parejas en el dominó, qué se puede comunicar y qué no, ' +
+      'cómo leer los pases de tu compañero y la estrategia básica de equipo.',
+  },
   '/privacidad': {
     title: 'Política de privacidad | 2mino',
     description:

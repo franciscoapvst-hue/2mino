@@ -771,6 +771,34 @@
   color: var(--amber);
 }
 
+.reglas-art a {
+  color: var(--amber);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.reglas-art a:hover { color: var(--amber-hi); }
+
+/* Lista de puntos dentro del artículo (ej. errores comunes). El bullet va
+   en ámbar para separarlo del texto sin recurrir a otro tamaño de fuente. */
+.reglas-lista { margin: 0; padding-left: 20px; list-style: none; }
+.reglas-lista li {
+  position: relative;
+  font-size: 0.94rem;
+  line-height: 1.7;
+  color: var(--d-muted);
+  margin-bottom: 12px;
+}
+.reglas-lista li::before {
+  content: '·';
+  position: absolute;
+  left: -16px;
+  color: var(--amber);
+  font-weight: 700;
+  font-size: 1.4rem;
+  line-height: 1.1;
+}
+.reglas-lista strong { color: var(--d-ink); font-weight: 650; }
+
 .reglas-glosario { margin-top: 4px; }
 .reglas-glosario dt {
   font-weight: 700;
